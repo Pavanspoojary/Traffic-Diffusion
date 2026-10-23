@@ -74,10 +74,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       'top-left'
     );
 
-    mapInstance.on('load', async () => {
+    mapInstance.on('load', () => {
       setup3DBuildings();
-      await loadMangaluruNetwork();
-      await triggerDiversionEvaluation();
+      renderNetworkOnMap();
+      setupJunctionMarkers();
+      if (latestEvaluation) {
+        renderDetoursOnMap(latestEvaluation);
+      }
+    });
+
+    // Immediately load Mangaluru network and trigger initial evaluation without waiting on tile downloads
+    loadMangaluruNetwork().then(() => {
+      triggerDiversionEvaluation();
     });
   }
 
@@ -292,12 +300,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   // =========================================================================
   // 5. Calculate & Compare Diversions (/api/v1/intelligence/interventions/evaluate)
   // =========================================================================
+  function updateWorkflowStepper(currentStage) {
+    const s1 = document.getElementById('stepDetect');
+    const s2 = document.getElementById('stepPredict');
+    const s3 = document.getElementById('stepCompare');
+    const s4 = document.getElementById('stepRecommend');
+    if (!s1 || !s2 || !s3 || !s4) return;
+
+    [s1, s2, s3, s4].forEach(s => s.classList.remove('active', 'completed'));
+
+    if (currentStage === 1) {
+      s1.classList.add('active');
+    } else if (currentStage === 2) {
+      s1.classList.add('completed');
+      s2.classList.add('active');
+    } else if (currentStage === 3) {
+      s1.classList.add('completed');
+      s2.classList.add('completed');
+      s3.classList.add('active');
+    } else if (currentStage === 4) {
+      s1.classList.add('completed');
+      s2.classList.add('completed');
+      s3.classList.add('completed');
+      s4.classList.add('active');
+    }
+  }
+
   async function triggerDiversionEvaluation() {
     const btnSim = document.getElementById('btnSimulateDiversion');
     if (btnSim) {
       btnSim.disabled = true;
-      btnSim.innerHTML = `<span>Computing Graph Redistribution...</span>`;
+      btnSim.innerHTML = `<span>Evaluating Network Redistribution...</span>`;
     }
+    updateWorkflowStepper(2);
 
     try {
       const payload = {
@@ -327,7 +362,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       latestEvaluation = await res.json();
       renderEvaluationResults(latestEvaluation);
       renderDetoursOnMap(latestEvaluation);
-      showToast('Graph Diversion Scenarios calculated');
+      updateWorkflowStepper(4);
+      showToast('Incident analysis evaluated');
 
     } catch (err) {
       console.error('Diversion evaluation error:', err);
@@ -336,11 +372,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (btnSim) {
         btnSim.disabled = false;
         btnSim.innerHTML = `
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <polygon points="10 8 16 12 10 16 10 8"></polygon>
           </svg>
-          <span>Calculate &amp; Compare Diversions</span>
+          <span>Run Analysis</span>
         `;
       }
     }
@@ -779,6 +815,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeCorridorId = corridorId;
     const select = document.getElementById('selectCorridor');
     if (select) select.value = corridorId;
+    updateWorkflowStepper(1);
     triggerDiversionEvaluation();
   }
 
@@ -787,6 +824,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (selectCorridor) {
     selectCorridor.addEventListener('change', (e) => {
       activeCorridorId = e.target.value;
+      updateWorkflowStepper(1);
       triggerDiversionEvaluation();
     });
   }
@@ -802,6 +840,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (sliderBlockage) sliderBlockage.value = activeBlockagePct;
       if (lblBlockagePct) lblBlockagePct.textContent = `${activeBlockagePct}% Blocked`;
 
+      updateWorkflowStepper(1);
       triggerDiversionEvaluation();
     });
   });
@@ -821,6 +860,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           b.classList.remove('active');
         }
       });
+      updateWorkflowStepper(1);
     });
     sliderBlockage.addEventListener('change', () => {
       triggerDiversionEvaluation();
@@ -849,6 +889,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
 
+      updateWorkflowStepper(1);
       triggerDiversionEvaluation();
     });
   });
@@ -859,97 +900,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnSimulate.addEventListener('click', () => {
       triggerDiversionEvaluation();
     });
-  }
-
-  // =========================================================================
-  // 9. Citizen Reports Ingestion Modal
-  // =========================================================================
-  const incidentModal = document.getElementById('incidentModal');
-  const btnOpenCitizenFeed = document.getElementById('btnOpenCitizenFeed');
-  const btnCloseIncidentModal = document.getElementById('btnCloseIncidentModal');
-  const citizenFeedList = document.getElementById('citizenFeedList');
-  const tabIncidentAnalysis = document.getElementById('tabIncidentAnalysis');
-
-  function openIncidentModal() {
-    if (incidentModal) incidentModal.classList.remove('hidden');
-    loadCitizenReports();
-  }
-
-  function closeIncidentModal() {
-    if (incidentModal) incidentModal.classList.add('hidden');
-  }
-
-  if (btnOpenCitizenFeed) btnOpenCitizenFeed.addEventListener('click', openIncidentModal);
-  if (tabIncidentAnalysis) tabIncidentAnalysis.addEventListener('click', openIncidentModal);
-  if (btnCloseIncidentModal) btnCloseIncidentModal.addEventListener('click', closeIncidentModal);
-
-  async function loadCitizenReports() {
-    try {
-      const res = await fetch('/api/v1/intelligence/citizen-reports');
-      if (!res.ok) return;
-      const reports = await res.json();
-
-      const feedBadge = document.getElementById('citizenFeedCount');
-      if (feedBadge) feedBadge.textContent = reports.length;
-
-      citizenFeedList.innerHTML = '';
-      if (!reports.length) {
-        citizenFeedList.innerHTML = '<div style="color: var(--text-dim); text-align: center; padding: 20px;">No pending citizen reports</div>';
-        return;
-      }
-
-      reports.forEach(rep => {
-        const isVerified = (rep.verification_status === 'VERIFIED');
-        const card = document.createElement('div');
-        card.className = 'citizen-feed-card';
-        card.innerHTML = `
-          <div class="feed-card-header">
-            <span class="feed-road-title">${rep.road_name}</span>
-            <span class="feed-badge ${isVerified ? 'badge-verified' : 'badge-pending'}">${rep.verification_status}</span>
-          </div>
-          <div class="feed-card-desc">${rep.description} &bull; ${rep.category.replace(/_/g, ' ')} (${rep.lanes_affected} lane affected)</div>
-          <div class="feed-card-actions">
-            <span style="font-size: 11px; color: var(--text-dim);">${rep.report_id}</span>
-            ${!isVerified ? `
-              <button type="button" class="btn-action-small btn-modal-verify" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}">
-                Verify &amp; Simulate Diversion
-              </button>
-            ` : `
-              <button type="button" class="btn-action-small btn-modal-load" data-edge="${rep.road_segment_id}">
-                Inspect on Map
-              </button>
-            `}
-          </div>
-        `;
-        citizenFeedList.appendChild(card);
-      });
-
-      document.querySelectorAll('.btn-modal-verify').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          const id = e.currentTarget.dataset.id;
-          const edge = e.currentTarget.dataset.edge;
-          await fetch(`/api/v1/intelligence/citizen-reports/${id}/verify?verified=true`, { method: 'POST' });
-          showToast(`Report ${id} verified. Corridor loaded into Diversion Studio.`);
-          closeIncidentModal();
-          activeCorridorId = edge;
-          if (selectCorridor) selectCorridor.value = edge;
-          triggerDiversionEvaluation();
-        });
-      });
-
-      document.querySelectorAll('.btn-modal-load').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const edge = e.currentTarget.dataset.edge;
-          closeIncidentModal();
-          activeCorridorId = edge;
-          if (selectCorridor) selectCorridor.value = edge;
-          triggerDiversionEvaluation();
-        });
-      });
-
-    } catch (err) {
-      console.warn('Citizen modal fetch error:', err);
-    }
   }
 
   // =========================================================================
