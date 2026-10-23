@@ -14,11 +14,21 @@ from backend.app.models.schemas import (
     InterventionEvaluationResponse,
     HistoricalAnalyticsResponse,
     HistoricalImportRequest,
+    CitizenReport,
+    CitizenReportCreate,
+    ResourceDispatchOrder,
+    ResourceDispatchCreate,
+    ResourceDispatchUpdate,
+    InfrastructureRecommendation,
+    TrafficPatternComparison,
+    InfrastructureSimulateRequest,
+    InfrastructureSimulateResponse,
 )
 from backend.app.services.prediction_service import prediction_service
 from backend.app.services.risk_service import risk_service
 from backend.app.services.intervention_service import intervention_service
 from backend.app.services.historical_service import historical_service
+from backend.app.services.dispatch_service import dispatch_service
 from backend.app.services.routing_service import routing_service
 
 router = APIRouter(prefix="/api/v1/intelligence", tags=["Predictive Traffic Intelligence & Intervention Planning"])
@@ -264,3 +274,76 @@ async def load_demo_scenario(scenario_key: str = Query("nanthoor_freight_rollove
         "interventions": interventions,
         "risk_assessment": risk,
     }
+
+# ================= Citizen Incident Reports (Public App Ingestion) =================
+@router.get("/citizen-reports", response_model=List[CitizenReport])
+async def list_citizen_reports():
+    """Lists all incoming citizen reports submitted via the public mobile map app."""
+    return dispatch_service.list_citizen_reports()
+
+@router.post("/citizen-reports", response_model=CitizenReport, status_code=status.HTTP_201_CREATED)
+async def submit_citizen_report(request: CitizenReportCreate):
+    """Allows public users / mobile apps to report observed road hazards, collisions, or waterlogging."""
+    return dispatch_service.create_citizen_report(request)
+
+@router.post("/citizen-reports/{report_id}/verify", response_model=CitizenReport)
+async def verify_citizen_report(
+    report_id: str,
+    verified: bool = Query(True, description="Whether the control-room operator confirms this report")
+):
+    """
+    Control-room operator action to verify an incoming citizen report.
+    When verified, this automatically spawns an active TrafficIncident ready for impact forecasting.
+    """
+    try:
+        return dispatch_service.verify_citizen_report(report_id, verified=verified)
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+# ================= Police & Control-Room Resource Dispatches =================
+@router.get("/dispatches", response_model=List[ResourceDispatchOrder])
+async def list_resource_dispatches():
+    """Lists all active and completed traffic police, heavy tow, and patrol unit dispatches."""
+    return dispatch_service.list_dispatch_orders()
+
+@router.post("/dispatches", response_model=ResourceDispatchOrder, status_code=status.HTTP_201_CREATED)
+async def create_resource_dispatch(request: ResourceDispatchCreate):
+    """
+    Control-room operator tool: Dispatches traffic officers, recovery tow units, or patrol cars
+    to specific road bottlenecks or saturated junctions to enact intervention plans.
+    """
+    return dispatch_service.create_dispatch_order(request)
+
+@router.patch("/dispatches/{order_id}", response_model=ResourceDispatchOrder)
+async def update_resource_dispatch(order_id: str, request: ResourceDispatchUpdate):
+    """Updates the status or ETA of an active resource dispatch (e.g. EN_ROUTE -> ON_SCENE)."""
+    try:
+        return dispatch_service.update_dispatch_order(order_id, request)
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+# ================= City Traffic Planners & Road Authorities =================
+@router.get("/planner/infrastructure-recommendations", response_model=List[InfrastructureRecommendation])
+async def get_infrastructure_recommendations():
+    """
+    Returns data-driven capital and operational infrastructure proposals
+    derived from recurring historical chokepoint and bottleneck analysis.
+    """
+    return dispatch_service.get_infrastructure_recommendations()
+
+@router.get("/planner/traffic-patterns", response_model=TrafficPatternComparison)
+async def get_traffic_patterns():
+    """
+    Returns macro traffic pattern comparison across Morning Peak, Mid-Day Off-Peak, and Evening Peak
+    including speed degradation, V/C load, and chronic bottleneck locations.
+    """
+    return dispatch_service.get_traffic_pattern_comparison()
+
+@router.post("/planner/simulate-infrastructure", response_model=InfrastructureSimulateResponse)
+async def simulate_infrastructure_upgrade(request: InfrastructureSimulateRequest):
+    """
+    What-If Infrastructure Modeling: Simulates the network-wide benefit of adding lane capacity,
+    constructing a grade-separated flyover, or optimizing signal cycles on a chronic chokepoint.
+    """
+    return dispatch_service.simulate_infrastructure_upgrade(request)
+

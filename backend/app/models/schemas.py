@@ -328,6 +328,104 @@ class HistoricalImportRequest(BaseModel):
     source_name: str = "MANGALURU_TRAFFIC_LOGS"
     is_simulated: bool = False
 
+# Citizen Incident Reports (Public App Ingestion)
+class CitizenReport(BaseModel):
+    report_id: str
+    reported_at: str
+    reporter_name: Optional[str] = "Citizen Commuter"
+    contact_number: Optional[str] = None
+    road_segment_id: str
+    road_name: str
+    category: IncidentCategory
+    description: str
+    lanes_affected: int = 1
+    verification_status: VerificationStatus = VerificationStatus.VERIFICATION_PENDING
+    verified_incident_id: Optional[str] = None
+    upvotes: int = 1
+
+class CitizenReportCreate(BaseModel):
+    reporter_name: Optional[str] = "Citizen Commuter"
+    contact_number: Optional[str] = None
+    road_segment_id: str
+    category: IncidentCategory = IncidentCategory.COLLISION
+    description: str
+    lanes_affected: int = 1
+
+# Resource Deployment & Dispatch (Traffic Police & Control Room Operators)
+class ResourceDispatchOrder(BaseModel):
+    order_id: str
+    incident_id: str
+    target_location_id: str
+    target_location_name: str
+    resource_type: str  # TRAFFIC_POLICE_OFFICER | HEAVY_TOW_UNIT | PATROL_INTERCEPTOR | RAPID_RESPONSE_TEAM
+    units_assigned: int = 2
+    directive: str  # Manual Signal Override, Enforce Diversion, Rapid Vehicle Recovery, Clearance Management
+    priority: str = "HIGH"  # CRITICAL | HIGH | STANDARD
+    status: str = "DISPATCHED"  # DISPATCHED | EN_ROUTE | ON_SCENE | RESOLVED
+    dispatched_at: str
+    eta_minutes: float = 6.0
+    notes: Optional[str] = None
+
+class ResourceDispatchCreate(BaseModel):
+    incident_id: str
+    target_location_id: str
+    target_location_name: str
+    resource_type: str = "TRAFFIC_POLICE_OFFICER"
+    units_assigned: int = 2
+    directive: str
+    priority: str = "HIGH"
+    eta_minutes: float = 6.0
+    notes: Optional[str] = None
+
+class ResourceDispatchUpdate(BaseModel):
+    status: Optional[str] = None
+    eta_minutes: Optional[float] = None
+    notes: Optional[str] = None
+
+# City Traffic Planners & Road Authorities Models
+class InfrastructureRecommendation(BaseModel):
+    id: str
+    location_id: str
+    location_name: str
+    category: str  # GRADE_SEPARATION | SIGNAL_RECALIBRATION | BOTTLENECK_WIDENING | DRAINAGE_RESILIENCE
+    title: str
+    description: str
+    projected_delay_reduction_pct: float
+    estimated_cost_tier: str  # LOW_OPEX | MEDIUM_CAPEX | MAJOR_CAPEX
+    annual_bottlenecks_mitigated: int
+    implementation_timeline: str
+    priority: str  # PRIORITY_1_URGENT | PRIORITY_2_PLANNED | PRIORITY_3_STRATEGIC
+
+class TrafficPatternPeriod(BaseModel):
+    period_name: str
+    hours: str
+    average_network_speed_kmh: float
+    average_vc_ratio: float
+    dominant_chokepoints: List[str]
+    delay_index: float
+
+class TrafficPatternComparison(BaseModel):
+    city: str
+    analysis_date: str
+    periods: List[TrafficPatternPeriod]
+    summary_findings: str
+    key_recommendations: List[str]
+
+class InfrastructureSimulateRequest(BaseModel):
+    target_edge_id: str
+    intervention_type: str  # ADD_LANE | GRADE_SEPARATION | SIGNAL_OPTIMIZATION
+    capacity_increase_pct: float = 0.50
+
+class InfrastructureSimulateResponse(BaseModel):
+    target_edge_id: str
+    road_name: str
+    baseline_network_delay_min: float
+    simulated_network_delay_min: float
+    delay_saved_min: float
+    delay_reduction_pct: float
+    queue_length_reduction_pct: float
+    projected_benefit_summary: str
+
 # Supporting Legacy Models (Ambulance & CCTV)
 class VehicleCounts(BaseModel):
     cars: int = 0

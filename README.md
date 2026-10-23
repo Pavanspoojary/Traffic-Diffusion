@@ -10,6 +10,22 @@ Urban traffic management centers traditionally operate reactively: operators det
 
 **Traffic-Diffusion** transforms urban traffic operations from reactive monitoring to **predictive traffic intelligence and automated intervention planning**. Designed for municipal traffic operations analysts and control-room dispatchers, the platform models how a localized road incident propagates across an arterial network over multi-step temporal horizons (T+15m, T+30m, T+60m), quantifies network-wide risk through an explainable multi-factor index, simulates alternative mitigation strategies under what-if scenarios, and ranks actionable intervention plans by total vehicle-hours of delay saved.
 
+### The Dual Dashboard Architecture
+
+Traffic-Diffusion provides two complementary interfaces designed for distinct user roles:
+
+1. **Dashboard 1: Public Citizen Navigator & Incident Reporter (`/driver` & `/public`)**
+   - **Target User**: General driving public and daily commuters.
+   - **Purpose**: Google Maps-style mobile web app with street-level road-following geometry (OSRM), turn-by-turn maneuvers, speed limits, and a one-tap citizen incident reporting module.
+   - **Citizen Ingestion**: Commuters report road hazards, collisions, stalled vehicles, or waterlogging directly into the municipal control room queue.
+
+2. **Dashboard 2: Tactical Command & Urban Planning Center (`/`)**
+   - **Target Users**:
+     - **Traffic Police and Control-Room Operators**: Review incoming citizen reports, run multi-horizon congestion spread forecasts (15m, 30m, 60m), prioritize risky junctions, evaluate what-if intervention plans, and **dispatch traffic police officers, heavy tow units, and patrol interceptors** to critical bottlenecks.
+     - **City Traffic Planners and Road Authorities**: Mine historical incident records to identify recurring chokepoints, analyze macro traffic patterns (morning peak vs. evening peak), evaluate municipal infrastructure proposals (e.g., Nanthoor Flyover, Bunts Hostel slip lanes), and simulate what-if infrastructure upgrades (+1 lane capacity, grade separation).
+
+---
+
 ### The Core Operational Workflow
 
 ```
@@ -128,6 +144,15 @@ Outputs a side-by-side comparison matrix with net vehicle-hours saved, peak queu
 | `GET` | `/historical/analytics` | Retrieve historical hotspot analysis, peak hour distributions, and MTTC. |
 | `POST` | `/historical/import` | Ingest historical incident records into the analytical database. |
 | `POST` | `/demo-scenario` | Load pre-configured incident scenarios (Nanthoor Rollover, Bunts Waterlogging, etc.). |
+| `GET` | `/citizen-reports` | List incoming citizen road incident reports submitted via the public app. |
+| `POST` | `/citizen-reports` | Submit a citizen incident report (hazard, breakdown, collision, flood). |
+| `POST` | `/citizen-reports/{id}/verify` | Control room operator action to verify report and auto-spawn active incident. |
+| `GET` | `/dispatches` | List active resource dispatch orders (police officers, tow units, patrol cars). |
+| `POST` | `/dispatches` | Dispatch tactical traffic officers or equipment to specific junctions. |
+| `PATCH` | `/dispatches/{id}` | Update status of active dispatch order (DISPATCHED -> EN_ROUTE -> ON_SCENE). |
+| `GET` | `/planner/infrastructure-recommendations` | Get structural municipal road recommendations (flyovers, slip lanes). |
+| `GET` | `/planner/traffic-patterns` | Macro traffic pattern analysis (Morning Peak vs. Mid-Day vs. Evening Peak). |
+| `POST` | `/planner/simulate-infrastructure` | What-If Infrastructure simulator (+1 lane, grade-separated overpass). |
 
 ### Supporting Endpoints
 
@@ -155,7 +180,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# 3. Run automated test suite (23 tests)
+# 3. Run automated test suite (26 tests)
 pytest
 
 # 4. Start the application

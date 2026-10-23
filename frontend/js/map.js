@@ -18,6 +18,7 @@ class TrafficMap {
     this.edgeLayers = L.layerGroup().addTo(this.map);
     this.nodeLayers = L.layerGroup().addTo(this.map);
     this.routeLayer = L.layerGroup().addTo(this.map);
+    this.dispatchLayer = L.layerGroup().addTo(this.map);
 
     this.nodeMap = new Map();
   }
@@ -253,6 +254,49 @@ class TrafficMap {
           .bindTooltip(`<strong>${junc.junction_name}</strong><br/>Gridlock Risk: ${junc.inflow_spillback_risk}<br/>Saturation: ${satPercent}%`)
           .addTo(this.routeLayer);
       }
+    });
+  }
+
+  renderDispatches(dispatches) {
+    if (!this.dispatchLayer) {
+      this.dispatchLayer = L.layerGroup().addTo(this.map);
+    }
+    this.dispatchLayer.clearLayers();
+
+    dispatches.forEach(d => {
+      const node = this.nodeMap.get(d.target_location_id);
+      let latlng;
+      if (node) {
+        latlng = [node.lat, node.lng];
+      } else {
+        // Default near Nanthoor / Kadri coordinates
+        latlng = [12.8790, 74.8650];
+      }
+
+      let badgeColor = '#3b82f6';
+      let label = 'POLICE';
+      if (d.resource_type === 'HEAVY_TOW_UNIT') {
+        badgeColor = '#f59e0b';
+        label = 'TOW CRANE';
+      } else if (d.resource_type === 'PATROL_INTERCEPTOR') {
+        badgeColor = '#06b6d4';
+        label = 'PATROL';
+      }
+
+      const icon = L.divIcon({
+        className: 'dispatch-marker-icon',
+        html: `
+          <div style="background: ${badgeColor}; color: white; border: 2px solid #ffffff; border-radius: 6px; padding: 2px 6px; font-weight: 800; font-size: 10px; font-family: var(--font-mono); box-shadow: 0 4px 12px rgba(0,0,0,0.6); white-space: nowrap;">
+            ${label} · ${d.status}
+          </div>
+        `,
+        iconSize: [95, 24],
+        iconAnchor: [47, 12],
+      });
+
+      L.marker(latlng, { icon })
+        .bindTooltip(`<strong>${d.resource_type.replace(/_/g, ' ')}</strong><br/>Target: ${d.target_location_name}<br/>Directive: ${d.directive}<br/>Status: ${d.status}${d.eta_minutes > 0 ? ` (ETA ${d.eta_minutes.toFixed(0)}m)` : ''}`)
+        .addTo(this.dispatchLayer);
     });
   }
 }

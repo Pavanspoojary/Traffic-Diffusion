@@ -64,13 +64,13 @@
           <option value="HOSPITAL_WENLOCK">Wenlock District Hospital (Hampankatta)</option>
         </select>
       </div>
-      <a href="/operations" class="ops-switch-btn" title="Open CCTV Operations Control Dashboard">
+      <a href="/" class="ops-switch-btn" title="Open Tactical Command & Planning Center">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
           <line x1="8" y1="21" x2="16" y2="21"/>
           <line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
-        <span>Ops Center</span>
+        <span>Control Room</span>
       </a>
     </div>
 
@@ -121,6 +121,15 @@
           <line x1="16" y1="3" x2="14" y2="21"/>
         </svg>
       </button>
+
+      <!-- Public Citizen Report Incident Floating Button -->
+      <button id="btnOpenCitizenReport" class="fab-btn" title="Report Road Incident to Control Room" aria-label="Report Hazard" style="background-color: #ef4444; border-color: #ef4444;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Bottom Google Maps Navigation Sheet -->
@@ -163,12 +172,99 @@
       </div>
     </footer>
 
+    <!-- Public Citizen Incident Reporting Modal -->
+    <div id="citizenReportModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; padding: 16px;">
+      <div style="background: #ffffff; border-radius: 12px; max-width: 400px; width: 100%; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); color: #1f2937;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #111827;">Report Traffic Incident</h3>
+          <button id="btnCloseModal" style="border: none; background: none; font-size: 20px; cursor: pointer; color: #6b7280;">&times;</button>
+        </div>
+        <p style="font-size: 12px; color: #4b5563; margin-bottom: 12px;">
+          Submit real-time road blockage, accident, or waterlogging to the City Traffic Control Room.
+        </p>
+        <form id="publicReportForm" style="display: flex; flex-direction: column; gap: 10px;">
+          <div>
+            <label style="font-size: 11px; font-weight: 600; display: block; margin-bottom: 4px;">Road Location</label>
+            <select id="repEdgeSelect" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px;">
+              <option value="corridor_cctv_07">Circuit House - Nanthoor Highway</option>
+              <option value="corridor_cctv_05">Bunts Hostel Avenue</option>
+              <option value="corridor_cctv_10">M.G. Road (Lalbagh)</option>
+              <option value="corridor_cctv_01">K.S. Rao Arterial Road</option>
+              <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 600; display: block; margin-bottom: 4px;">Incident Category</label>
+            <select id="repCategorySelect" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px;">
+              <option value="COLLISION">Vehicle Collision / Accident</option>
+              <option value="VEHICLE_BREAKDOWN">Vehicle Breakdown / Stalled Bus</option>
+              <option value="WEATHER_WATERLOGGING">Road Waterlogging / Flood</option>
+              <option value="ROADWORKS">Road Construction / Repair</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 600; display: block; margin-bottom: 4px;">Description of Disruption</label>
+            <textarea id="repDescInput" rows="2" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; box-sizing: border-box;" placeholder="e.g. Overturned truck blocking central lane"></textarea>
+          </div>
+          <button type="submit" id="btnSubmitPublicReport" style="background: #ef4444; color: #fff; font-weight: 700; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-top: 4px;">
+            Submit Report to Traffic Police
+          </button>
+        </form>
+      </div>
+    </div>
+
   </div>
 
   <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="/js/driver.js"></script>
   <script>
+    // Public Citizen Incident Reporting Hook
+    const btnOpenReport = document.getElementById('btnOpenCitizenReport');
+    const modalReport = document.getElementById('citizenReportModal');
+    const btnCloseModal = document.getElementById('btnCloseModal');
+    const formReport = document.getElementById('publicReportForm');
+
+    if (btnOpenReport && modalReport) {
+      btnOpenReport.addEventListener('click', () => {
+        modalReport.style.display = 'flex';
+      });
+      btnCloseModal.addEventListener('click', () => {
+        modalReport.style.display = 'none';
+      });
+      modalReport.addEventListener('click', (e) => {
+        if (e.target === modalReport) modalReport.style.display = 'none';
+      });
+
+      formReport.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const edgeId = document.getElementById('repEdgeSelect').value;
+        const category = document.getElementById('repCategorySelect').value;
+        const desc = document.getElementById('repDescInput').value.trim() || 'Citizen reported road disruption';
+
+        try {
+          const res = await fetch('/api/v1/intelligence/citizen-reports', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              reporter_name: 'Citizen Driver (Public App)',
+              road_segment_id: edgeId,
+              category: category,
+              description: desc,
+              lanes_affected: 1
+            })
+          });
+
+          if (!res.ok) throw new Error('Failed to submit report');
+          alert('Report transmitted successfully to Traffic Police & Control Room');
+          modalReport.style.display = 'none';
+          document.getElementById('repDescInput').value = '';
+        } catch (err) {
+          alert('Submission error: ' + err.message);
+        }
+      });
+    }
+
     // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
