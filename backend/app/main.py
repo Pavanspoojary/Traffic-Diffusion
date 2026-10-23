@@ -40,8 +40,9 @@ async def health_check():
     }
 
 @app.api_route("/driver", methods=["GET", "HEAD"])
-async def driver_page():
-    """Secondary supporting view: Field EMS Ambulance Navigator."""
+@app.api_route("/public", methods=["GET", "HEAD"])
+async def public_driver_page():
+    """Dashboard 1: Public Citizen Navigator & Incident Reporter (teammate track)."""
     return FileResponse(settings.base_dir / "frontend" / "driver.html")
 
 @app.api_route("/operations", methods=["GET", "HEAD"])

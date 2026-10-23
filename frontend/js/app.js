@@ -1,4 +1,4 @@
-// Traffic Diffusion - Predictive Traffic Intelligence & Intervention Planning Controller
+// Traffic Diffusion - Command & Planning Platform Controller
 document.addEventListener('DOMContentLoaded', () => {
   const trafficMap = new TrafficMap('map');
 
@@ -9,6 +9,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const valSaturatedJunctions = document.getElementById('valSaturatedJunctions');
   const valOptimalMitigation = document.getElementById('valOptimalMitigation');
   const btnResetAll = document.getElementById('btnResetAll');
+
+  // Authority Persona Tabs
+  const tabPoliceOps = document.getElementById('tabPoliceOps');
+  const tabCityPlanners = document.getElementById('tabCityPlanners');
+  const viewPoliceControlRoom = document.getElementById('viewPoliceControlRoom');
+  const viewCityPlanners = document.getElementById('viewCityPlanners');
+
+  // Citizen Reports Elements
+  const citizenReportsList = document.getElementById('citizenReportsList');
+  const badgeCitizenCount = document.getElementById('badgeCitizenCount');
+
+  // Tactical Dispatch Elements
+  const dispatchForm = document.getElementById('dispatchForm');
+  const dispatchLocationSelect = document.getElementById('dispatchLocationSelect');
+  const dispatchResourceSelect = document.getElementById('dispatchResourceSelect');
+  const dispatchDirectiveInput = document.getElementById('dispatchDirectiveInput');
+  const dispatchOrdersList = document.getElementById('dispatchOrdersList');
 
   // Scenario & Demo Elements
   const btnDemoNanthoor = document.getElementById('btnDemoNanthoor');
@@ -42,10 +59,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const recomRationaleTxt = document.getElementById('recomRationaleTxt');
   const intervScenarioList = document.getElementById('intervScenarioList');
 
-  // Historical Elements
-  const histTotalRecords = document.getElementById('histTotalRecords');
-  const histTopHotspotName = document.getElementById('histTopHotspotName');
-  const hotspotMiniList = document.getElementById('hotspotMiniList');
+  // City Planners Elements
+  const plannerHistTotal = document.getElementById('plannerHistTotal');
+  const plannerTopHotspot = document.getElementById('plannerTopHotspot');
+  const plannerHotspotList = document.getElementById('plannerHotspotList');
+  const trafficPatternGrid = document.getElementById('trafficPatternGrid');
+  const patternSummaryText = document.getElementById('patternSummaryText');
+  const infraProposalsList = document.getElementById('infraProposalsList');
+
+  const infraSimForm = document.getElementById('infraSimForm');
+  const infraSimEdgeSelect = document.getElementById('infraSimEdgeSelect');
+  const infraSimTypeSelect = document.getElementById('infraSimTypeSelect');
+  const infraSimResultBox = document.getElementById('infraSimResultBox');
+  const infraResultTitle = document.getElementById('infraResultTitle');
+  const infraResultBadge = document.getElementById('infraResultBadge');
+  const infraResultDesc = document.getElementById('infraResultDesc');
+  const infraDelaySaved = document.getElementById('infraDelaySaved');
+  const infraQueueDrop = document.getElementById('infraQueueDrop');
 
   // State
   let networkNodes = [];
@@ -56,7 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let riskData = null;
   let interventionData = null;
 
+  // =========================================================================
   // 1. Initial Startup & Network Loading
+  // =========================================================================
   async function initializePlatform() {
     try {
       const netRes = await fetch('/api/v1/navigation/network');
@@ -65,10 +97,17 @@ document.addEventListener('DOMContentLoaded', () => {
         networkNodes = netData.nodes;
         networkEdges = netData.edges;
         trafficMap.renderNetwork(networkNodes, networkEdges);
-        populateEdgeDropdown(networkEdges);
+        populateEdgeDropdowns(networkEdges);
       }
 
-      await loadHistoricalAnalytics();
+      // Initialize Citizen Reports & Dispatches
+      await loadCitizenReports();
+      await loadResourceDispatches();
+
+      // Initialize City Planners Data
+      await loadPlannerAnalytics();
+      await loadTrafficPatterns();
+      await loadInfrastructureProposals();
 
       // Trigger default demonstration scenario: Nanthoor Freight Rollover
       await triggerDemoScenario('nanthoor_freight_rollover');
@@ -77,17 +116,191 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function populateEdgeDropdown(edges) {
+  function populateEdgeDropdowns(edges) {
     incidentEdgeSelect.innerHTML = '';
+    infraSimEdgeSelect.innerHTML = '';
     edges.forEach(e => {
       const opt = document.createElement('option');
       opt.value = e.id;
       opt.textContent = `${e.name} (${e.id}) [${e.lanes} lanes]`;
       incidentEdgeSelect.appendChild(opt);
+
+      const opt2 = document.createElement('option');
+      opt2.value = e.id;
+      opt2.textContent = `${e.name} (${e.id})`;
+      infraSimEdgeSelect.appendChild(opt2);
     });
   }
 
-  // 2. Demo Scenario Presets Loader
+  // =========================================================================
+  // 2. Persona Role Switcher
+  // =========================================================================
+  tabPoliceOps.addEventListener('click', () => {
+    tabPoliceOps.classList.add('active');
+    tabCityPlanners.classList.remove('active');
+    viewPoliceControlRoom.classList.add('active');
+    viewCityPlanners.classList.remove('active');
+  });
+
+  tabCityPlanners.addEventListener('click', () => {
+    tabCityPlanners.classList.add('active');
+    tabPoliceOps.classList.remove('active');
+    viewCityPlanners.classList.add('active');
+    viewPoliceControlRoom.classList.remove('active');
+  });
+
+  // =========================================================================
+  // 3. Citizen Incident Reports (Public Ingestion & Operator Verification)
+  // =========================================================================
+  async function loadCitizenReports() {
+    try {
+      const res = await fetch('/api/v1/intelligence/citizen-reports');
+      if (!res.ok) return;
+      const reports = await res.json();
+
+      badgeCitizenCount.textContent = `${reports.length} Reports`;
+      citizenReportsList.innerHTML = '';
+
+      if (reports.length === 0) {
+        citizenReportsList.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 10px;">No pending citizen reports</div>';
+        return;
+      }
+
+      reports.forEach(rep => {
+        const isVerified = rep.verification_status === 'VERIFIED';
+        const card = document.createElement('div');
+        card.className = 'citizen-report-item';
+        card.innerHTML = `
+          <div class="citizen-report-header">
+            <span class="citizen-report-id">${rep.report_id}</span>
+            <span class="status-tag ${isVerified ? 'tag-free' : 'tag-heavy'}">${rep.verification_status}</span>
+          </div>
+          <div class="citizen-report-loc">${rep.road_name}</div>
+          <div class="citizen-report-desc">${rep.description}</div>
+          <div class="citizen-report-footer">
+            <span style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">${rep.category} · ${rep.lanes_affected} lane(s)</span>
+            ${!isVerified ? `
+              <button class="btn btn-sm btn-primary btn-verify-report" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}" style="font-size: 10px; padding: 3px 8px;">
+                Verify & Forecast
+              </button>
+            ` : `
+              <span style="font-size: 10px; color: var(--accent-green); font-weight: 700;">Active in Forecast</span>
+            `}
+          </div>
+        `;
+        citizenReportsList.appendChild(card);
+      });
+
+      // Hook up verify buttons
+      document.querySelectorAll('.btn-verify-report').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const repId = e.currentTarget.dataset.id;
+          const edgeId = e.currentTarget.dataset.edge;
+          await verifyCitizenReportAndForecast(repId, edgeId);
+        });
+      });
+    } catch (err) {
+      console.warn('Citizen reports fetch error:', err);
+    }
+  }
+
+  async function verifyCitizenReportAndForecast(reportId, edgeId) {
+    try {
+      const res = await fetch(`/api/v1/intelligence/citizen-reports/${reportId}/verify?verified=true`, {
+        method: 'POST'
+      });
+      if (!res.ok) throw new Error('Verification failed');
+      const updated = await res.json();
+
+      // Set edge select
+      incidentEdgeSelect.value = edgeId;
+      capacityReductionInput.value = updated.lanes_affected > 1 ? 70 : 40;
+
+      // Reload reports
+      await loadCitizenReports();
+
+      // Trigger forecast on this edge
+      await triggerCustomForecast();
+    } catch (err) {
+      alert('Verification error: ' + err.message);
+    }
+  }
+
+  // =========================================================================
+  // 4. Tactical Resource & Police Deployment Console
+  // =========================================================================
+  async function loadResourceDispatches() {
+    try {
+      const res = await fetch('/api/v1/intelligence/dispatches');
+      if (!res.ok) return;
+      const orders = await res.json();
+
+      dispatchOrdersList.innerHTML = '';
+      if (orders.length === 0) {
+        dispatchOrdersList.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px;">No active dispatches</div>';
+        return;
+      }
+
+      orders.forEach(ord => {
+        const item = document.createElement('div');
+        item.className = 'dispatch-item';
+        
+        let statusClass = 'dispatched';
+        if (ord.status === 'ON_SCENE') statusClass = 'on-scene';
+        else if (ord.status === 'EN_ROUTE') statusClass = 'en-route';
+
+        item.innerHTML = `
+          <div class="dispatch-header">
+            <span class="dispatch-type-badge">${ord.resource_type.replace(/_/g, ' ')} (${ord.units_assigned}u)</span>
+            <span class="dispatch-status-badge ${statusClass}">${ord.status} ${ord.eta_minutes > 0 ? `· ETA ${ord.eta_minutes.toFixed(0)}m` : ''}</span>
+          </div>
+          <div class="dispatch-target">${ord.target_location_name}</div>
+          <div class="dispatch-directive">${ord.directive}</div>
+          ${ord.notes ? `<div style="font-size: 10px; color: var(--text-muted);">${ord.notes}</div>` : ''}
+        `;
+        dispatchOrdersList.appendChild(item);
+      });
+    } catch (err) {
+      console.warn('Dispatch load error:', err);
+    }
+  }
+
+  dispatchForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const targetId = dispatchLocationSelect.value;
+      const targetName = dispatchLocationSelect.options[dispatchLocationSelect.selectedIndex].text;
+      const resourceType = dispatchResourceSelect.value;
+      const directive = dispatchDirectiveInput.value.trim() || 'Manual Traffic Regulation & Queue Clearing';
+
+      const payload = {
+        incident_id: activeIncident ? activeIncident.incident_id : 'INC-CURRENT-TACTICAL',
+        target_location_id: targetId,
+        target_location_name: targetName,
+        resource_type: resourceType,
+        units_assigned: resourceType === 'TRAFFIC_POLICE_OFFICER' ? 2 : 1,
+        directive: directive,
+        priority: 'HIGH',
+        eta_minutes: 5.0,
+        notes: 'Dispatched via Police Tactical Operations Console'
+      };
+
+      const res = await fetch('/api/v1/intelligence/dispatches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Failed to dispatch unit');
+      await loadResourceDispatches();
+    } catch (err) {
+      alert('Dispatch error: ' + err.message);
+    }
+  });
+
+  // =========================================================================
+  // 5. Demo Scenario Presets Loader
+  // =========================================================================
   async function triggerDemoScenario(scenarioKey) {
     try {
       btnRunForecast.disabled = true;
@@ -106,12 +319,11 @@ document.addEventListener('DOMContentLoaded', () => {
       capacityReductionInput.value = Math.round(activeIncident.capacity_reduction_pct * 100);
       durationInput.value = Math.round(activeIncident.estimated_duration_min);
 
-      displayIncidentMetadata(activeIncident);
-
-      // Re-run full forecast across 15, 30, 60 min
-      await runFullForecast(activeIncident);
+      // Fetch complete multi-horizon forecast
+      await fetchAndDisplayForecast(activeIncident.incident_id);
     } catch (err) {
-      alert('Demo scenario error: ' + err.message);
+      console.error('Demo scenario error:', err);
+      alert('Could not load scenario: ' + err.message);
     } finally {
       btnRunForecast.disabled = false;
       btnRunForecast.textContent = 'Run Spatiotemporal Impact Forecast';
@@ -122,77 +334,79 @@ document.addEventListener('DOMContentLoaded', () => {
   btnDemoBunts.addEventListener('click', () => triggerDemoScenario('bunts_hostel_waterlogging'));
   btnDemoMgRoad.addEventListener('click', () => triggerDemoScenario('mg_road_breakdown'));
 
-  // 3. Custom Incident Form Handler
+  // =========================================================================
+  // 6. Custom Incident Forecast Form Handler
+  // =========================================================================
   incidentForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const edgeId = incidentEdgeSelect.value;
-    const cat = incidentCategorySelect.value;
-    const sev = incidentSeveritySelect.value;
-    const reduc = parseFloat(capacityReductionInput.value) / 100.0;
-    const dur = parseFloat(durationInput.value);
+    await triggerCustomForecast();
+  });
 
-    btnRunForecast.disabled = true;
-    btnRunForecast.textContent = 'Simulating Congestion Model...';
-
+  async function triggerCustomForecast() {
     try {
-      const res = await fetch('/api/v1/intelligence/incidents', {
+      btnRunForecast.disabled = true;
+      btnRunForecast.textContent = 'Projecting Network Spread...';
+
+      const edgeId = incidentEdgeSelect.value;
+      const category = incidentCategorySelect.value;
+      const severity = incidentSeveritySelect.value;
+      const capacityCut = parseFloat(capacityReductionInput.value) / 100.0;
+      const duration = parseFloat(durationInput.value);
+
+      const incPayload = {
+        affected_edge_id: edgeId,
+        category: category,
+        severity: severity,
+        blocked_lanes: capacityCut > 0.5 ? 2 : 1,
+        capacity_reduction_pct: capacityCut,
+        estimated_duration_min: duration,
+        description: `Disruption on ${edgeId} (${category}): ${Math.round(capacityCut * 100)}% capacity reduction`,
+        provenance: 'SIMULATED',
+      };
+
+      const incRes = await fetch('/api/v1/intelligence/incidents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          affected_edge_id: edgeId,
-          category: cat,
-          severity: sev,
-          capacity_reduction_pct: reduc,
-          estimated_duration_min: dur,
-          description: `Custom ${cat.replace(/_/g, ' ')} disruption (${sev} severity) on ${edgeId}`,
-          provenance: 'SIMULATED',
-        }),
+        body: JSON.stringify(incPayload),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Failed to create incident');
-      }
+      if (!incRes.ok) throw new Error('Failed to register incident');
+      activeIncident = await incRes.json();
 
-      activeIncident = await res.json();
-      displayIncidentMetadata(activeIncident);
-      await runFullForecast(activeIncident);
+      await fetchAndDisplayForecast(activeIncident.incident_id);
     } catch (err) {
-      alert('Impact simulation error: ' + err.message);
+      console.error('Forecast execution error:', err);
+      alert('Forecast error: ' + err.message);
     } finally {
       btnRunForecast.disabled = false;
       btnRunForecast.textContent = 'Run Spatiotemporal Impact Forecast';
     }
-  });
-
-  function displayIncidentMetadata(inc) {
-    txtIncidentId.textContent = inc.incident_id;
-    txtIncidentStatus.textContent = inc.verification_status;
-    txtIncidentDesc.textContent = `${inc.description} | ${Math.round(inc.capacity_reduction_pct * 100)}% capacity reduction | Est. Duration: ${inc.estimated_duration_min} min`;
   }
 
-  // 4. Run Multi-Horizon Forecast & What-If Interventions
-  async function runFullForecast(incident) {
+  // =========================================================================
+  // 7. Multi-Horizon Impact Forecast Fetcher
+  // =========================================================================
+  async function fetchAndDisplayForecast(incidentId) {
     try {
-      // A. Forecast Request
+      // 1. Multi-horizon forecast
       const fcRes = await fetch('/api/v1/intelligence/forecast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          incident_id: incident.incident_id,
-          horizons: [15, 30, 60],
-        }),
+        body: JSON.stringify({ incident_id: incidentId, horizons: [15, 30, 60] }),
       });
-      if (!fcRes.ok) throw new Error('Forecast calculation failure');
+      if (!fcRes.ok) throw new Error('Forecast calculation failed');
       forecastData = await fcRes.json();
 
-      // B. What-If Intervention Evaluation
+      // 2. Risk assessment for active horizon
+      await updateRiskAssessment(incidentId, activeHorizon);
+
+      // 3. What-if intervention evaluation
       const intRes = await fetch('/api/v1/intelligence/interventions/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          incident_id: incident.incident_id,
-          optimization_objective: 'MINIMIZE_NETWORK_DELAY_AND_PREVENT_JUNCTION_GRIDLOCK',
+          incident_id: incidentId,
+          optimization_objective: 'MINIMIZE_NETWORK_DELAY_AND_PREVENT_JUNCTION_GRIDLOCK'
         }),
       });
       if (intRes.ok) {
@@ -200,103 +414,99 @@ document.addEventListener('DOMContentLoaded', () => {
         renderInterventionScenarios(interventionData);
       }
 
-      // C. Render Active Horizon on Map & Telemetry
-      renderHorizonSnapshot(activeHorizon);
-
-      // D. Risk Assessment for Active Horizon
-      await fetchAndRenderRiskAssessment(activeHorizon, incident.incident_id);
+      // Render Active Snapshot
+      renderHorizonView(activeHorizon);
     } catch (err) {
-      console.error('Forecast execution error:', err);
+      console.error('Data pipeline error:', err);
     }
   }
 
-  // 5. Horizon Tabs Switcher Handler
+  async function updateRiskAssessment(incidentId, horizon) {
+    try {
+      const riskRes = await fetch(`/api/v1/intelligence/risk-assessment?horizon_minutes=${horizon}&incident_id=${incidentId}`);
+      if (!riskRes.ok) return;
+      riskData = await riskRes.json();
+      renderRiskRankings(riskData);
+    } catch (err) {
+      console.warn('Risk assessment error:', err);
+    }
+  }
+
+  // =========================================================================
+  // 8. Horizon Toggling & Visualization Update
+  // =========================================================================
   horizonPills.forEach(pill => {
     pill.addEventListener('click', async (e) => {
       horizonPills.forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      activeHorizon = parseInt(pill.getAttribute('data-horizon'), 10);
-      renderHorizonSnapshot(activeHorizon);
+      e.currentTarget.classList.add('active');
+      activeHorizon = parseInt(e.currentTarget.dataset.horizon, 10);
+
+      renderHorizonView(activeHorizon);
       if (activeIncident) {
-        await fetchAndRenderRiskAssessment(activeHorizon, activeIncident.incident_id);
+        await updateRiskAssessment(activeIncident.incident_id, activeHorizon);
       }
     });
   });
 
-  function renderHorizonSnapshot(horizon) {
+  function renderHorizonView(horizon) {
     if (!forecastData || !forecastData.forecasts) return;
-    const snapshot = forecastData.forecasts[horizon] || forecastData.forecasts[String(horizon)];
-    if (!snapshot) return;
+    const snap = forecastData.forecasts[horizon];
+    if (!snap) return;
 
-    // Update Top Telemetry Banner
+    // Active Incident metadata card
+    txtIncidentId.textContent = forecastData.incident.incident_id;
+    txtIncidentStatus.textContent = forecastData.incident.severity;
+    txtIncidentDesc.textContent = forecastData.incident.description;
+
+    // Narrative & Titles
+    forecastHorizonTitle.textContent = `Forecast Horizon: T+${horizon} Minutes (Model: ${snap.model_method})`;
+    forecastNarrative.textContent = snap.propagation_summary;
     valActiveHorizon.textContent = `T+${horizon} min`;
-    valNetworkDelay.textContent = `+${snapshot.network_delay_relative_to_baseline_min.toFixed(1)} min`;
-    valElevatedCorridors.textContent = snapshot.elevated_risk_corridors_count;
-    valSaturatedJunctions.textContent = snapshot.saturated_junctions_count;
 
-    // Narrative & Stats
-    forecastHorizonTitle.textContent = `Forecast Horizon: T+${horizon} Minutes (${snapshot.model_method})`;
-    forecastNarrative.textContent = snapshot.propagation_summary;
+    // Metrics
+    valNetworkDelay.textContent = `+${snap.network_delay_relative_to_baseline_min.toFixed(1)} min`;
+    valElevatedCorridors.textContent = snap.elevated_risk_corridors_count;
+    valSaturatedJunctions.textContent = snap.saturated_junctions_count;
 
-    const targetImpact = snapshot.edge_impacts.find(e => e.impact_type === 'DIRECT_INCIDENT');
-    if (targetImpact) {
-      statQueueMeters.textContent = `${Math.round(targetImpact.queue_length_meters)} m`;
-      const excess = Math.round((targetImpact.predicted_volume_capacity_ratio - 1.0) * 450 * (horizon / 60));
-      statExcessPcu.textContent = `${Math.max(15, excess)} PCU`;
-    } else {
-      statQueueMeters.textContent = '0 m';
-      statExcessPcu.textContent = '0 PCU';
+    const directImpact = snap.edge_impacts.find(e => e.impact_type === 'DIRECT_INCIDENT');
+    if (directImpact) {
+      statQueueMeters.textContent = `${Math.round(directImpact.estimated_queue_length_meters)} m`;
+      statExcessPcu.textContent = `${Math.round(directImpact.accumulated_excess_volume_pcu)} PCU`;
     }
 
-    // Render on Map
-    trafficMap.renderPredictiveForecast(snapshot, networkNodes, activeIncident);
+    // Leaflet map render
+    trafficMap.renderPredictiveForecast(snap, networkNodes, networkEdges);
   }
 
-  // 6. Risk Assessment Fetch & Render
-  async function fetchAndRenderRiskAssessment(horizon, incidentId) {
-    try {
-      const res = await fetch(`/api/v1/intelligence/risk-assessment?horizon_minutes=${horizon}&incident_id=${incidentId}`);
-      if (!res.ok) return;
-      riskData = await res.json();
-      renderRiskRankings(riskData);
-    } catch (err) {
-      console.warn('Risk assessment fetch error:', err);
-    }
-  }
-
+  // =========================================================================
+  // 9. Risk Breakdown Ranking List
+  // =========================================================================
   function renderRiskRankings(data) {
-    if (!data.high_risk_roads || data.high_risk_roads.length === 0) {
-      riskRankList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 12px;">No elevated risk corridors at this horizon.</div>`;
-      return;
-    }
-
+    if (!data.high_risk_roads) return;
     riskRankList.innerHTML = '';
-    data.high_risk_roads.slice(0, 5).forEach(item => {
+
+    data.high_risk_roads.forEach(item => {
       const card = document.createElement('div');
-      card.className = `risk-rank-card ${item.risk_level.toLowerCase()}`;
+      card.className = `risk-rank-item ${item.risk_level.toLowerCase()}`;
       card.innerHTML = `
-        <div class="risk-header">
-          <span class="risk-road-name">#${item.rank} ${item.road_name}</span>
-          <span class="risk-score-badge ${item.risk_level === 'CRITICAL' ? 'tag-blocked' : (item.risk_level === 'HIGH' ? 'tag-heavy' : 'tag-moderate')}">
-            ${item.risk_score.toFixed(1)} / 100
-          </span>
+        <div class="risk-rank-header">
+          <div style="font-weight: 700; color: var(--text-primary); font-size: 11px;">
+            #${item.rank} ${item.road_name}
+          </div>
+          <span class="risk-score-badge">${item.risk_score.toFixed(1)}</span>
         </div>
-        <div class="risk-breakdown-bars">
-          <div class="risk-component-col">
-            <span class="risk-component-lbl">Severity</span>
-            <span class="risk-component-val">${item.components.severity_component.toFixed(1)}</span>
+        <div class="risk-components-bar">
+          <div class="risk-sub-bar" style="background-color: #ef4444; width: ${(item.components.severity_component / 25) * 100}%;" title="Disruption Severity: ${item.components.severity_component.toFixed(1)}">
+            ${item.components.severity_component > 8 ? `Sev: ${item.components.severity_component.toFixed(0)}` : ''}
           </div>
-          <div class="risk-component-col">
-            <span class="risk-component-lbl">V/C Load</span>
-            <span class="risk-component-val">${item.components.capacity_load_component.toFixed(1)}</span>
+          <div class="risk-sub-bar" style="background-color: #f97316; width: ${(item.components.capacity_load_component / 25) * 100}%;" title="V/C Ratio Load: ${item.components.capacity_load_component.toFixed(1)}">
+            ${item.components.capacity_load_component > 8 ? `V/C: ${item.components.capacity_load_component.toFixed(0)}` : ''}
           </div>
-          <div class="risk-component-col">
-            <span class="risk-component-lbl">Network Dep</span>
-            <span class="risk-component-val">${item.components.downstream_dependency.toFixed(1)}</span>
+          <div class="risk-sub-bar" style="background-color: #3b82f6; width: ${(item.components.downstream_dependency / 25) * 100}%;" title="Network Dependency: ${item.components.downstream_dependency.toFixed(1)}">
+            ${item.components.downstream_dependency > 8 ? `Net: ${item.components.downstream_dependency.toFixed(0)}` : ''}
           </div>
-          <div class="risk-component-col">
-            <span class="risk-component-lbl">Div Deficit</span>
-            <span class="risk-component-val">${item.components.diversion_deficit.toFixed(1)}</span>
+          <div class="risk-sub-bar" style="background-color: #8b5cf6; width: ${(item.components.diversion_deficit / 25) * 100}%;" title="Diversion Deficit: ${item.components.diversion_deficit.toFixed(1)}">
+            ${item.components.diversion_deficit > 8 ? `Div: ${item.components.diversion_deficit.toFixed(0)}` : ''}
           </div>
         </div>
         <div style="font-size: 10px; color: var(--text-muted);">${item.contributing_factors.join('; ')}</div>
@@ -306,7 +516,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 7. What-If Intervention Scenarios Matrix
+  // =========================================================================
+  // 10. What-If Intervention Scenarios Matrix
+  // =========================================================================
   function renderInterventionScenarios(data) {
     if (!data.candidate_scenarios || data.candidate_scenarios.length === 0) return;
 
@@ -359,20 +571,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 8. Historical Intelligence & Recurring Hotspots
-  async function loadHistoricalAnalytics() {
+  // =========================================================================
+  // 11. City Planners: Historical Analytics & Macro Patterns
+  // =========================================================================
+  async function loadPlannerAnalytics() {
     try {
       const res = await fetch('/api/v1/intelligence/historical/analytics');
       if (!res.ok) return;
       const data = await res.json();
 
-      histTotalRecords.textContent = data.total_records_analyzed;
+      plannerHistTotal.textContent = data.total_records_analyzed;
       if (data.top_recurring_hotspots && data.top_recurring_hotspots.length > 0) {
-        histTopHotspotName.textContent = data.top_recurring_hotspots[0].location_name.split('-')[0].trim();
+        plannerTopHotspot.textContent = data.top_recurring_hotspots[0].location_name.split('-')[0].trim();
       }
 
-      hotspotMiniList.innerHTML = '';
-      data.top_recurring_hotspots.slice(0, 3).forEach(spot => {
+      plannerHotspotList.innerHTML = '';
+      data.top_recurring_hotspots.slice(0, 4).forEach(spot => {
         const item = document.createElement('div');
         item.className = 'hotspot-mini-item';
         item.innerHTML = `
@@ -381,17 +595,114 @@ document.addEventListener('DOMContentLoaded', () => {
             <span style="color: var(--accent-amber); font-family: var(--font-mono);">${spot.incident_count} events</span>
           </div>
           <div style="color: var(--text-muted); font-size: 10px; margin-top: 2px;">
-            ${spot.recurring_pattern_summary}
+            Mean Duration: <strong>${spot.mean_duration_minutes.toFixed(0)} min</strong> | ${spot.recurring_pattern_summary}
           </div>
         `;
-        hotspotMiniList.appendChild(item);
+        plannerHotspotList.appendChild(item);
       });
     } catch (err) {
-      console.warn('Historical analytics fetch error:', err);
+      console.warn('Planner analytics error:', err);
     }
   }
 
-  // 9. Reset Grid
+  async function loadTrafficPatterns() {
+    try {
+      const res = await fetch('/api/v1/intelligence/planner/traffic-patterns');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      trafficPatternGrid.innerHTML = '';
+      data.periods.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'pattern-card';
+        card.innerHTML = `
+          <div class="pattern-period-name">${p.period_name}</div>
+          <div class="pattern-hours">${p.hours}</div>
+          <div style="margin-top: 4px;">
+            <div class="pattern-metric">${p.average_network_speed_kmh} <span style="font-size: 9px;">km/h</span></div>
+            <div class="pattern-metric-lbl">Avg Speed</div>
+          </div>
+          <div style="margin-top: 2px;">
+            <div class="pattern-metric" style="color: ${p.average_vc_ratio > 1.2 ? 'var(--accent-red)' : 'var(--accent-green)'};">${p.average_vc_ratio}</div>
+            <div class="pattern-metric-lbl">V/C Load Index</div>
+          </div>
+        `;
+        trafficPatternGrid.appendChild(card);
+      });
+
+      patternSummaryText.textContent = data.summary_findings;
+    } catch (err) {
+      console.warn('Traffic patterns error:', err);
+    }
+  }
+
+  async function loadInfrastructureProposals() {
+    try {
+      const res = await fetch('/api/v1/intelligence/planner/infrastructure-recommendations');
+      if (!res.ok) return;
+      const recs = await res.json();
+
+      infraProposalsList.innerHTML = '';
+      recs.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'infra-card';
+        card.innerHTML = `
+          <div class="infra-card-header">
+            <span class="infra-title">${r.title}</span>
+            <span class="infra-metric-pill">-${r.projected_delay_reduction_pct.toFixed(0)}% Delay</span>
+          </div>
+          <div class="infra-desc">${r.description}</div>
+          <div class="infra-meta-row">
+            <span>Location: <strong>${r.location_name}</strong></span>
+            <span>Mitigates: <strong>${r.annual_bottlenecks_mitigated} / yr</strong></span>
+            <span>Timeline: <strong>${r.implementation_timeline}</strong></span>
+          </div>
+        `;
+        infraProposalsList.appendChild(card);
+      });
+    } catch (err) {
+      console.warn('Infrastructure proposals error:', err);
+    }
+  }
+
+  // =========================================================================
+  // 12. City Planners: What-If Infrastructure Upgrade Simulator
+  // =========================================================================
+  infraSimForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const targetEdge = infraSimEdgeSelect.value;
+      const simType = infraSimTypeSelect.value;
+
+      const payload = {
+        target_edge_id: targetEdge,
+        intervention_type: simType,
+        capacity_increase_pct: simType === 'ADD_LANE' ? 0.50 : 0.80
+      };
+
+      const res = await fetch('/api/v1/intelligence/planner/simulate-infrastructure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Simulation failed');
+      const data = await res.json();
+
+      infraSimResultBox.style.display = 'block';
+      infraResultTitle.textContent = `${data.road_name} Projection`;
+      infraResultBadge.textContent = `-${data.delay_reduction_pct.toFixed(1)}% DELAY`;
+      infraResultDesc.textContent = data.projected_benefit_summary;
+      infraDelaySaved.textContent = `${data.delay_saved_min.toFixed(1)} min saved`;
+      infraQueueDrop.textContent = `-${data.queue_length_reduction_pct.toFixed(0)}%`;
+    } catch (err) {
+      alert('Infrastructure simulation error: ' + err.message);
+    }
+  });
+
+  // =========================================================================
+  // 13. Reset Grid
+  // =========================================================================
   btnResetAll.addEventListener('click', async () => {
     try {
       await fetch('/api/v1/navigation/reset', { method: 'POST' });

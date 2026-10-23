@@ -225,3 +225,94 @@ def test_intelligence_api_endpoints():
     assert "forecast_30m" in demo_data
     assert "interventions" in demo_data
     assert "risk_assessment" in demo_data
+
+def test_citizen_reports_and_operator_verification():
+    # 1. Citizen submits report from public app
+    payload = {
+        "reporter_name": "Test Commuter",
+        "road_segment_id": "corridor_cctv_07",
+        "category": "COLLISION",
+        "description": "Multi-car pileup blocking lanes near Nanthoor",
+        "lanes_affected": 2,
+    }
+    create_res = client.post("/api/v1/intelligence/citizen-reports", json=payload)
+    assert create_res.status_code == 201
+    rep = create_res.json()
+    assert rep["report_id"].startswith("CIT-MNG-")
+    assert rep["verification_status"] == "VERIFICATION_PENDING"
+
+    # 2. Control room operator lists reports
+    list_res = client.get("/api/v1/intelligence/citizen-reports")
+    assert list_res.status_code == 200
+    assert len(list_res.json()) >= 1
+
+    # 3. Control room operator verifies report -> auto-spawns active TrafficIncident
+    verify_res = client.post(f"/api/v1/intelligence/citizen-reports/{rep['report_id']}/verify?verified=true")
+    assert verify_res.status_code == 200
+    v_data = verify_res.json()
+    assert v_data["verification_status"] == "VERIFIED"
+    assert v_data["verified_incident_id"] is not None
+
+def test_resource_dispatch_lifecycle():
+    # 1. Dispatch officers to an incident
+    dispatch_payload = {
+        "incident_id": "INC-TEST-001",
+        "target_location_id": "INT_NANTHOOR",
+        "target_location_name": "Nanthoor Junction",
+        "resource_type": "TRAFFIC_POLICE_OFFICER",
+        "units_assigned": 2,
+        "directive": "Manual Green Wave Override",
+        "priority": "HIGH",
+        "eta_minutes": 5.0,
+        "notes": "Deploy immediately to alleviate feeder queues",
+    }
+    create_res = client.post("/api/v1/intelligence/dispatches", json=dispatch_payload)
+    assert create_res.status_code == 201
+    dsp = create_res.json()
+    assert dsp["order_id"].startswith("DSP-MNG-")
+    assert dsp["status"] == "DISPATCHED"
+
+    # 2. List active dispatches
+    list_res = client.get("/api/v1/intelligence/dispatches")
+    assert list_res.status_code == 200
+    assert len(list_res.json()) >= 1
+
+    # 3. Update dispatch status to ON_SCENE
+    patch_res = client.patch(
+        f"/api/v1/intelligence/dispatches/{dsp['order_id']}",
+        json={"status": "ON_SCENE", "notes": "Units arrived on scene and managing traffic"}
+    )
+    assert patch_res.status_code == 200
+    updated = patch_res.json()
+    assert updated["status"] == "ON_SCENE"
+    assert updated["eta_minutes"] == 0.0
+
+def test_traffic_planner_infrastructure_endpoints():
+    # 1. Infrastructure recommendations
+    rec_res = client.get("/api/v1/intelligence/planner/infrastructure-recommendations")
+    assert rec_res.status_code == 200
+    recs = rec_res.json()
+    assert len(recs) >= 3
+    assert any("GRADE_SEPARATION" in r["category"] for r in recs)
+
+    # 2. Macro traffic pattern comparison
+    pat_res = client.get("/api/v1/intelligence/planner/traffic-patterns")
+    assert pat_res.status_code == 200
+    patterns = pat_res.json()
+    assert len(patterns["periods"]) >= 3
+    assert "Morning Peak" in [p["period_name"] for p in patterns["periods"]]
+
+    # 3. What-if infrastructure simulation
+    sim_res = client.post(
+        "/api/v1/intelligence/planner/simulate-infrastructure",
+        json={
+            "target_edge_id": "corridor_cctv_07",
+            "intervention_type": "GRADE_SEPARATION",
+            "capacity_increase_pct": 0.80
+        }
+    )
+    assert sim_res.status_code == 200
+    sim_data = sim_res.json()
+    assert sim_data["delay_saved_min"] > 0
+    assert sim_data["delay_reduction_pct"] > 50.0
+
