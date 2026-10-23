@@ -69,6 +69,31 @@ document.addEventListener('DOMContentLoaded', () => {
   let forecastData = null;
   let riskData = null;
   let interventionData = null;
+  let lastCitizenFingerprint = '';
+  let lastDispatchFingerprint = '';
+
+  const CORRIDOR_JUNCTION_MAP = {
+    'corridor_cctv_07': { id: 'INT_NANTHOOR', name: 'Nanthoor Junction' },
+    'corridor_cctv_05': { id: 'INT_BUNTS_HOSTEL', name: 'Bunts Hostel Circle' },
+    'corridor_cctv_10': { id: 'INT_PVS', name: 'PVS Junction' },
+    'corridor_cctv_11': { id: 'INT_KADRI', name: 'Kadri Tollgate / Bypass' },
+    'corridor_cctv_13': { id: 'INT_BUNTS_HOSTEL', name: 'Bunts Hostel Circle' },
+    'corridor_cctv_01': { id: 'INT_HAMPANKATTA', name: 'Hampankatta Junction' },
+    'corridor_cctv_09': { id: 'INT_LADYHILL', name: 'Ladyhill Circle' },
+    'corridor_cctv_12': { id: 'INT_KADRI', name: 'Kadri Tollgate' },
+  };
+
+  function ensureDispatchLocation(locId, locName) {
+    if (!dispatchLocationSelect) return;
+    let opt = Array.from(dispatchLocationSelect.options).find(o => o.value === locId);
+    if (!opt) {
+      opt = document.createElement('option');
+      opt.value = locId;
+      opt.textContent = locName || locId;
+      dispatchLocationSelect.appendChild(opt);
+    }
+    dispatchLocationSelect.value = locId;
+  }
 
   // =========================================================================
   // 1. Live Digital Clock
@@ -100,6 +125,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Launch default demo scenario
       await triggerDemoScenario('nanthoor_freight_rollover');
+
+      // Periodic live data sync between public app submissions and dispatch ledger
+      if (!window._syncIntervalStarted) {
+        window._syncIntervalStarted = true;
+        setInterval(loadCitizenReports, 3000);
+        setInterval(loadResourceDispatches, 4000);
+      }
     } catch (err) {
       console.error('Initialization error:', err);
     }
@@ -124,6 +156,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) return;
       const reports = await res.json();
 
+      const fingerprint = JSON.stringify(reports.map(r => [r.report_id, r.verification_status, r.verified_incident_id, r.road_segment_id]));
+      if (fingerprint === lastCitizenFingerprint) {
+        return;
+      }
+      lastCitizenFingerprint = fingerprint;
+
       badgeCitizenCount.textContent = reports.length;
       citizenReportsList.innerHTML = '';
 
@@ -139,17 +177,19 @@ document.addEventListener('DOMContentLoaded', () => {
         card.innerHTML = `
           <div class="feed-head">
             <span class="feed-loc">${rep.road_name}</span>
-            <span class="badge-tag ${isVerified ? 'badge-cyan' : 'badge-amber'}">${rep.verification_status}</span>
+            <span class="badge-tag ${isVerified ? 'badge-cyan' : 'badge-amber'}">${isVerified ? 'VERIFIED' : 'PENDING'}</span>
           </div>
-          <div class="feed-sub">${rep.description} (${rep.category})</div>
+          <div class="feed-sub">${rep.description} (${rep.category.replace(/_/g, ' ')})</div>
           <div class="feed-foot">
             <span style="font-size: 9.5px; color: var(--text-dim); font-family: var(--font-mono);">${rep.report_id}</span>
             ${!isVerified ? `
-              <button class="btn-mini-adv btn-verify-report" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}">
-                Verify
+              <button type="button" class="btn-mini-adv btn-verify-report" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}" data-cat="${rep.category}" data-lanes="${rep.lanes_affected}" data-desc="${encodeURIComponent(rep.description)}">
+                Verify & Forecast
               </button>
             ` : `
-              <span style="font-size: 9.5px; color: var(--accent-green); font-weight: 700;">Verified</span>
+              <button type="button" class="btn-mini-adv btn-forecast-report" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}" data-incident="${rep.verified_incident_id || ''}" data-cat="${rep.category}" data-lanes="${rep.lanes_affected}" data-desc="${encodeURIComponent(rep.description)}">
+                Forecast
+              </button>
             `}
           </div>
         `;
@@ -160,7 +200,22 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', async (e) => {
           const repId = e.currentTarget.dataset.id;
           const edgeId = e.currentTarget.dataset.edge;
-          await verifyCitizenReportAndForecast(repId, edgeId);
+          const cat = e.currentTarget.dataset.cat;
+          const lanes = parseInt(e.currentTarget.dataset.lanes || '1', 10);
+          const desc = decodeURIComponent(e.currentTarget.dataset.desc || '');
+          await verifyCitizenReportAndForecast(repId, edgeId, cat, lanes, desc);
+        });
+      });
+
+      document.querySelectorAll('.btn-forecast-report').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const repId = e.currentTarget.dataset.id;
+          const edgeId = e.currentTarget.dataset.edge;
+          const incidentId = e.currentTarget.dataset.incident;
+          const cat = e.currentTarget.dataset.cat;
+          const lanes = parseInt(e.currentTarget.dataset.lanes || '1', 10);
+          const desc = decodeURIComponent(e.currentTarget.dataset.desc || '');
+          await loadCitizenReportForecast(repId, edgeId, incidentId, cat, lanes, desc);
         });
       });
     } catch (err) {
@@ -168,8 +223,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function verifyCitizenReportAndForecast(reportId, edgeId) {
+  async function verifyCitizenReportAndForecast(reportId, edgeId, cat, lanes, desc) {
     try {
+      presetPills.forEach(p => p.classList.remove('active'));
       const res = await fetch(`/api/v1/intelligence/citizen-reports/${reportId}/verify?verified=true`, {
         method: 'POST'
       });
@@ -177,12 +233,51 @@ document.addEventListener('DOMContentLoaded', () => {
       const updated = await res.json();
 
       incidentEdgeSelect.value = edgeId;
-      capacityReductionInput.value = updated.lanes_affected > 1 ? 75 : 45;
+      if (cat && incidentCategorySelect.querySelector(`option[value="${cat}"]`)) {
+        incidentCategorySelect.value = cat;
+      }
+      incidentSeveritySelect.value = (lanes > 1 ? 'CRITICAL' : 'HIGH');
+      capacityReductionInput.value = (lanes > 1 ? 75 : 45);
 
+      const mapping = CORRIDOR_JUNCTION_MAP[edgeId] || { id: edgeId, name: edgeId };
+      ensureDispatchLocation(mapping.id, mapping.name);
+      dispatchDirectiveInput.value = `Deploy units to handle verified citizen alert: ${desc || edgeId}`;
+
+      lastCitizenFingerprint = '';
       await loadCitizenReports();
-      await triggerCustomForecast();
+
+      if (updated.verified_incident_id) {
+        await fetchAndDisplayForecast(updated.verified_incident_id);
+      } else {
+        await triggerCustomForecast();
+      }
     } catch (err) {
       alert('Verification error: ' + err.message);
+    }
+  }
+
+  async function loadCitizenReportForecast(reportId, edgeId, incidentId, cat, lanes, desc) {
+    try {
+      presetPills.forEach(p => p.classList.remove('active'));
+      incidentEdgeSelect.value = edgeId;
+      if (cat && incidentCategorySelect.querySelector(`option[value="${cat}"]`)) {
+        incidentCategorySelect.value = cat;
+      }
+      incidentSeveritySelect.value = (lanes > 1 ? 'CRITICAL' : 'HIGH');
+      capacityReductionInput.value = (lanes > 1 ? 75 : 45);
+
+      const mapping = CORRIDOR_JUNCTION_MAP[edgeId] || { id: edgeId, name: edgeId };
+      ensureDispatchLocation(mapping.id, mapping.name);
+      dispatchDirectiveInput.value = `Deploy units to handle citizen alert: ${desc || edgeId}`;
+
+      if (incidentId) {
+        await fetchAndDisplayForecast(incidentId);
+      } else {
+        await triggerCustomForecast();
+      }
+    } catch (err) {
+      console.warn('Citizen report forecast execution failed:', err);
+      await triggerCustomForecast();
     }
   }
 
@@ -291,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       if (!fcRes.ok) throw new Error('Forecast calculation failed');
       forecastData = await fcRes.json();
+      activeIncident = forecastData.incident;
 
       await updateRiskAssessment(incidentId, activeHorizon);
 
@@ -513,6 +609,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) return;
       const orders = await res.json();
 
+      const fingerprint = JSON.stringify(orders.map(o => [o.order_id, o.status, o.directive]));
+      if (fingerprint === lastDispatchFingerprint) {
+        return;
+      }
+      lastDispatchFingerprint = fingerprint;
+
       dispatchOrdersList.innerHTML = '';
       ledgerCountBadge.textContent = `${orders.length} Units Active`;
 
@@ -578,6 +680,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
       });
       if (!res.ok) throw new Error('Status transition failed');
+      lastDispatchFingerprint = '';
       await loadResourceDispatches();
     } catch (err) {
       alert('Error updating dispatch: ' + err.message);
@@ -611,6 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (!res.ok) throw new Error('Failed to dispatch unit');
+      lastDispatchFingerprint = '';
       await loadResourceDispatches();
     } catch (err) {
       alert('Dispatch error: ' + err.message);

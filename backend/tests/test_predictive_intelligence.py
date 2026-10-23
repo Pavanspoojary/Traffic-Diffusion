@@ -139,7 +139,9 @@ def test_historical_incident_analytics():
     assert len(analytics.weekday_distribution) == 7
     assert len(analytics.mean_duration_by_category_min) >= 3
 
-def test_historical_record_import():
+def test_historical_record_import(tmp_path):
+    from backend.app.services.historical_service import HistoricalAnalyticsService
+    test_engine = HistoricalAnalyticsService(data_path=tmp_path / "test_hist.json")
     valid_batch = [
         {
             "record_id": "TEST-IMP-01",
@@ -153,7 +155,7 @@ def test_historical_record_import():
             "observed_delay_min": 15.0,
         }
     ]
-    res = historical_service.import_records(valid_batch, is_simulated=True)
+    res = test_engine.import_records(valid_batch, is_simulated=True)
     assert res["status"] == "success"
     assert res["imported_count"] == 1
 
@@ -315,4 +317,29 @@ def test_traffic_planner_infrastructure_endpoints():
     sim_data = sim_res.json()
     assert sim_data["delay_saved_min"] > 0
     assert sim_data["delay_reduction_pct"] > 50.0
+
+def test_citizen_incident_trigger_and_edge_marking():
+    """Verify that public citizen submissions trigger verified incidents and reflect on network edges."""
+    payload = {
+        "road_segment_id": "corridor_cctv_05",
+        "category": "COLLISION",
+        "description": "Public alert: Bus collision near Bunts Hostel Circle",
+        "reporter_name": "Citizen Ravi",
+        "lanes_affected": 2
+    }
+    res = client.post("/api/v1/intelligence/incident/trigger", json=payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["incident_id"] is not None
+    assert data["report"]["verification_status"] == "VERIFIED"
+
+    # Verify edge congestion is updated on public network
+    net_res = client.get("/api/v1/navigation/network")
+    assert net_res.status_code == 200
+    edges = {e["id"]: e for e in net_res.json()["edges"]}
+    assert "corridor_cctv_05" in edges
+    assert edges["corridor_cctv_05"]["has_incident"] is True
+    assert edges["corridor_cctv_05"]["congestion_level"] in ["HEAVY", "BLOCKED"]
+
 

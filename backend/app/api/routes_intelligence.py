@@ -276,6 +276,44 @@ async def load_demo_scenario(scenario_key: str = Query("nanthoor_freight_rollove
     }
 
 # ================= Citizen Incident Reports (Public App Ingestion) =================
+@router.post("/incident/trigger", status_code=status.HTTP_201_CREATED)
+async def trigger_incident_from_public(payload: dict):
+    """
+    Direct bridge endpoint for public citizen app submissions.
+    Creates a citizen report and immediately registers active incident forecasting.
+    """
+    edge_id = payload.get("edge_id") or payload.get("road_segment_id") or "corridor_cctv_07"
+    category_raw = payload.get("category", "ROAD_BLOCKAGE")
+    try:
+        cat = IncidentCategory(category_raw)
+    except ValueError:
+        cat = IncidentCategory.ROAD_BLOCKAGE
+
+    desc = payload.get("custom_subject") or payload.get("description") or f"Citizen alert on {edge_id}"
+    reporter = payload.get("reporter") or payload.get("reporter_name") or "Citizen Commuter"
+    contact = payload.get("location") or payload.get("contact_number")
+    lanes = int(payload.get("lanes_affected", 1))
+
+    report = dispatch_service.create_citizen_report(
+        CitizenReportCreate(
+            reporter_name=reporter,
+            contact_number=contact,
+            road_segment_id=edge_id,
+            category=cat,
+            description=desc,
+            lanes_affected=lanes
+        )
+    )
+
+    # Auto-verify report from citizen app so the dashboard immediately updates
+    verified_report = dispatch_service.verify_citizen_report(report.report_id, verified=True)
+    return {
+        "status": "success",
+        "message": f"Alert received and verified: {desc}",
+        "report": verified_report,
+        "incident_id": verified_report.verified_incident_id
+    }
+
 @router.get("/citizen-reports", response_model=List[CitizenReport])
 async def list_citizen_reports():
     """Lists all incoming citizen reports submitted via the public mobile map app."""
