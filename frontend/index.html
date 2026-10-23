@@ -3,407 +3,805 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Traffic Police & Control Room Command Center - Traffic Diffusion</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <title>Mangaluru Traffic Police & Control Room Command Center - Traffic Diffusion</title>
+  <link rel="stylesheet" href="/css/style.css?v=3.2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="app-layout">
     <!-- Top Command & Control Header Bar -->
     <header class="top-nav">
       <div class="brand-section">
-        <div class="brand-badge" style="background: linear-gradient(135deg, #1d4ed8, #0284c7);">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <div class="brand-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           </svg>
         </div>
         <div>
-          <h1 class="brand-title">MANGALURU TRAFFIC POLICE — COMMAND & CONTROL ROOM</h1>
-          <p class="brand-subtitle">ITMS Predictive Incident Intelligence, Congestion Spread Forecasting & Tactical Resource Deployment</p>
+          <div class="brand-title-wrap">
+            <h1 class="brand-title">MANGALURU TRAFFIC POLICE & ITMS COMMAND</h1>
+            <span class="live-clock-badge" id="liveClock">--:--:-- IST</span>
+          </div>
+          <p class="brand-subtitle">Predictive Incident Intelligence, Congestion Spread Forecasting & Tactical Resource Deployment</p>
         </div>
       </div>
 
+      <!-- Center View Switcher Tabs (Police Operators vs City Planners) -->
+      <nav class="view-tabs-nav" aria-label="Command Mode Navigation">
+        <button type="button" class="view-tab active" id="tabBtnTactical" data-view="tactical">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          Tactical Operations & Incident Control
+        </button>
+        <button type="button" class="view-tab" id="tabBtnPlanners" data-view="planners">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+          City Traffic Planners & Authority
+        </button>
+      </nav>
+
       <div class="header-actions">
-        <div class="status-pill status-active">
+        <div class="status-pill status-active" title="Surveillance feeds and graph topology active">
           <span class="status-dot"></span>
-          <span>COMMAND CENTER ACTIVE</span>
+          <span>GRID ACTIVE</span>
         </div>
-        <span class="badge-simulated">17 JUNCTIONS · 38 CORRIDORS</span>
-        <a href="/public" class="btn btn-outline-sm" style="text-decoration: none;" target="_blank">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+        <span class="badge-simulated" title="Mangaluru urban network coverage">17 JUNCTIONS · 38 CORRIDORS</span>
+        <a href="/public" class="btn btn-outline-sm btn-public-app" target="_blank" rel="noopener noreferrer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
           </svg>
           Launch Public Citizen Map
         </a>
-        <button id="btnResetAll" class="btn btn-outline-sm">Reset Grid</button>
+        <button id="btnResetAll" class="btn btn-outline-sm" title="Reset road network to nominal baseline">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <polyline points="23 20 23 14 17 14"></polyline>
+            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+          </svg>
+          Reset Grid
+        </button>
       </div>
     </header>
 
-    <!-- Operational Transparency Banner -->
+    <!-- Operational Transparency Ribbon -->
     <div class="transparency-bar">
-      <span><strong>Operations Console:</strong> Dedicated tactical dashboard for Traffic Police & Control-Room Operators. Predict spatiotemporal queue spread (T+15m, T+30m, T+60m), prioritize saturated junctions, compare intervention scenarios, and deploy field units.</span>
-      <span class="badge-simulated">SECTOR: MANGALURU METROPOLITAN</span>
+      <div class="transparency-content">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <span id="transparencyText"><strong>Tactical Operations Console:</strong> Real-time spatiotemporal queue propagation model (T+15m, T+30m, T+60m), multi-attribute risk ranking, what-if intervention evaluator, and rapid field unit deployment.</span>
+      </div>
+      <div class="transparency-meta">
+        <span class="sector-tag">SECTOR: MANGALURU METROPOLITAN (NH-66 / NH-73)</span>
+      </div>
     </div>
 
-    <!-- Main Pure Dashboard Scrollable Container -->
-    <div class="dashboard-container">
+    <!-- Main Dashboard Container -->
+    <main class="dashboard-container">
 
-      <!-- Executive KPI Telemetry Row -->
-      <section class="kpi-row">
-        <div class="kpi-box">
-          <span class="kpi-label">Active Disruption</span>
-          <span class="kpi-value" id="kpiSeverity" style="color: var(--accent-red); font-size: 15px;">CRITICAL</span>
-          <span class="kpi-subtext" id="kpiLocation">Circuit House - Nanthoor</span>
-        </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Active Forecast Horizon</span>
-          <span class="kpi-value highlight-cyan" id="valActiveHorizon">T+30 min</span>
-          <span class="kpi-subtext">Multi-Step Model</span>
-        </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Total Network Delay</span>
-          <span class="kpi-value highlight-red" id="valNetworkDelay">+0.0 min</span>
-          <span class="kpi-subtext">Delay Relative to Baseline</span>
-        </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Peak Queue Buildup</span>
-          <span class="kpi-value highlight-amber" id="kpiQueueMeters">0 m</span>
-          <span class="kpi-subtext" id="kpiExcessPcu">0 PCU Backlog</span>
-        </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Critical Saturated Junctions</span>
-          <span class="kpi-value highlight-amber" id="valSaturatedJunctions">0</span>
-          <span class="kpi-subtext">&ge;70% Capacity Overload</span>
-        </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Recommended Action Plan</span>
-          <span class="kpi-value highlight-green" id="valOptimalMitigation" style="font-size: 14px;">Scenario D (-74%)</span>
-          <span class="kpi-subtext">Coordinated Protocol</span>
-        </div>
-      </section>
+      <!-- ========================================================================= -->
+      <!-- VIEW 1: TACTICAL OPERATIONS & INCIDENT CONTROL (POLICE OPERATORS)        -->
+      <!-- ========================================================================= -->
+      <div id="viewTactical" class="view-panel active">
 
-      <!-- Main Operational 3-Column Grid -->
-      <div class="dashboard-main-grid">
+        <!-- Executive KPI Telemetry Strip (6 Cards with Clean Icons & Top Highlights) -->
+        <section class="kpi-row" aria-label="Key Operational Indicators">
+          <div class="kpi-box border-red">
+            <div class="kpi-head">
+              <span class="kpi-label">Active Disruption</span>
+              <svg class="kpi-icon icon-red" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-red" id="kpiSeverity">CRITICAL</span>
+            <span class="kpi-subtext" id="kpiLocation">Circuit House - Nanthoor</span>
+          </div>
+
+          <div class="kpi-box border-cyan">
+            <div class="kpi-head">
+              <span class="kpi-label">Forecast Horizon</span>
+              <svg class="kpi-icon icon-cyan" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-cyan" id="valActiveHorizon">T+30 min</span>
+            <span class="kpi-subtext">Spatiotemporal Wave Model</span>
+          </div>
+
+          <div class="kpi-box border-red">
+            <div class="kpi-head">
+              <span class="kpi-label">Total Network Delay</span>
+              <svg class="kpi-icon icon-red" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                <polyline points="17 6 23 6 23 12"></polyline>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-red" id="valNetworkDelay">+0.0 min</span>
+            <span class="kpi-subtext">Delay Relative to Baseline</span>
+          </div>
+
+          <div class="kpi-box border-amber">
+            <div class="kpi-head">
+              <span class="kpi-label">Peak Queue Buildup</span>
+              <svg class="kpi-icon icon-amber" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="1" y="3" width="15" height="13"></rect>
+                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-amber" id="kpiQueueMeters">0 m</span>
+            <span class="kpi-subtext" id="kpiExcessPcu">0 PCU Backlog</span>
+          </div>
+
+          <div class="kpi-box border-amber">
+            <div class="kpi-head">
+              <span class="kpi-label">Critical Junctions</span>
+              <svg class="kpi-icon icon-amber" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="22" y1="12" x2="18" y2="12"></line>
+                <line x1="6" y1="12" x2="2" y2="12"></line>
+                <line x1="12" y1="6" x2="12" y2="2"></line>
+                <line x1="12" y1="22" x2="12" y2="18"></line>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-amber" id="valSaturatedJunctions">0</span>
+            <span class="kpi-subtext">&ge;70% Capacity Overload</span>
+          </div>
+
+          <div class="kpi-box border-green">
+            <div class="kpi-head">
+              <span class="kpi-label">Recommended Action</span>
+              <svg class="kpi-icon icon-green" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <polyline points="9 12 11 14 15 10"></polyline>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-green" id="valOptimalMitigation">Scenario D (-74%)</span>
+            <span class="kpi-subtext">Coordinated Protocol</span>
+          </div>
+        </section>
+
+        <!-- Main Operational 3-Column Grid -->
+        <div class="dashboard-main-grid">
+
+          <!-- ========================================================================= -->
+          <!-- COLUMN 1: CITIZEN INGESTION & INCIDENT DISRUPTION CONTROLLER             -->
+          <!-- ========================================================================= -->
+          <div class="dashboard-col">
+
+            <!-- 1. Citizen Reports Ingestion Queue (From Friend's Public Map App) -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                  </svg>
+                  <h2 class="card-title">Citizen Incident Reports Queue</h2>
+                </div>
+                <span class="badge badge-subtle" id="badgeCitizenCount">3 Inbound</span>
+              </div>
+              <p class="section-description">
+                Live incident reports ingested from public citizen mobile navigation apps. Verify to launch predictive spread forecast.
+              </p>
+              <div id="citizenReportsList" class="citizen-reports-list">
+                <div class="loading-state">Loading incoming citizen reports...</div>
+              </div>
+            </section>
+
+            <!-- 2. Active Disruption & Incident Parameters -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                  </svg>
+                  <h2 class="card-title">Disruption Event Controller</h2>
+                </div>
+                <span class="badge badge-accent">Input Parameters</span>
+              </div>
+
+              <!-- Quick Tactical Presets with Active Highlighting -->
+              <div class="preset-group">
+                <label class="form-label">Tactical Scenario Presets</label>
+                <div class="preset-btn-row">
+                  <button type="button" id="btnDemoNanthoor" class="preset-btn active" data-preset="nanthoor_freight_rollover">
+                    <span class="preset-dot dot-red"></span>
+                    Nanthoor Rollover
+                  </button>
+                  <button type="button" id="btnDemoBunts" class="preset-btn" data-preset="bunts_hostel_waterlogging">
+                    <span class="preset-dot dot-amber"></span>
+                    Bunts Flood
+                  </button>
+                  <button type="button" id="btnDemoMgRoad" class="preset-btn" data-preset="mg_road_breakdown">
+                    <span class="preset-dot dot-cyan"></span>
+                    MG Road Bus
+                  </button>
+                </div>
+              </div>
+
+              <form id="incidentForm" class="control-group">
+                <div class="form-field">
+                  <label class="form-label" for="incidentEdgeSelect">Disrupted Road Corridor</label>
+                  <select id="incidentEdgeSelect" class="form-select">
+                    <option value="corridor_cctv_07">Circuit House - Nanthoor Road (corridor_cctv_07)</option>
+                    <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
+                    <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
+                    <option value="corridor_cctv_11">Bejai Green Bypass Expressway (corridor_cctv_11)</option>
+                    <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial (corridor_cctv_13)</option>
+                    <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
+                  </select>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-field">
+                    <label class="form-label" for="incidentCategorySelect">Category</label>
+                    <select id="incidentCategorySelect" class="form-select">
+                      <option value="COLLISION">Collision</option>
+                      <option value="ROAD_BLOCKAGE">Road Blockage</option>
+                      <option value="VEHICLE_BREAKDOWN">Vehicle Breakdown</option>
+                      <option value="ROADWORKS">Roadworks</option>
+                      <option value="WEATHER_WATERLOGGING">Weather Waterlogging</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label" for="incidentSeveritySelect">Severity</label>
+                    <select id="incidentSeveritySelect" class="form-select">
+                      <option value="CRITICAL">Critical</option>
+                      <option value="HIGH" selected>High</option>
+                      <option value="MODERATE">Moderate</option>
+                      <option value="LOW">Low</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-field">
+                    <label class="form-label" for="capacityReductionInput">Capacity Cut (%)</label>
+                    <input type="number" id="capacityReductionInput" class="form-select" min="10" max="100" value="85" step="5">
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label" for="durationInput">Est Duration (min)</label>
+                    <input type="number" id="durationInput" class="form-select" min="10" max="180" value="60" step="5">
+                  </div>
+                </div>
+
+                <button type="submit" id="btnRunForecast" class="btn btn-primary btn-block">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  Run Spatiotemporal Impact Forecast
+                </button>
+              </form>
+
+              <!-- Active Incident Telemetry Box -->
+              <div id="activeIncidentBox" class="cv-results-box">
+                <div class="results-meta">
+                  <span class="mono-label">INCIDENT ID:</span>
+                  <span id="txtIncidentId" class="mono-val">-</span>
+                  <span class="mono-label">STATUS:</span>
+                  <span id="txtIncidentStatus" class="mono-val status-val-red">ACTIVE</span>
+                </div>
+                <div id="txtIncidentDesc" class="results-desc">
+                  Loading scenario parameters...
+                </div>
+              </div>
+            </section>
+
+          </div>
+
+          <!-- ========================================================================= -->
+          <!-- COLUMN 2: SPATIOTEMPORAL SPREAD FORECAST & SATURATED JUNCTIONS           -->
+          <!-- ========================================================================= -->
+          <div class="dashboard-col">
+
+            <!-- 1. Congestion Spread Forecast (15m, 30m, 60m) -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  <h2 class="card-title">Congestion Spread Forecast Engine</h2>
+                </div>
+                <span class="badge badge-subtle">Shockwave Model</span>
+              </div>
+
+              <div class="horizon-btn-group" role="tablist" aria-label="Forecast Horizon Selector">
+                <button type="button" class="horizon-pill" data-horizon="15">T+15m Forecast</button>
+                <button type="button" class="horizon-pill active" data-horizon="30">T+30m Forecast</button>
+                <button type="button" class="horizon-pill" data-horizon="60">T+60m Forecast</button>
+              </div>
+
+              <div id="forecastSummaryBox" class="forecast-narrative-box">
+                <div class="forecast-narrative-title" id="forecastHorizonTitle">
+                  Forecast Horizon: T+30 Minutes
+                </div>
+                <div class="forecast-narrative-body" id="forecastNarrative">
+                  Simulating queue spillback, downstream bottlenecks, and diversion load...
+                </div>
+              </div>
+
+              <div class="stat-pills-grid">
+                <div class="stat-pill">
+                  <div class="stat-num" id="statQueueMeters">0 m</div>
+                  <div class="stat-name">Queue Length Accumulation</div>
+                </div>
+                <div class="stat-pill">
+                  <div class="stat-num" id="statExcessPcu">0 PCU</div>
+                  <div class="stat-name">Volume Backlog (Excess PCU)</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- 2. Impacted Corridors Spread Breakdown Table -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                  </svg>
+                  <h2 class="card-title">Network Corridors Impact Progression</h2>
+                </div>
+                <span class="badge badge-subtle">Arterial Load</span>
+              </div>
+              <p class="section-description">
+                Macroscopic spread breakdown across direct disruption, upstream feeder spillback, and diversion-loaded bypasses.
+              </p>
+              <div class="data-table-wrapper">
+                <table class="data-table" id="corridorSpreadTable">
+                  <thead>
+                    <tr>
+                      <th>Corridor / Segment</th>
+                      <th>Classification</th>
+                      <th>Pred Travel Time</th>
+                      <th>Queue Length</th>
+                      <th>V/C Ratio</th>
+                    </tr>
+                  </thead>
+                  <tbody id="corridorSpreadTbody">
+                    <tr>
+                      <td colspan="5" class="table-empty-cell">Calculating corridor spread...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- 3. Critical Saturated Junctions Table -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  <h2 class="card-title">Critical Junction Saturation Monitor</h2>
+                </div>
+                <span class="badge badge-accent">Intersection Load</span>
+              </div>
+              <p class="section-description">
+                Intersections exceeding nominal capacity threshold (&ge;70%) with severe queue spillback risk.
+              </p>
+              <div class="data-table-wrapper">
+                <table class="data-table" id="saturatedJuncTable">
+                  <thead>
+                    <tr>
+                      <th>Intersection</th>
+                      <th>Saturation Index</th>
+                      <th>Spillback Risk</th>
+                      <th>Delayed Feeders</th>
+                    </tr>
+                  </thead>
+                  <tbody id="saturatedJuncTbody">
+                    <tr>
+                      <td colspan="4" class="table-empty-cell">Analyzing junction saturation...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+          </div>
+
+          <!-- ========================================================================= -->
+          <!-- COLUMN 3: RISK PRIORITIZATION & WHAT-IF INTERVENTION MATRIX              -->
+          <!-- ========================================================================= -->
+          <div class="dashboard-col">
+
+            <!-- 1. Prioritized Risk Ranking & Critical Junctions -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                  </svg>
+                  <h2 class="card-title">Prioritized Chokepoint Risk Ranking</h2>
+                </div>
+                <span class="badge badge-accent">Score 0-100</span>
+              </div>
+
+              <p class="section-description">
+                Composite risk decomposed into Severity (25), V/C Load (25), Centrality & Dependency (25), and Diversion Deficit (25).
+              </p>
+
+              <div id="riskRankList" class="risk-rank-list">
+                <div class="loading-state">Generating risk assessment...</div>
+              </div>
+            </section>
+
+            <!-- 2. What-If Intervention Planner -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2">
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                  </svg>
+                  <h2 class="card-title">What-If Intervention Optimization Matrix</h2>
+                </div>
+                <span class="badge badge-accent">Scenario Comparison</span>
+              </div>
+
+              <p class="section-description">
+                Evaluates candidate operational responses under identical initial conditions to select the optimal mitigation strategy.
+              </p>
+
+              <!-- Recommendation Banner with 1-Click Action -->
+              <div id="recomPlanBanner" class="recom-banner">
+                <div class="recom-banner-top">
+                  <div class="recom-banner-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2.2">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                      <polyline points="9 12 11 14 15 10"></polyline>
+                    </svg>
+                    <strong>RECOMMENDED ACTION PLAN</strong>
+                  </div>
+                  <span class="badge-recom">OPTIMAL PROTOCOL</span>
+                </div>
+                <div id="recomRationaleTxt" class="recom-banner-text">
+                  Evaluating candidate response scenarios...
+                </div>
+                <div class="recom-banner-actions">
+                  <button type="button" id="btnApplyRecomPlan" class="btn btn-sm btn-recom-action">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Apply & Pre-fill Deployment Console
+                  </button>
+                </div>
+              </div>
+
+              <div id="intervScenarioList" class="interv-scenario-list"></div>
+            </section>
+
+          </div>
+
+        </div>
 
         <!-- ========================================================================= -->
-        <!-- COLUMN 1: LIVE INGESTION & TACTICAL POLICE DEPLOYMENT                    -->
+        <!-- FULL-WIDTH SECTION: POLICE & RESOURCE DEPLOYMENT CONSOLE                  -->
         <!-- ========================================================================= -->
-        <div class="dashboard-col">
-
-          <!-- 1. Citizen Reports Ingestion Queue (From Friend's Public Map App) -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Citizen Incident Reports Queue</h2>
-              <span class="badge badge-subtle" id="badgeCitizenCount">3 Inbound</span>
-            </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Live reports ingested from public citizen mobile navigation apps. Verify to launch predictive spread forecast.
-            </p>
-            <div id="citizenReportsList" class="citizen-reports-list">
-              <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 10px;">
-                Loading incoming citizen reports...
+        <section class="card panel-section dispatch-console-card">
+          <div class="card-header">
+            <div class="card-header-left">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2.2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <circle cx="12" cy="11" r="3"></circle>
+              </svg>
+              <div>
+                <h2 class="card-title">Traffic Police & Field Resource Deployment Console</h2>
+                <p class="section-description-inline">
+                  Direct tactical deployment of traffic police officers, heavy recovery cranes, and patrol interceptors to chokepoints.
+                </p>
               </div>
             </div>
-          </section>
+            <span class="badge badge-accent">Tactical Dispatch</span>
+          </div>
 
-          <!-- 2. Active Disruption & Incident Parameters -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Disruption Event Controller</h2>
-              <span class="badge badge-accent">Input Parameters</span>
-            </div>
-
-            <div style="margin-bottom: 8px;">
-              <label class="form-label">Quick Scenario Presets (Live Tactical Demos)</label>
-              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <button type="button" id="btnDemoNanthoor" class="btn btn-sm btn-secondary" style="flex: 1;">
-                  Nanthoor Rollover
-                </button>
-                <button type="button" id="btnDemoBunts" class="btn btn-sm btn-secondary" style="flex: 1;">
-                  Bunts Flood
-                </button>
-                <button type="button" id="btnDemoMgRoad" class="btn btn-sm btn-secondary" style="flex: 1;">
-                  MG Road Bus
-                </button>
+          <div class="dispatch-console-grid">
+            <!-- Left: Tactical Dispatch Form -->
+            <form id="dispatchForm" class="dispatch-form-card">
+              <div class="dispatch-form-header">
+                <span>Deploy Field Resource Unit to Scene</span>
+                <span class="badge-mini">Live Dispatch</span>
               </div>
-            </div>
-
-            <form id="incidentForm" class="control-group">
-              <label class="form-label" for="incidentEdgeSelect">Disrupted Road Corridor</label>
-              <select id="incidentEdgeSelect" class="form-select">
-                <option value="corridor_cctv_07">Circuit House - Nanthoor Road (corridor_cctv_07)</option>
-                <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
-                <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
-                <option value="corridor_cctv_11">Bejai Green Bypass Expressway (corridor_cctv_11)</option>
-                <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial (corridor_cctv_13)</option>
-                <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
-              </select>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <div>
-                  <label class="form-label" for="incidentCategorySelect">Category</label>
-                  <select id="incidentCategorySelect" class="form-select">
-                    <option value="COLLISION">Collision</option>
-                    <option value="ROAD_BLOCKAGE">Road Blockage</option>
-                    <option value="VEHICLE_BREAKDOWN">Vehicle Breakdown</option>
-                    <option value="ROADWORKS">Roadworks</option>
-                    <option value="WEATHER_WATERLOGGING">Weather Waterlogging</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" for="incidentSeveritySelect">Severity</label>
-                  <select id="incidentSeveritySelect" class="form-select">
-                    <option value="CRITICAL">Critical</option>
-                    <option value="HIGH" selected>High</option>
-                    <option value="MODERATE">Moderate</option>
-                    <option value="LOW">Low</option>
-                  </select>
-                </div>
+              
+              <div class="form-field">
+                <label class="form-label" for="dispatchLocationSelect">Target Junction / Bottleneck</label>
+                <select id="dispatchLocationSelect" class="form-select">
+                  <option value="INT_NANTHOOR">Nanthoor Junction (NH-66 / NH-73)</option>
+                  <option value="INT_BUNTS_HOSTEL">Bunts Hostel Circle</option>
+                  <option value="corridor_cctv_07">Circuit House - Nanthoor Highway Arterial</option>
+                  <option value="INT_KADRI_FIRE">Kadri Junction Feeder</option>
+                  <option value="INT_PUMPWELL">Pumpwell (Mahaveer) Circle</option>
+                  <option value="INT_LALBAGH">Lalbagh Circle (MG Road)</option>
+                </select>
               </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <div>
-                  <label class="form-label" for="capacityReductionInput">Capacity Cut (%)</label>
-                  <input type="number" id="capacityReductionInput" class="form-select" min="10" max="100" value="80" step="5">
-                </div>
-                <div>
-                  <label class="form-label" for="durationInput">Est Duration (min)</label>
-                  <input type="number" id="durationInput" class="form-select" min="10" max="180" value="60" step="5">
-                </div>
+              <div class="form-field">
+                <label class="form-label" for="dispatchResourceSelect">Resource Unit Type</label>
+                <select id="dispatchResourceSelect" class="form-select">
+                  <option value="TRAFFIC_POLICE_OFFICER">Traffic Police Officers (2 Units)</option>
+                  <option value="HEAVY_TOW_UNIT">Heavy Tow Recovery Crane</option>
+                  <option value="PATROL_INTERCEPTOR">Patrol Interceptor Car</option>
+                  <option value="RAPID_RESPONSE_TEAM">Rapid Response Team (QRT)</option>
+                </select>
               </div>
 
-              <button type="submit" id="btnRunForecast" class="btn btn-primary btn-block" style="margin-top: 6px;">
-                Run Spatiotemporal Impact Forecast
-              </button>
-            </form>
-
-            <div id="activeIncidentBox" class="cv-results-box" style="margin-top: 8px;">
-              <div class="results-meta">
-                <span class="mono-label">INCIDENT ID:</span>
-                <span id="txtIncidentId" class="mono-val">-</span>
-                <span class="mono-label">STATUS:</span>
-                <span id="txtIncidentStatus" class="mono-val" style="color: var(--accent-red);">ACTIVE</span>
-              </div>
-              <div id="txtIncidentDesc" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
-                Loading scenario parameters...
-              </div>
-            </div>
-          </section>
-
-          <!-- 3. Traffic Police & Resource Deployment Console -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Police & Resource Deployment</h2>
-              <span class="badge badge-accent">Tactical Dispatch</span>
-            </div>
-
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Deploy traffic police officers, recovery cranes, or patrol cars to specific junctions and bottlenecks.
-            </p>
-
-            <form id="dispatchForm" style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
-              <div style="font-size: 11px; font-weight: 700; color: var(--accent-blue); margin-bottom: 6px;">
-                Create Tactical Field Dispatch Order
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px;">
-                <div>
-                  <label class="form-label" for="dispatchLocationSelect">Target Junction / Road</label>
-                  <select id="dispatchLocationSelect" class="form-select">
-                    <option value="INT_NANTHOOR">Nanthoor Junction (NH-66 / NH-73)</option>
-                    <option value="INT_BUNTS_HOSTEL">Bunts Hostel Circle</option>
-                    <option value="corridor_cctv_07">Circuit House - Nanthoor Highway</option>
-                    <option value="INT_KADRI_FIRE">Kadri Junction Feeder</option>
-                    <option value="INT_PUMPWELL">Pumpwell (Mahaveer) Circle</option>
-                    <option value="INT_LALBAGH">Lalbagh Circle (MG Road)</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" for="dispatchResourceSelect">Resource Unit Type</label>
-                  <select id="dispatchResourceSelect" class="form-select">
-                    <option value="TRAFFIC_POLICE_OFFICER">Traffic Police Officers (2 Units)</option>
-                    <option value="HEAVY_TOW_UNIT">Heavy Tow Recovery Crane</option>
-                    <option value="PATROL_INTERCEPTOR">Patrol Interceptor Car</option>
-                    <option value="RAPID_RESPONSE_TEAM">Rapid Response Team (QRT)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style="margin-bottom: 6px;">
+              <div class="form-field">
                 <label class="form-label" for="dispatchDirectiveInput">Operational Directive</label>
                 <input type="text" id="dispatchDirectiveInput" class="form-select" value="Manual Signal Override & Queue Flushing">
+                <!-- Quick Directive Action Chips -->
+                <div class="directive-chips-row">
+                  <button type="button" class="chip-btn" data-directive="Manual Signal Override & Queue Flushing">Signal Override</button>
+                  <button type="button" class="chip-btn" data-directive="Enforce Upstream Freight Diversion at NH-66">NH-66 Diversion</button>
+                  <button type="button" class="chip-btn" data-directive="Rapid Tow Crane Extraction of Disabled Vehicle">Crane Extraction</button>
+                  <button type="button" class="chip-btn" data-directive="Pedestrian & Transit Bus Flow Segregation">Transit Clearing</button>
+                </div>
               </div>
 
-              <button type="submit" class="btn btn-primary btn-block" style="font-size: 11px; padding: 6px 12px;">
-                Dispatch Resource Unit to Field
+              <button type="submit" class="btn btn-primary btn-block">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+                Dispatch Tactical Unit to Scene
               </button>
             </form>
 
-            <label class="form-label">Active Field Dispatches Ledger</label>
-            <div id="dispatchOrdersList" class="dispatch-list">
-              <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px;">
-                Loading active dispatches...
+            <!-- Right: Active Dispatches Ledger Table -->
+            <div class="dispatch-ledger-card">
+              <div class="dispatch-ledger-head">
+                <span class="ledger-title">Active Field Dispatches Ledger</span>
+                <span class="ledger-subtitle" id="ledgerCountBadge">3 Units Active</span>
+              </div>
+              <div id="dispatchOrdersList" class="dispatch-list">
+                <div class="loading-state">Loading active dispatches...</div>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-        </div>
+      </div>
 
-        <!-- ========================================================================= -->
-        <!-- COLUMN 2: SPATIOTEMPORAL SPREAD FORECAST & SATURATED JUNCTIONS           -->
-        <!-- ========================================================================= -->
-        <div class="dashboard-col">
+      <!-- ========================================================================= -->
+      <!-- VIEW 2: STRATEGIC PLANNING & INFRASTRUCTURE (CITY TRAFFIC PLANNERS)      -->
+      <!-- ========================================================================= -->
+      <div id="viewPlanners" class="view-panel" style="display: none;">
 
-          <!-- 1. Congestion Spread Forecast (15m, 30m, 60m) -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Congestion Spread Forecast Engine</h2>
-              <span class="badge badge-subtle">Multi-Horizon</span>
+        <!-- Planners Executive Macro Metrics Strip -->
+        <section class="kpi-row" aria-label="City-Wide Traffic Engineering Indicators">
+          <div class="kpi-box border-cyan">
+            <div class="kpi-head">
+              <span class="kpi-label">Morning Peak Speed</span>
+              <svg class="kpi-icon icon-cyan" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 14 10"></polyline>
+              </svg>
             </div>
+            <span class="kpi-value highlight-cyan" id="planMornSpeed">24.5 km/h</span>
+            <span class="kpi-subtext">V/C Ratio 1.28 (Overload)</span>
+          </div>
 
-            <div class="horizon-btn-group">
-              <button type="button" class="horizon-pill" data-horizon="15">T+15m Forecast</button>
-              <button type="button" class="horizon-pill active" data-horizon="30">T+30m Forecast</button>
-              <button type="button" class="horizon-pill" data-horizon="60">T+60m Forecast</button>
+          <div class="kpi-box border-green">
+            <div class="kpi-head">
+              <span class="kpi-label">Mid-Day Off-Peak</span>
+              <svg class="kpi-icon icon-green" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
             </div>
+            <span class="kpi-value highlight-green" id="planMidSpeed">41.2 km/h</span>
+            <span class="kpi-subtext">V/C Ratio 0.62 (Free Flow)</span>
+          </div>
 
-            <div id="forecastSummaryBox" style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-top: 8px;">
-              <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;" id="forecastHorizonTitle">
-                Forecast Horizon: T+30 Minutes
+          <div class="kpi-box border-red">
+            <div class="kpi-head">
+              <span class="kpi-label">Evening Peak Speed</span>
+              <svg class="kpi-icon icon-red" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-red" id="planEveSpeed">21.8 km/h</span>
+            <span class="kpi-subtext">V/C Ratio 1.42 (Severe)</span>
+          </div>
+
+          <div class="kpi-box border-amber">
+            <div class="kpi-head">
+              <span class="kpi-label">Peak Delay Multiplier</span>
+              <svg class="kpi-icon icon-amber" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-amber" id="planDelayIndex">2.15x</span>
+            <span class="kpi-subtext">Baseline Off-Peak Factor</span>
+          </div>
+
+          <div class="kpi-box border-blue">
+            <div class="kpi-head">
+              <span class="kpi-label">Capital Proposals</span>
+              <svg class="kpi-icon icon-blue" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-cyan" id="planCapitalCount">4 Projects</span>
+            <span class="kpi-subtext">Data-Driven Interventions</span>
+          </div>
+
+          <div class="kpi-box border-green">
+            <div class="kpi-head">
+              <span class="kpi-label">Annual Relief</span>
+              <svg class="kpi-icon icon-green" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <span class="kpi-value highlight-green" id="planReliefCount">46 Events/Yr</span>
+            <span class="kpi-subtext">Bottlenecks Mitigated</span>
+          </div>
+        </section>
+
+        <!-- Planners Main 2-Column Grid -->
+        <div class="planners-main-grid">
+
+          <!-- Left: Data-Driven Capital Infrastructure Recommendations -->
+          <div class="planners-col">
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                  </svg>
+                  <h2 class="card-title">Data-Driven Capital Infrastructure Proposals</h2>
+                </div>
+                <span class="badge badge-accent">Long-Term ROI</span>
               </div>
-              <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" id="forecastNarrative">
-                Simulating queue spillback, downstream bottlenecks, and diversion load...
+              <p class="section-description">
+                Structural engineering, flyover grade-separation, and dynamic signal investments synthesized from recurring chokepoint data.
+              </p>
+
+              <div id="infraProposalsList" class="infra-proposals-grid">
+                <div class="loading-state">Loading infrastructure proposals...</div>
               </div>
-            </div>
+            </section>
+          </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
-              <div class="stat-pill">
-                <div class="stat-num" id="statQueueMeters">0 m</div>
-                <div class="stat-name">Queue Length Accumulation</div>
+          <!-- Right: Macro Traffic Patterns & What-If Infrastructure Simulator -->
+          <div class="planners-col">
+
+            <!-- 1. Macro Traffic Patterns Analysis -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  <h2 class="card-title">Peak vs Off-Peak Congestion Distribution</h2>
+                </div>
+                <span class="badge badge-subtle">Macro Intelligence</span>
               </div>
-              <div class="stat-pill">
-                <div class="stat-num" id="statExcessPcu">0 PCU</div>
-                <div class="stat-name">Volume Backlog (Excess PCU)</div>
+
+              <div id="trafficPatternReportBox" class="traffic-patterns-box">
+                <div class="pattern-summary-header">
+                  <span>Mangaluru Urban Sector Diurnal Variation Analysis</span>
+                  <span class="badge-mini">2026 Baseline</span>
+                </div>
+                <div id="patternSummaryText" class="pattern-summary-text">
+                  Loading macro traffic patterns...
+                </div>
+                <div id="patternPeriodsGrid" class="pattern-periods-grid"></div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <!-- 2. Impacted Corridors Spread Breakdown Table -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Network Corridors Impact Progression</h2>
-              <span class="badge badge-subtle">Arterial Load</span>
-            </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Macroscopic spread breakdown across direct disruption, upstream feeder spillback, and diversion-loaded bypasses.
-            </p>
-            <div class="data-table-wrapper">
-              <table class="data-table" id="corridorSpreadTable">
-                <thead>
-                  <tr>
-                    <th>Corridor / Segment</th>
-                    <th>Impact Classification</th>
-                    <th>Pred Travel Time</th>
-                    <th>Queue Length</th>
-                    <th>V/C Ratio</th>
-                  </tr>
-                </thead>
-                <tbody id="corridorSpreadTbody">
-                  <tr>
-                    <td colspan="5" style="text-align: center; color: var(--text-muted);">Calculating corridor spread...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <!-- 3. Critical Saturated Junctions Table -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Critical Junction Saturation Monitor</h2>
-              <span class="badge badge-accent">Intersection Load</span>
-            </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Intersections exceeding nominal capacity threshold with severe queue spillback risk.
-            </p>
-            <div class="data-table-wrapper">
-              <table class="data-table" id="saturatedJuncTable">
-                <thead>
-                  <tr>
-                    <th>Intersection</th>
-                    <th>Saturation Index</th>
-                    <th>Spillback Risk</th>
-                    <th>Incoming Delayed Feeders</th>
-                  </tr>
-                </thead>
-                <tbody id="saturatedJuncTbody">
-                  <tr>
-                    <td colspan="4" style="text-align: center; color: var(--text-muted);">Analyzing junction saturation...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-        </div>
-
-        <!-- ========================================================================= -->
-        <!-- COLUMN 3: RISK PRIORITIZATION & WHAT-IF INTERVENTION MATRIX              -->
-        <!-- ========================================================================= -->
-        <div class="dashboard-col">
-
-          <!-- 1. Prioritized Risk Ranking & Critical Junctions -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Prioritized Chokepoint Risk Ranking</h2>
-              <span class="badge badge-accent">Composite Score 0-100</span>
-            </div>
-
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Decomposed into Severity (25), V/C Load (25), Centrality & Dependency (25), and Diversion Deficit (25).
-            </p>
-
-            <div id="riskRankList" class="risk-rank-list" style="max-height: 380px;">
-              <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 12px;">
-                Generating risk assessment...
+            <!-- 2. What-If Infrastructure Capacity Simulator -->
+            <section class="card panel-section">
+              <div class="card-header">
+                <div class="card-header-left">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                  </svg>
+                  <h2 class="card-title">What-If Infrastructure Modeling Simulator</h2>
+                </div>
+                <span class="badge badge-accent">Investment ROI Model</span>
               </div>
-            </div>
-          </section>
+              <p class="section-description">
+                Simulate the network-wide benefit of adding lane capacity, building a grade-separated flyover, or optimizing signals.
+              </p>
 
-          <!-- 2. What-If Intervention Planner -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">What-If Intervention Optimization Matrix</h2>
-              <span class="badge badge-accent">Scenario Comparison</span>
-            </div>
+              <form id="simulateInfraForm" class="control-group">
+                <div class="form-field">
+                  <label class="form-label" for="simInfraEdgeSelect">Target Chronic Chokepoint</label>
+                  <select id="simInfraEdgeSelect" class="form-select">
+                    <option value="corridor_cctv_07">Circuit House - Nanthoor Highway Arterial (corridor_cctv_07)</option>
+                    <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
+                    <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
+                    <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial (corridor_cctv_13)</option>
+                  </select>
+                </div>
 
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Evaluates candidate operational responses under identical initial conditions to select the optimal mitigation strategy.
-            </p>
+                <div class="form-field">
+                  <label class="form-label" for="simInfraTypeSelect">Structural Intervention Type</label>
+                  <select id="simInfraTypeSelect" class="form-select">
+                    <option value="GRADE_SEPARATION">Grade-Separated 4-Lane Flyover & Overpass</option>
+                    <option value="ADD_LANE">Add Dedicated Travel Lane (+50% Capacity)</option>
+                    <option value="SIGNAL_OPTIMIZATION">Dynamic Adaptive Signal Phase Optimization</option>
+                  </select>
+                </div>
 
-            <!-- Recommendation Banner -->
-            <div id="recomPlanBanner" style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-green); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <strong style="color: var(--accent-green); font-size: 12px;">RECOMMENDED ACTION PLAN</strong>
-                <span class="badge-recom">OPTIMAL</span>
+                <button type="submit" id="btnSimulateInfra" class="btn btn-primary btn-block">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  Simulate Capital Investment ROI & Capacity Relief
+                </button>
+              </form>
+
+              <!-- Simulation Output Box -->
+              <div id="simInfraResultBox" class="sim-infra-results" style="display: none;">
+                <div class="sim-result-header">
+                  <span class="sim-result-title">Projected Network Relief Output</span>
+                  <span class="badge-recom" id="simResultBadge">-63.9% Delay</span>
+                </div>
+                <div class="sim-metrics-grid">
+                  <div class="sim-metric-pill">
+                    <span class="sim-metric-label">Baseline Delay</span>
+                    <span class="sim-metric-val" id="simBaseDelay">48.5 min</span>
+                  </div>
+                  <div class="sim-metric-pill">
+                    <span class="sim-metric-label">Simulated Delay</span>
+                    <span class="sim-metric-val highlight-green" id="simSimDelay">17.5 min</span>
+                  </div>
+                  <div class="sim-metric-pill">
+                    <span class="sim-metric-label">Time Saved</span>
+                    <span class="sim-metric-val highlight-green" id="simDelaySaved">31.0 min</span>
+                  </div>
+                  <div class="sim-metric-pill">
+                    <span class="sim-metric-label">Queue Suppression</span>
+                    <span class="sim-metric-val highlight-cyan" id="simQueueReduc">-75.0%</span>
+                  </div>
+                </div>
+                <div id="simResultSummary" class="sim-result-summary-txt"></div>
               </div>
-              <div id="recomRationaleTxt" style="font-size: 11px; color: var(--text-primary); line-height: 1.4;">
-                Evaluating candidate response scenarios...
-              </div>
-            </div>
 
-            <div id="intervScenarioList" class="interv-scenario-list" style="max-height: 480px;"></div>
-          </section>
+            </section>
+
+          </div>
 
         </div>
 
       </div>
 
-    </div>
+    </main>
   </div>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=3.2"></script>
 </body>
 </html>
