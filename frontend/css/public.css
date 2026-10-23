@@ -756,12 +756,10 @@
 
 @keyframes pulseBadge {
   0%, 100% {
-    transform: scale(1);
     box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
   }
   50% {
-    transform: scale(1.1);
-    box-shadow: 0 0 16px rgba(239, 68, 68, 0.9);
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.95);
   }
 }
 
@@ -1069,12 +1067,10 @@
 
 @keyframes pulseWarning {
   0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.75), 0 2px 6px rgba(0,0,0,0.5);
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.75), 0 2px 6px rgba(0,0,0,0.5);
   }
   50% {
-    transform: scale(1.15);
-    box-shadow: 0 0 25px rgba(239, 68, 68, 1), 0 2px 8px rgba(0,0,0,0.6);
+    box-shadow: 0 0 26px rgba(239, 68, 68, 1), 0 2px 8px rgba(0,0,0,0.6);
   }
 }
 
@@ -1138,5 +1134,52 @@
   border-color: #60a5fa;
   box-shadow: 0 0 18px rgba(37, 99, 235, 0.6);
 }
+
+/* Safe MapLibre Marker Containers (Zero transform overwrite) */
+.maplibre-marker-anchor {
+  pointer-events: auto;
+}
+
+.maplibre-incident-pin-inner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);
+  border: 2px solid #ffffff;
+  cursor: pointer;
+  animation: pulseWarning 2s infinite ease-in-out;
+  transition: filter 0.15s ease;
+}
+
+.maplibre-incident-pin-inner:hover {
+  filter: brightness(1.25);
+}
+
+.maplibre-gps-beacon-inner {
+  width: 22px;
+  height: 22px;
+  background: #3b82f6;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.95);
+  animation: pulseBeaconGlow 2s infinite ease-in-out;
+}
+
+@keyframes pulseBeaconGlow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(59, 130, 246, 1);
+  }
+}
+
 
 

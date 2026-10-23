@@ -241,6 +241,109 @@ class MapLibre3DTrafficMap {
         .setHTML(content)
         .addTo(this.map);
     });
+
+    // 4. Native WebGL Junction Source & Layers (Stable, zero-lag, no drifting or flying away)
+    if (!this.map.getSource('traffic-junctions')) {
+      this.map.addSource('traffic-junctions', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+    }
+
+    // Junction Soft Luminous Aura
+    if (!this.map.getLayer('traffic-junctions-glow')) {
+      this.map.addLayer({
+        id: 'traffic-junctions-glow',
+        type: 'circle',
+        source: 'traffic-junctions',
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            12, 7,
+            15, 13,
+            18, 19
+          ],
+          'circle-color': '#3b82f6',
+          'circle-opacity': 0.35,
+          'circle-blur': 0.8,
+          'circle-pitch-alignment': 'viewport'
+        }
+      });
+    }
+
+    // Junction Sharp Core Node
+    if (!this.map.getLayer('traffic-junctions-core')) {
+      this.map.addLayer({
+        id: 'traffic-junctions-core',
+        type: 'circle',
+        source: 'traffic-junctions',
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            12, 4.5,
+            15, 7.5,
+            18, 10
+          ],
+          'circle-color': '#1d4ed8',
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#ffffff',
+          'circle-pitch-alignment': 'viewport'
+        }
+      });
+    }
+
+    // Junction Label (Legible and cleanly positioned above each junction node)
+    if (!this.map.getLayer('traffic-junctions-label')) {
+      this.map.addLayer({
+        id: 'traffic-junctions-label',
+        type: 'symbol',
+        source: 'traffic-junctions',
+        minzoom: 13.8,
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-size': 11,
+          'text-offset': [0, 1.25],
+          'text-anchor': 'top',
+          'text-optional': true,
+          'text-allow-overlap': false
+        },
+        paint: {
+          'text-color': '#f8fafc',
+          'text-halo-color': '#0f172a',
+          'text-halo-width': 2.5
+        }
+      });
+    }
+
+    // Interactive Hover and Click handlers for Junctions
+    this.map.on('mouseenter', 'traffic-junctions-core', () => {
+      this.map.getCanvas().style.cursor = 'pointer';
+      this.map.setPaintProperty('traffic-junctions-core', 'circle-color', '#38bdf8');
+    });
+
+    this.map.on('mouseleave', 'traffic-junctions-core', () => {
+      this.map.getCanvas().style.cursor = '';
+      this.map.setPaintProperty('traffic-junctions-core', 'circle-color', '#1d4ed8');
+    });
+
+    this.map.on('click', 'traffic-junctions-core', (e) => {
+      if (!e.features || e.features.length === 0) return;
+      const props = e.features[0].properties;
+
+      this.popup
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div style="font-family: sans-serif; font-size: 12px; color: #f8fafc; padding: 2px;">
+            <div style="font-weight: 800; font-size: 13px; color: #f8fafc; margin-bottom: 4px;">${props.name}</div>
+            <div style="color: #60a5fa; font-size: 11px; margin-bottom: 2px;">Junction ID: <code>${props.id}</code></div>
+            <div style="color: #94a3b8; font-size: 10px;">Classification: ${props.type || 'Key Intersection'}</div>
+          </div>
+        `)
+        .addTo(this.map);
+    });
   }
 
   // Render Network Nodes and Road-Following Edges
@@ -307,44 +410,27 @@ class MapLibre3DTrafficMap {
       });
     }
 
-    // Render 3D Junction Markers
-    nodes.forEach(node => {
-      const el = document.createElement('div');
-      el.className = 'maplibre-junction-badge';
-      el.style.cssText = `
-        background: #1e293b;
-        border: 2px solid #3b82f6;
-        color: #60a5fa;
-        font-family: monospace;
-        font-size: 10px;
-        font-weight: 800;
-        padding: 3px 6px;
-        border-radius: 12px;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
-        cursor: pointer;
-        transition: transform 0.15s ease;
-      `;
-      el.textContent = node.name.split(' ')[0].slice(0, 3).toUpperCase();
+    // Update WebGL Junctions GeoJSON Source (locked to coordinates, zero lag, zero drifting)
+    const junctionFeatures = nodes.map(node => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: [node.lng, node.lat]
+      },
+      properties: {
+        id: node.id,
+        name: node.name,
+        type: node.type || 'Key Intersection'
+      }
+    }));
 
-      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.2)'; });
-      el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; });
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([node.lng, node.lat])
-        .setPopup(
-          new maplibregl.Popup({ offset: 12, className: 'maplibre-dark-popup' })
-            .setHTML(`
-              <div style="font-family: sans-serif; font-size: 12px; padding: 2px;">
-                <div style="font-weight: 800; font-size: 13px; color: #f8fafc;">${node.name}</div>
-                <div style="color: #94a3b8; font-size: 11px;">Junction ID: <code>${node.id}</code></div>
-                <div style="color: #64748b; font-size: 10px; margin-top: 2px;">Type: ${node.type || 'Intersection'}</div>
-              </div>
-            `)
-        )
-        .addTo(this.map);
-
-      this.nodeMarkers.push(marker);
-    });
+    const junctionSource = this.map.getSource('traffic-junctions');
+    if (junctionSource) {
+      junctionSource.setData({
+        type: 'FeatureCollection',
+        features: junctionFeatures
+      });
+    }
   }
 
   _getEdgeColor(edge) {
@@ -371,25 +457,15 @@ class MapLibre3DTrafficMap {
     incidents.forEach(inc => {
       if (!inc.lat || !inc.lng) return;
 
-      const el = document.createElement('div');
-      el.className = 'maplibre-incident-pin';
-      el.style.cssText = `
-        background: #ef4444;
-        color: #ffffff;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 15px;
-        font-weight: 800;
-        box-shadow: 0 0 16px rgba(239, 68, 68, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);
-        border: 2px solid #ffffff;
-        cursor: pointer;
-        animation: pulseWarning 2s infinite ease-in-out;
-      `;
-      el.innerHTML = '⚠️';
+      // Safe Marker Anchor (MapLibre controls transform here without CSS conflict)
+      const anchor = document.createElement('div');
+      anchor.className = 'maplibre-marker-anchor';
+
+      // Inner element for styling, hover, and glowing effects
+      const innerPin = document.createElement('div');
+      innerPin.className = 'maplibre-incident-pin-inner';
+      innerPin.innerHTML = '⚠️';
+      anchor.appendChild(innerPin);
 
       const photoHtml = inc.photo
         ? `<div style="margin-top: 8px; border-radius: 6px; overflow: hidden; max-height: 120px; border: 1px solid #10b981;">
@@ -410,7 +486,7 @@ class MapLibre3DTrafficMap {
         </div>
       `;
 
-      const marker = new maplibregl.Marker({ element: el })
+      const marker = new maplibregl.Marker({ element: anchor, anchor: 'center' })
         .setLngLat([inc.lng, inc.lat])
         .setPopup(
           new maplibregl.Popup({ offset: 14, className: 'maplibre-dark-popup' })
@@ -439,18 +515,14 @@ class MapLibre3DTrafficMap {
       this.userGpsMarker.remove();
     }
 
-    const beacon = document.createElement('div');
-    beacon.style.cssText = `
-      width: 22px;
-      height: 22px;
-      background: #3b82f6;
-      border-radius: 50%;
-      border: 3px solid #ffffff;
-      box-shadow: 0 0 20px rgba(59, 130, 246, 0.95);
-      animation: pulseBadge 2s infinite ease-in-out;
-    `;
+    const anchor = document.createElement('div');
+    anchor.className = 'maplibre-marker-anchor';
 
-    this.userGpsMarker = new maplibregl.Marker({ element: beacon })
+    const beacon = document.createElement('div');
+    beacon.className = 'maplibre-gps-beacon-inner';
+    anchor.appendChild(beacon);
+
+    this.userGpsMarker = new maplibregl.Marker({ element: anchor, anchor: 'center' })
       .setLngLat([lng, lat])
       .setPopup(
         new maplibregl.Popup({ offset: 14, className: 'maplibre-dark-popup' })
