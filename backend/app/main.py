@@ -39,12 +39,12 @@ async def health_check():
         "platform_purpose": "Predictive Incident Impact Forecasting & What-If Intervention Planning",
     }
 
-@app.get("/driver")
+@app.api_route("/driver", methods=["GET", "HEAD"])
 async def driver_page():
     """Secondary supporting view: Field EMS Ambulance Navigator."""
     return FileResponse(settings.base_dir / "frontend" / "driver.html")
 
-@app.get("/operations")
+@app.api_route("/operations", methods=["GET", "HEAD"])
 async def operations_page():
     """Secondary supporting view: CCTV & Legacy Operations Console."""
     return FileResponse(settings.base_dir / "frontend" / "operations.html")
