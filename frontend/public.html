@@ -119,25 +119,27 @@
           <span id="statLatestTitle" style="color: #cbd5e1; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 150px; display: inline-block; vertical-align: middle;">Freight Rollover</span>
         </div>
       </div>
-
-      <!-- Prominent Red "+" Floating Action Button (FAB) on Bottom Right Corner -->
-      <button 
-        type="button" 
-        id="btnEmergencyFab" 
-        class="fab-emergency-add" 
-        aria-label="Report Incident or Emergency"
-      >
-        <span class="fab-tooltip">Report Incident / SOS</span>
-        <!-- Bold White "+" Icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-      </button>
     </main>
+  </div>
 
-    <!-- Emergency Incident Report Modal (Triggered by the Red "+" button) -->
-    <div id="incidentReportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <!-- Prominent Red "+" Floating Action Button (FAB) on Bottom Right Corner -->
+  <button 
+    type="button" 
+    id="btnEmergencyFab" 
+    class="fab-emergency-add" 
+    aria-label="Report Incident or Emergency"
+    onclick="window.openCitizenReportModal && window.openCitizenReportModal()"
+  >
+    <span class="fab-tooltip">Report Incident / SOS</span>
+    <!-- Bold White "+" Icon -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  </button>
+
+  <!-- Emergency Incident Report Modal (Triggered by the Red "+" button) -->
+  <div id="incidentReportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-card">
         <div class="modal-header">
           <div class="modal-header-title">
@@ -175,13 +177,12 @@
               </select>
             </div>
 
-            <!-- Affected Road Corridor -->
-            <div class="login-form-group">
+            <!-- Affected Road Corridor (Hidden input for backend ingestion compatibility) -->
+            <div class="login-form-group" style="display: none;">
               <label class="login-label" for="modalCorridorSelect">
                 <span>Affected Road Corridor</span>
-                <span style="font-size: 11px; color: var(--pub-text-muted);">Required</span>
               </label>
-              <select id="modalCorridorSelect" class="login-input" required>
+              <select id="modalCorridorSelect" class="login-input">
                 <option value="corridor_cctv_07" selected>Circuit House - Nanthoor Road (corridor_cctv_07)</option>
                 <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
                 <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
@@ -412,10 +413,8 @@
       </div>
     </div>
 
-  </div>
-
   <!-- MapLibre 3D Vector Map & Citizen Controller Scripts -->
   <script src="/js/maplibre_3d_traffic_map.js"></script>
-  <script src="/js/public.js?v=5.0"></script>
+  <script src="/js/public.js?v=5.1"></script>
 </body>
 </html>

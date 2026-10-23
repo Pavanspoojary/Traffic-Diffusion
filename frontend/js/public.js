@@ -1,8 +1,8 @@
 // Public Citizen Portal & Emergency Map Controller
-// Supports Google Maps Platform integration (internalUsageAttributionIds: gmp_git_agentskills_v1)
-// with live Incident History logging and counter tracking.
+// Supports MapLibre GL JS 3D vector map with 3D buildings, road-following traffic corridors,
+// WebGL junction nodes, camera photo capture, live incident history, and emergency SOS dispatch.
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   // 1. Authenticate / Check Citizen Session
   const citizenDataRaw = localStorage.getItem('trafficCitizenUser');
   let currentCitizen = { name: 'Citizen User', age: '-', address: 'Mangaluru Sector' };
@@ -15,20 +15,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Populate User Chip in Nav
+  // Populate User Chip in Nav safely
   const userNameElem = document.getElementById('citizenDisplayName');
   const userAddressElem = document.getElementById('citizenDisplayAddress');
   const userAvatarElem = document.getElementById('citizenAvatarInitials');
 
-  if (userNameElem) userNameElem.textContent = currentCitizen.name;
-  if (userAddressElem) userAddressElem.textContent = `${currentCitizen.address} (Age: ${currentCitizen.age || '-'})`;
+  if (userNameElem) userNameElem.textContent = currentCitizen.name || 'Citizen User';
+  if (userAddressElem) userAddressElem.textContent = `${currentCitizen.address || 'Mangaluru Sector'} (Age: ${currentCitizen.age || '-'})`;
   if (userAvatarElem) {
-    const initials = currentCitizen.name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2) || 'C';
+    const rawName = (currentCitizen.name || 'Citizen User').trim();
+    const parts = rawName.split(/\s+/).filter(Boolean);
+    const initials = parts.length > 0 
+      ? parts.map(p => p[0]).join('').toUpperCase().slice(0, 2)
+      : 'CU';
     userAvatarElem.textContent = initials;
   }
 
@@ -163,77 +162,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (countMy) countMy.textContent = myReports;
   }
 
-  // 3. Initialize MapLibre GL JS 3D Traffic Map
-  let activeMap = null;
-  let networkEdges = [];
-  let networkNodes = [];
+  // 3. Modals and Core UI Binding (Synchronous & Immediate)
+  const incidentModal = document.getElementById('incidentReportModal');
+  const btnEmergencyFab = document.getElementById('btnEmergencyFab');
+  const btnCloseModal = document.getElementById('btnCloseModal');
+  const btnCancelReport = document.getElementById('btnCancelReport');
+  const emergencyForm = document.getElementById('emergencyReportForm');
+  const toastNotification = document.getElementById('publicToast');
+  const toastMessage = document.getElementById('toastMessage');
 
-  try {
-    if (typeof MapLibre3DTrafficMap !== 'undefined') {
-      activeMap = new MapLibre3DTrafficMap('map');
-      await activeMap.init();
-      console.info('MapLibre GL JS 3D Traffic Map initialized successfully.');
-    }
-  } catch (err) {
-    console.warn('MapLibre GL 3D Map initialization error:', err);
-  }
+  const modalCategorySelect = document.getElementById('modalCategorySelect');
+  const modalIncidentSubject = document.getElementById('modalIncidentSubject');
+  const modalIncidentLocation = document.getElementById('modalIncidentLocation');
+  const btnUseCurrentLocation = document.getElementById('btnUseCurrentLocation');
+  const gpsActivePill = document.getElementById('gpsActivePill');
 
-  // Load Road Network
-  async function loadPublicNetwork() {
-    try {
-      let netData = null;
-      try {
-        const res = await fetch('/api/v1/navigation/network');
-        if (res.ok) {
-          netData = await res.json();
-        }
-      } catch (e) {}
-
-      if (!netData) {
-        try {
-          const fallbackRes = await fetch('/data/seed_network.json');
-          if (fallbackRes.ok) {
-            netData = await fallbackRes.json();
-          }
-        } catch (e) {}
-      }
-
-      if (netData) {
-        networkNodes = netData.nodes || [];
-        networkEdges = netData.edges || [];
-
-        if (activeMap) {
-          activeMap.renderNetwork(networkNodes, networkEdges);
-          if (typeof activeMap.renderIncidents === 'function') {
-            activeMap.renderIncidents(incidentHistory);
-          }
-        }
-        populateCorridorSelect(networkEdges);
-      }
-    } catch (err) {
-      console.error('Failed to load public traffic network:', err);
-    }
-  }
-
-  function populateCorridorSelect(edges) {
-    const select = document.getElementById('modalCorridorSelect');
-    if (!select) return;
-    const currentVal = select.value;
-    select.innerHTML = '<option value="">-- Select Road Corridor --</option>';
-    edges.forEach(e => {
-      const opt = document.createElement('option');
-      opt.value = e.id;
-      opt.textContent = `${e.name} (${e.congestion_level || 'NORMAL'})`;
-      select.appendChild(opt);
-    });
-    if (currentVal) select.value = currentVal;
-  }
-
-  await loadPublicNetwork();
-  updateIncidentCounters();
-  setInterval(loadPublicNetwork, 8000);
-
-  // 4. Incident History Modal Management
+  // History Modal Elements
   const btnOpenHistoryModal = document.getElementById('btnOpenHistoryModal');
   const btnQuickViewHistory = document.getElementById('btnQuickViewHistory');
   const incidentHistoryModal = document.getElementById('incidentHistoryModal');
@@ -243,6 +187,69 @@ document.addEventListener('DOMContentLoaded', async () => {
   const incidentHistoryList = document.getElementById('incidentHistoryList');
   let currentHistoryFilter = 'ALL';
 
+  // Camera Elements
+  const cameraInput = document.getElementById('cameraInput');
+  const btnStartLiveCamera = document.getElementById('btnStartLiveCamera');
+  const btnSnapPhoto = document.getElementById('btnSnapPhoto');
+  const btnStopLiveCamera = document.getElementById('btnStopLiveCamera');
+  const btnTriggerNativeCamera = document.getElementById('btnTriggerNativeCamera');
+  const cameraStreamWrapper = document.getElementById('cameraStreamWrapper');
+  const cameraVideo = document.getElementById('cameraVideo');
+  const cameraCanvas = document.getElementById('cameraCanvas');
+  const photoPreviewCard = document.getElementById('photoPreviewCard');
+  const photoPreviewImg = document.getElementById('photoPreviewImg');
+  const btnRemovePhoto = document.getElementById('btnRemovePhoto');
+
+  let activeMediaStream = null;
+  let capturedPhotoBase64 = null;
+  let currentCoordinates = { lat: 12.8750, lng: 74.8550 };
+
+  // Toast Function
+  function showToast(msg) {
+    if (!toastNotification || !toastMessage) return;
+    toastMessage.textContent = msg;
+    toastNotification.classList.add('show');
+    setTimeout(() => {
+      toastNotification.classList.remove('show');
+    }, 4500);
+  }
+
+  // Incident Reporting Modal Open / Close
+  function openReportModal() {
+    if (incidentModal) {
+      incidentModal.classList.add('active');
+      if (modalIncidentSubject) modalIncidentSubject.focus();
+      if (modalIncidentLocation && !modalIncidentLocation.value) {
+        modalIncidentLocation.value = currentCitizen.address || '';
+      }
+    }
+  }
+
+  function closeReportModal() {
+    stopLiveCamera();
+    if (incidentModal) incidentModal.classList.remove('active');
+  }
+
+  // Globally expose for inline click handlers as a failsafe
+  window.openCitizenReportModal = openReportModal;
+  window.closeCitizenReportModal = closeReportModal;
+
+  // Bind Emergency FAB & Modal Buttons Immediately
+  if (btnEmergencyFab) {
+    btnEmergencyFab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openReportModal();
+    });
+  }
+  if (btnCloseModal) btnCloseModal.addEventListener('click', closeReportModal);
+  if (btnCancelReport) btnCancelReport.addEventListener('click', closeReportModal);
+  if (incidentModal) {
+    incidentModal.addEventListener('click', (e) => {
+      if (e.target === incidentModal) closeReportModal();
+    });
+  }
+
+  // History Modal Handlers
   function openHistoryModal() {
     renderIncidentHistoryList(currentHistoryFilter);
     if (incidentHistoryModal) {
@@ -256,11 +263,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  window.openCitizenHistoryModal = openHistoryModal;
+  window.closeCitizenHistoryModal = closeHistoryModal;
+
   if (btnOpenHistoryModal) btnOpenHistoryModal.addEventListener('click', openHistoryModal);
   if (btnQuickViewHistory) btnQuickViewHistory.addEventListener('click', openHistoryModal);
   if (btnCloseHistoryModal) btnCloseHistoryModal.addEventListener('click', closeHistoryModal);
   if (btnCloseHistoryBtn) btnCloseHistoryBtn.addEventListener('click', closeHistoryModal);
-
+  if (btnReportFromHistory) {
+    btnReportFromHistory.addEventListener('click', () => {
+      closeHistoryModal();
+      openReportModal();
+    });
+  }
   if (incidentHistoryModal) {
     incidentHistoryModal.addEventListener('click', (e) => {
       if (e.target === incidentHistoryModal) closeHistoryModal();
@@ -366,39 +381,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 5. Emergency SOS / Incident Reporting Modal
-  const btnEmergencyFab = document.getElementById('btnEmergencyFab');
-  const incidentModal = document.getElementById('incidentReportModal');
-  const btnCloseModal = document.getElementById('btnCloseModal');
-  const btnCancelReport = document.getElementById('btnCancelReport');
-  const emergencyForm = document.getElementById('emergencyReportForm');
-  const toastNotification = document.getElementById('publicToast');
-  const toastMessage = document.getElementById('toastMessage');
+  // Handle Category Select Change
+  if (modalCategorySelect) {
+    modalCategorySelect.addEventListener('change', () => {
+      const selectedVal = modalCategorySelect.value;
+      const subjectInput = document.getElementById('modalIncidentSubject');
+      const subjectHint = document.getElementById('subjectHint');
 
-  const modalCategorySelect = document.getElementById('modalCategorySelect');
-  const modalIncidentSubject = document.getElementById('modalIncidentSubject');
-  const modalIncidentLocation = document.getElementById('modalIncidentLocation');
-  const btnUseCurrentLocation = document.getElementById('btnUseCurrentLocation');
-  const gpsActivePill = document.getElementById('gpsActivePill');
+      if (selectedVal === 'OTHER') {
+        if (subjectInput) {
+          subjectInput.placeholder = 'Please specify custom incident subject...';
+          subjectInput.focus();
+        }
+        if (subjectHint) subjectHint.textContent = 'Custom Subject (Required)';
+      } else {
+        if (subjectInput) subjectInput.placeholder = 'e.g. Fallen electrical wire blocking junction';
+        if (subjectHint) subjectHint.textContent = 'Required';
+      }
+    });
+  }
 
-  // Camera Elements
-  const cameraInput = document.getElementById('cameraInput');
-  const btnStartLiveCamera = document.getElementById('btnStartLiveCamera');
-  const btnSnapPhoto = document.getElementById('btnSnapPhoto');
-  const btnStopLiveCamera = document.getElementById('btnStopLiveCamera');
-  const btnTriggerNativeCamera = document.getElementById('btnTriggerNativeCamera');
-  const cameraStreamWrapper = document.getElementById('cameraStreamWrapper');
-  const cameraVideo = document.getElementById('cameraVideo');
-  const cameraCanvas = document.getElementById('cameraCanvas');
-  const photoPreviewCard = document.getElementById('photoPreviewCard');
-  const photoPreviewImg = document.getElementById('photoPreviewImg');
-  const btnRemovePhoto = document.getElementById('btnRemovePhoto');
-
-  let activeMediaStream = null;
-  let capturedPhotoBase64 = null;
-  let currentCoordinates = { lat: 12.8750, lng: 74.8550 };
-
-  // Live Camera Logic
+  // Live Camera Handlers
   async function startLiveCamera() {
     try {
       if (activeMediaStream) stopLiveCamera();
@@ -488,7 +491,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (btnRemovePhoto) btnRemovePhoto.addEventListener('click', clearPhotoPreview);
 
-  // GPS Current Location Logic
+  // GPS Current Location Handlers
   if (btnUseCurrentLocation) {
     btnUseCurrentLocation.addEventListener('click', () => {
       if (modalIncidentLocation) modalIncidentLocation.placeholder = 'Acquiring GPS fix...';
@@ -507,9 +510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (gpsActivePill) gpsActivePill.style.display = 'inline-block';
 
             if (activeMap && typeof activeMap.focusLocation === 'function') {
-              activeMap.focusLocation(lat, lng, 'Your Current GPS Location');
-            } else if (activeMap && activeMap.map) {
-              activeMap.map.setView([lat, lng], 15);
+              activeMap.focusLocation(lat, lng, 'Your Current GPS Location', 16);
             }
           },
           (error) => {
@@ -528,38 +529,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function openReportModal() {
-    if (incidentModal) {
-      incidentModal.classList.add('active');
-      if (modalIncidentSubject) modalIncidentSubject.focus();
-      if (modalIncidentLocation && !modalIncidentLocation.value) {
-        modalIncidentLocation.value = currentCitizen.address || '';
-      }
-    }
-  }
-
-  function closeReportModal() {
-    stopLiveCamera();
-    if (incidentModal) incidentModal.classList.remove('active');
-  }
-
-  if (btnEmergencyFab) btnEmergencyFab.addEventListener('click', openReportModal);
-  if (btnCloseModal) btnCloseModal.addEventListener('click', closeReportModal);
-  if (btnCancelReport) btnCancelReport.addEventListener('click', closeReportModal);
-  if (btnReportFromHistory) {
-    btnReportFromHistory.addEventListener('click', () => {
-      closeHistoryModal();
-      openReportModal();
-    });
-  }
-
-  if (incidentModal) {
-    incidentModal.addEventListener('click', (e) => {
-      if (e.target === incidentModal) closeReportModal();
-    });
-  }
-
-  // 6. Handle SOS Form Submission & Append to Live Incident History
+  // Handle SOS Form Submission & Live Sync
   if (emergencyForm) {
     emergencyForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -617,19 +587,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Submit to backend intelligence API
       try {
         const payload = {
-          road_segment_id: corridorId,
-          edge_id: corridorId,
-          category: (category === 'OTHER' || category === 'EMERGENCY_AMBULANCE') ? 'ROAD_BLOCKAGE' : category,
+          incident_id: newIncident.id,
+          corridor_id: corridorId,
+          road_segment_id: corridorId || 'corridor_cctv_07',
+          category: category,
+          incident_type: category,
           severity: severity,
-          lanes_affected: lanesAffected,
-          capacity_reduction: lanesAffected > 1 ? 0.75 : 0.45,
-          estimated_duration_min: 45,
-          custom_subject: subject,
           description: fullDetails,
+          lat: incLat,
+          lng: incLng,
           location: location,
+          lanes_affected: lanesAffected,
           reporter_name: currentCitizen.name || 'Citizen Commuter',
-          reporter: currentCitizen.name || 'Citizen Commuter',
-          contact_number: currentCitizen.address || null,
+          citizen_name: currentCitizen.name || 'Citizen Commuter',
+          citizen_address: currentCitizen.address || 'Mangaluru',
           has_photo: !!capturedPhotoBase64
         };
 
@@ -648,7 +619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showToast(`Incident #${incidentHistory.length} posted to live log! Dispatched to Control Room.`);
       }
 
-      // Update Map Pins
+      // Update Map Pins if active
       if (activeMap && typeof activeMap.renderIncidents === 'function') {
         activeMap.renderIncidents(incidentHistory);
         activeMap.focusLocation(incLat, incLng, subject, 16);
@@ -664,7 +635,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 7. MapLibre 3D Building Extrusions Perspective View Toggle
+  // 3D Building Extrusions Perspective View Toggle
   const btnToggle3DView = document.getElementById('btnToggle3DView');
   const label3DView = document.getElementById('label3DView');
   let is3DActive = true;
@@ -687,13 +658,83 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Toast Function
-  function showToast(msg) {
-    if (!toastNotification || !toastMessage) return;
-    toastMessage.textContent = msg;
-    toastNotification.classList.add('show');
-    setTimeout(() => {
-      toastNotification.classList.remove('show');
-    }, 4500);
+  // Initial count update
+  updateIncidentCounters();
+
+  // 4. Background Initialization of MapLibre 3D Map & Network (Non-blocking)
+  let activeMap = null;
+  let networkEdges = [];
+  let networkNodes = [];
+
+  async function loadPublicNetwork() {
+    try {
+      let netData = null;
+      try {
+        const res = await fetch('/api/v1/navigation/network');
+        if (res.ok) {
+          netData = await res.json();
+        }
+      } catch (e) {}
+
+      if (!netData) {
+        try {
+          const fallbackRes = await fetch('/data/seed_network.json');
+          if (fallbackRes.ok) {
+            netData = await fallbackRes.json();
+          }
+        } catch (e) {}
+      }
+
+      if (netData) {
+        networkNodes = netData.nodes || [];
+        networkEdges = netData.edges || [];
+
+        if (activeMap) {
+          activeMap.renderNetwork(networkNodes, networkEdges);
+          if (typeof activeMap.renderIncidents === 'function') {
+            activeMap.renderIncidents(incidentHistory);
+          }
+        }
+        populateCorridorSelect(networkEdges);
+      }
+    } catch (err) {
+      console.error('Failed to load public traffic network:', err);
+    }
   }
+
+  function populateCorridorSelect(edges) {
+    const select = document.getElementById('modalCorridorSelect');
+    if (!select) return;
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">-- Select Road Corridor --</option>';
+    edges.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = `${e.name} (${e.congestion_level || 'NORMAL'})`;
+      select.appendChild(opt);
+    });
+    if (currentVal) select.value = currentVal;
+  }
+
+  // Launch MapLibre GL JS in background
+  if (typeof MapLibre3DTrafficMap !== 'undefined') {
+    try {
+      activeMap = new MapLibre3DTrafficMap('map');
+      activeMap.init().then(() => {
+        console.info('MapLibre GL JS 3D Traffic Map ready.');
+        loadPublicNetwork();
+      }).catch(err => {
+        console.warn('MapLibre 3D map initialization warning:', err);
+        loadPublicNetwork();
+      });
+    } catch (err) {
+      console.warn('MapLibre GL initialization error:', err);
+      loadPublicNetwork();
+    }
+  } else {
+    loadPublicNetwork();
+  }
+
+  // Periodic network refresh
+  setInterval(loadPublicNetwork, 8000);
 });

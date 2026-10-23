@@ -48,9 +48,30 @@ class MapLibre3DTrafficMap {
           className: 'maplibre-dark-popup'
         });
 
+        let isResolved = false;
+        const safetyTimeout = setTimeout(() => {
+          if (!isResolved) {
+            console.warn('MapLibre GL tile/style load timed out after 5s; resolving safely.');
+            isResolved = true;
+            this.isLoaded = true;
+            resolve(true);
+          }
+        }, 5000);
+
         this.map.on('load', () => {
-          this._setup3DBuildings();
-          this._setupTrafficLayers();
+          if (isResolved) return;
+          clearTimeout(safetyTimeout);
+          isResolved = true;
+          try {
+            this._setup3DBuildings();
+          } catch (e) {
+            console.warn('Could not setup 3D buildings:', e);
+          }
+          try {
+            this._setupTrafficLayers();
+          } catch (e) {
+            console.warn('Could not setup traffic layers:', e);
+          }
           this.isLoaded = true;
 
           // Process any pending data
@@ -70,7 +91,7 @@ class MapLibre3DTrafficMap {
 
       } catch (err) {
         console.error('Failed to instantiate MapLibre GL map:', err);
-        reject(err);
+        resolve(false);
       }
     });
   }

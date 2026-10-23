@@ -309,47 +309,51 @@
    Red "+" Floating Action Button (FAB)
    ========================================================================== */
 .fab-emergency-add {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 6px 24px rgba(239, 68, 68, 0.55), 0 0 12px rgba(239, 68, 68, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  cursor: pointer;
-  z-index: 1000;
+  position: fixed !important;
+  bottom: 28px !important;
+  right: 28px !important;
+  width: 62px !important;
+  height: 62px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  border: 2px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 6px 24px rgba(239, 68, 68, 0.65), 0 0 16px rgba(239, 68, 68, 0.45) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+  z-index: 99999 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
   transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   outline: none;
 }
 
 .fab-emergency-add svg {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
   transition: transform 0.25s ease;
 }
 
 .fab-emergency-add:hover {
   transform: scale(1.1);
-  box-shadow: 0 8px 30px rgba(239, 68, 68, 0.75), 0 0 18px rgba(239, 68, 68, 0.5);
-  background: linear-gradient(135deg, #f87171, #ef4444);
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.85), 0 0 20px rgba(239, 68, 68, 0.6) !important;
+  background: linear-gradient(135deg, #f87171, #ef4444) !important;
 }
 
 .fab-emergency-add:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
 }
 
 .fab-tooltip {
   position: absolute;
-  right: 70px;
+  right: 74px;
   background-color: rgba(17, 24, 39, 0.95);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
   padding: 6px 12px;
   border-radius: 8px;
   font-size: 12px;
@@ -359,7 +363,7 @@
   opacity: 0;
   transform: translateX(8px);
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 
 .fab-emergency-add:hover .fab-tooltip {
@@ -371,20 +375,20 @@
    Emergency Incident Report Modal
    ========================================================================== */
 .modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(10, 15, 29, 0.75);
+  position: fixed !important;
+  inset: 0 !important;
+  background-color: rgba(10, 15, 29, 0.8) !important;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 1100;
+  z-index: 100000 !important;
   padding: 20px;
 }
 
 .modal-backdrop.active {
-  display: flex;
+  display: flex !important;
 }
 
 .modal-card {
