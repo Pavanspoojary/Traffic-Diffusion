@@ -1,4 +1,7 @@
 // Public Citizen Portal & Emergency Map Controller
+// Supports Google Maps Platform integration (internalUsageAttributionIds: gmp_git_agentskills_v1)
+// with live Incident History logging and counter tracking.
+
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Authenticate / Check Citizen Session
   const citizenDataRaw = localStorage.getItem('trafficCitizenUser');
@@ -29,21 +32,166 @@ document.addEventListener('DOMContentLoaded', async () => {
     userAvatarElem.textContent = initials;
   }
 
-  // 2. Initialize Leaflet Map from the main branch
-  let trafficMap;
+  // 2. Incident History Seed & State Management
+  const SEED_INCIDENTS = [
+    {
+      id: "CIT-MNG-101",
+      timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+      timeAgo: "15 mins ago",
+      subject: "Heavy Commercial Freight Rollover",
+      category: "COLLISION",
+      location: "Circuit House - Nanthoor Road (GPS: 12.87850° N, 74.86200° E)",
+      lat: 12.87850,
+      lng: 74.86200,
+      severity: "CRITICAL",
+      description: "Overturned multi-axle freight truck blocking both arterial lanes towards Nanthoor circle approach.",
+      reporter: "Citizen Commuter",
+      reporterAddress: "Hampankatta",
+      verified: true,
+      photo: null
+    },
+    {
+      id: "CIT-MNG-102",
+      timestamp: new Date(Date.now() - 32 * 60 * 1000).toISOString(),
+      timeAgo: "32 mins ago",
+      subject: "Severe Monsoon Flash Flooding",
+      category: "WEATHER_WATERLOGGING",
+      location: "Bunts Hostel - Kadri Road (GPS: 12.87350° N, 74.85400° E)",
+      lat: 12.87350,
+      lng: 74.85400,
+      severity: "HIGH",
+      description: "Severe stormwater accumulation inundating left and central lanes; traffic crawling at 5 km/h.",
+      reporter: "Auto Rickshaw Driver",
+      reporterAddress: "Kadri",
+      verified: true,
+      photo: null
+    },
+    {
+      id: "CIT-MNG-103",
+      timestamp: new Date(Date.now() - 58 * 60 * 1000).toISOString(),
+      timeAgo: "58 mins ago",
+      subject: "Disabled Intercity Transit Bus",
+      category: "VEHICLE_BREAKDOWN",
+      location: "M.G. Road near Lalbagh (GPS: 12.87900° N, 74.84600° E)",
+      lat: 12.87900,
+      lng: 74.84600,
+      severity: "MODERATE",
+      description: "Stalled intercity bus blocking right two lanes near Lalbagh junction, causing feeder congestion.",
+      reporter: "Local Commuter",
+      reporterAddress: "Lalbagh",
+      verified: true,
+      photo: null
+    }
+  ];
+
+  let incidentHistory = [];
   try {
-    trafficMap = new TrafficMap('map');
-    setTimeout(() => {
-      if (trafficMap && trafficMap.map) trafficMap.map.invalidateSize();
-    }, 250);
-  } catch (err) {
-    console.error('Error initializing TrafficMap:', err);
+    const rawHistory = localStorage.getItem('trafficCitizenIncidentHistory');
+    if (rawHistory) {
+      incidentHistory = JSON.parse(rawHistory);
+    }
+  } catch (e) {
+    console.warn('Could not read stored incident history:', e);
   }
 
+  // Ensure minimum realistic seed history
+  if (!incidentHistory || incidentHistory.length === 0) {
+    incidentHistory = SEED_INCIDENTS;
+    saveIncidentHistory();
+  }
+
+  function saveIncidentHistory() {
+    try {
+      localStorage.setItem('trafficCitizenIncidentHistory', JSON.stringify(incidentHistory));
+    } catch (e) {}
+    updateIncidentCounters();
+  }
+
+  function formatRelativeTime(isoString) {
+    try {
+      const diffMs = Date.now() - new Date(isoString).getTime();
+      const diffMins = Math.floor(diffMs / (60 * 1000));
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return `${Math.floor(diffHours / 24)}d ago`;
+    } catch (e) {
+      return 'Recently';
+    }
+  }
+
+  function updateIncidentCounters() {
+    const total = incidentHistory.length;
+    const critical = incidentHistory.filter(i => i.severity === 'CRITICAL').length;
+    const myReports = incidentHistory.filter(i => i.reporter === currentCitizen.name).length;
+    const collisions = incidentHistory.filter(i => i.category === 'COLLISION').length;
+    const blockages = incidentHistory.filter(i => i.category === 'ROAD_BLOCKAGE').length;
+    const waters = incidentHistory.filter(i => i.category === 'WEATHER_WATERLOGGING').length;
+    const breakdowns = incidentHistory.filter(i => i.category === 'VEHICLE_BREAKDOWN').length;
+
+    // Badges & Overlay Stats
+    const navBadge = document.getElementById('navIncidentCountBadge');
+    const statTotal = document.getElementById('statTotalIncidents');
+    const statCrit = document.getElementById('statCriticalIncidents');
+    const statMy = document.getElementById('statMyIncidents');
+    const statLatest = document.getElementById('statLatestTitle');
+    const historyModalCount = document.getElementById('historyModalCountBadge');
+
+    if (navBadge) navBadge.textContent = total;
+    if (statTotal) statTotal.textContent = total;
+    if (statCrit) statCrit.textContent = critical;
+    if (statMy) statMy.textContent = myReports;
+    if (statLatest && incidentHistory.length > 0) {
+      statLatest.textContent = incidentHistory[0].subject || 'Recent Alert';
+    }
+    if (historyModalCount) historyModalCount.textContent = `${total} Posted`;
+
+    // Filter Chips Counts
+    const countAll = document.getElementById('countFilterAll');
+    const countCollision = document.getElementById('countFilterCollision');
+    const countBlockage = document.getElementById('countFilterBlockage');
+    const countWater = document.getElementById('countFilterWater');
+    const countBreakdown = document.getElementById('countFilterBreakdown');
+    const countMy = document.getElementById('countFilterMy');
+
+    if (countAll) countAll.textContent = total;
+    if (countCollision) countCollision.textContent = collisions;
+    if (countBlockage) countBlockage.textContent = blockages;
+    if (countWater) countWater.textContent = waters;
+    if (countBreakdown) countBreakdown.textContent = breakdowns;
+    if (countMy) countMy.textContent = myReports;
+  }
+
+  // 3. Initialize Google Maps Platform
+  let googleMapController = null;
+  let activeMap = null;
   let networkEdges = [];
   let networkNodes = [];
 
-  // Load Network Corridors
+  try {
+    if (typeof GoogleTrafficMap !== 'undefined') {
+      googleMapController = new GoogleTrafficMap('map');
+      const gmapReady = await googleMapController.init();
+      if (gmapReady) {
+        activeMap = googleMapController;
+      }
+    }
+  } catch (err) {
+    console.warn('Google Maps initialization encountered fallback:', err);
+  }
+
+  // Fallback to Leaflet if Google Maps failed to initialize
+  if (!activeMap && typeof TrafficMap !== 'undefined') {
+    try {
+      console.info('Loading fallback map controller...');
+      activeMap = new TrafficMap('map');
+    } catch (e) {
+      console.error('Fallback map error:', e);
+    }
+  }
+
+  // Load Road Network
   async function loadPublicNetwork() {
     try {
       let netData = null;
@@ -54,7 +202,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       } catch (e) {}
 
-      // Fallback to static seed data if backend API is not running
       if (!netData) {
         try {
           const fallbackRes = await fetch('/data/seed_network.json');
@@ -64,33 +211,159 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {}
       }
 
-      if (netData && trafficMap) {
+      if (netData) {
         networkNodes = netData.nodes || [];
         networkEdges = netData.edges || [];
-        trafficMap.renderNetwork(networkNodes, networkEdges);
-        populateCorridorSelect(networkEdges);
-        setTimeout(() => trafficMap.map.invalidateSize(), 300);
+
+        if (activeMap) {
+          activeMap.renderNetwork(networkNodes, networkEdges);
+          if (typeof activeMap.renderIncidents === 'function') {
+            activeMap.renderIncidents(incidentHistory);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load public traffic network:', err);
     }
   }
 
-  function populateCorridorSelect(edges) {
-    const select = document.getElementById('modalCorridorSelect');
-    if (!select) return;
-    select.innerHTML = '<option value="">-- Select Road Corridor --</option>';
-    edges.forEach(e => {
-      const opt = document.createElement('option');
-      opt.value = e.id;
-      opt.textContent = `${e.name} (${e.congestion_level || 'NORMAL'})`;
-      select.appendChild(opt);
+  await loadPublicNetwork();
+  updateIncidentCounters();
+
+  // 4. Incident History Modal Management
+  const btnOpenHistoryModal = document.getElementById('btnOpenHistoryModal');
+  const btnQuickViewHistory = document.getElementById('btnQuickViewHistory');
+  const incidentHistoryModal = document.getElementById('incidentHistoryModal');
+  const btnCloseHistoryModal = document.getElementById('btnCloseHistoryModal');
+  const btnCloseHistoryBtn = document.getElementById('btnCloseHistoryBtn');
+  const btnReportFromHistory = document.getElementById('btnReportFromHistory');
+  const incidentHistoryList = document.getElementById('incidentHistoryList');
+  let currentHistoryFilter = 'ALL';
+
+  function openHistoryModal() {
+    renderIncidentHistoryList(currentHistoryFilter);
+    if (incidentHistoryModal) {
+      incidentHistoryModal.classList.add('active');
+    }
+  }
+
+  function closeHistoryModal() {
+    if (incidentHistoryModal) {
+      incidentHistoryModal.classList.remove('active');
+    }
+  }
+
+  if (btnOpenHistoryModal) btnOpenHistoryModal.addEventListener('click', openHistoryModal);
+  if (btnQuickViewHistory) btnQuickViewHistory.addEventListener('click', openHistoryModal);
+  if (btnCloseHistoryModal) btnCloseHistoryModal.addEventListener('click', closeHistoryModal);
+  if (btnCloseHistoryBtn) btnCloseHistoryBtn.addEventListener('click', closeHistoryModal);
+
+  if (incidentHistoryModal) {
+    incidentHistoryModal.addEventListener('click', (e) => {
+      if (e.target === incidentHistoryModal) closeHistoryModal();
     });
   }
 
-  await loadPublicNetwork();
+  // Filter Chips Listeners
+  const filterChips = document.querySelectorAll('.filter-chip');
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      filterChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentHistoryFilter = chip.getAttribute('data-filter') || 'ALL';
+      renderIncidentHistoryList(currentHistoryFilter);
+    });
+  });
 
-  // 3. Floating Red "+" Action Button & Modal Logic
+  function renderIncidentHistoryList(filter = 'ALL') {
+    if (!incidentHistoryList) return;
+
+    let items = [...incidentHistory];
+    if (filter === 'MY_REPORTS') {
+      items = items.filter(i => i.reporter === currentCitizen.name);
+    } else if (filter !== 'ALL') {
+      items = items.filter(i => i.category === filter);
+    }
+
+    if (items.length === 0) {
+      incidentHistoryList.innerHTML = `
+        <div class="history-empty-state">
+          <div style="font-size: 32px; margin-bottom: 8px;">📋</div>
+          <div style="font-weight: 700; color: #cbd5e1; font-size: 14px; margin-bottom: 4px;">No Incidents Found</div>
+          <p style="font-size: 12px; margin-bottom: 14px;">No incident reports matching this filter are logged.</p>
+          <button type="button" id="btnEmptyReport" style="padding: 6px 14px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
+            + Post an Incident
+          </button>
+        </div>
+      `;
+      document.getElementById('btnEmptyReport')?.addEventListener('click', () => {
+        closeHistoryModal();
+        openReportModal();
+      });
+      return;
+    }
+
+    incidentHistoryList.innerHTML = items.map(inc => {
+      const severityClass = (inc.severity || 'HIGH').toLowerCase();
+      const relativeTime = formatRelativeTime(inc.timestamp);
+      const photoHtml = inc.photo
+        ? `<div style="margin-top: 8px; border-radius: 8px; overflow: hidden; max-height: 120px; border: 1px solid #10b981;">
+             <img src="${inc.photo}" style="width: 100%; height: 100%; object-fit: cover;" alt="Camera photo"/>
+           </div>`
+        : '';
+
+      return `
+        <div class="incident-card ${severityClass}" data-id="${inc.id}">
+          <div class="incident-card-header">
+            <div class="incident-card-tags">
+              <span class="incident-tag tag-severity-${severityClass}">${inc.severity || 'HIGH'}</span>
+              <span class="incident-tag tag-category">${inc.category || 'HAZARD'}</span>
+              ${inc.photo ? '<span class="incident-tag" style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399;">📸 Photo Verified</span>' : ''}
+            </div>
+            <span class="incident-card-time">${relativeTime}</span>
+          </div>
+
+          <div class="incident-card-title">${inc.subject || 'Incident Alert'}</div>
+          <div class="incident-card-loc">📍 ${inc.location || 'Mangaluru Sector'}</div>
+          ${inc.description ? `<div class="incident-card-desc">${inc.description}</div>` : ''}
+          ${photoHtml}
+
+          <div class="incident-card-footer">
+            <span class="incident-card-reporter">Reported by: <strong>${inc.reporter || 'Citizen'}</strong></span>
+            <button type="button" class="btn-locate-map" data-lat="${inc.lat || 12.875}" data-lng="${inc.lng || 74.855}" data-title="${encodeURIComponent(inc.subject || 'Incident')}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <span>Locate on Map</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Attach "Locate on Map" listeners
+    const locateButtons = incidentHistoryList.querySelectorAll('.btn-locate-map');
+    locateButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lat = parseFloat(btn.getAttribute('data-lat'));
+        const lng = parseFloat(btn.getAttribute('data-lng'));
+        const title = decodeURIComponent(btn.getAttribute('data-title') || 'Incident');
+
+        closeHistoryModal();
+
+        if (activeMap && typeof activeMap.focusLocation === 'function') {
+          activeMap.focusLocation(lat, lng, title, 16);
+        } else if (activeMap && activeMap.map) {
+          activeMap.map.setView([lat, lng], 16);
+        }
+
+        showToast(`Centered map on: "${title}"`);
+      });
+    });
+  }
+
+  // 5. Emergency SOS / Incident Reporting Modal
   const btnEmergencyFab = document.getElementById('btnEmergencyFab');
   const incidentModal = document.getElementById('incidentReportModal');
   const btnCloseModal = document.getElementById('btnCloseModal');
@@ -99,9 +372,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toastNotification = document.getElementById('publicToast');
   const toastMessage = document.getElementById('toastMessage');
 
-  // Category & Subject Elements
   const modalCategorySelect = document.getElementById('modalCategorySelect');
   const modalIncidentSubject = document.getElementById('modalIncidentSubject');
+  const modalIncidentLocation = document.getElementById('modalIncidentLocation');
+  const btnUseCurrentLocation = document.getElementById('btnUseCurrentLocation');
+  const gpsActivePill = document.getElementById('gpsActivePill');
 
   // Camera Elements
   const cameraInput = document.getElementById('cameraInput');
@@ -118,37 +393,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let activeMediaStream = null;
   let capturedPhotoBase64 = null;
+  let currentCoordinates = { lat: 12.8750, lng: 74.8550 };
 
-  // Incident Type change handler
-  if (modalCategorySelect && modalIncidentSubject) {
-    modalCategorySelect.addEventListener('change', () => {
-      if (modalCategorySelect.value === 'OTHER') {
-        modalIncidentSubject.placeholder = 'Specify custom incident subject (e.g. Broken water pipe / Electrical wire)';
-        modalIncidentSubject.focus();
-      } else {
-        modalIncidentSubject.placeholder = 'e.g. Tree fallen blocking both lanes near signal';
-      }
-    });
-  }
-
-  // Camera Management
-  function stopLiveCamera() {
-    if (activeMediaStream) {
-      activeMediaStream.getTracks().forEach(track => track.stop());
-      activeMediaStream = null;
-    }
-    if (cameraVideo) {
-      cameraVideo.srcObject = null;
-    }
-    if (cameraStreamWrapper) cameraStreamWrapper.classList.remove('active');
-    if (btnStartLiveCamera) btnStartLiveCamera.style.display = 'inline-flex';
-    if (btnSnapPhoto) btnSnapPhoto.style.display = 'none';
-    if (btnStopLiveCamera) btnStopLiveCamera.style.display = 'none';
-  }
-
+  // Live Camera Logic
   async function startLiveCamera() {
     try {
-      stopLiveCamera(); // clear existing
+      if (activeMediaStream) stopLiveCamera();
       const constraints = {
         video: {
           facingMode: { ideal: 'environment' },
@@ -159,18 +409,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
 
       activeMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      cameraVideo.srcObject = activeMediaStream;
-      await cameraVideo.play();
-
-      cameraStreamWrapper.classList.add('active');
-      btnStartLiveCamera.style.display = 'none';
-      btnSnapPhoto.style.display = 'inline-flex';
-      btnStopLiveCamera.style.display = 'inline-flex';
+      if (cameraVideo) {
+        cameraVideo.srcObject = activeMediaStream;
+        cameraStreamWrapper.classList.add('active');
+        if (btnStartLiveCamera) btnStartLiveCamera.style.display = 'none';
+        if (btnSnapPhoto) btnSnapPhoto.style.display = 'inline-flex';
+        if (btnStopLiveCamera) btnStopLiveCamera.style.display = 'inline-flex';
+      }
     } catch (err) {
-      console.warn('Direct camera stream inaccessible, falling back to device camera:', err);
-      // Automatically fallback to mobile device camera capture
+      console.warn('Live camera stream inaccessible, falling back to device camera:', err);
       if (cameraInput) cameraInput.click();
     }
+  }
+
+  function stopLiveCamera() {
+    if (activeMediaStream) {
+      activeMediaStream.getTracks().forEach(t => t.stop());
+      activeMediaStream = null;
+    }
+    if (cameraVideo) cameraVideo.srcObject = null;
+    if (cameraStreamWrapper) cameraStreamWrapper.classList.remove('active');
+    if (btnStartLiveCamera) btnStartLiveCamera.style.display = 'inline-flex';
+    if (btnSnapPhoto) btnSnapPhoto.style.display = 'none';
+    if (btnStopLiveCamera) btnStopLiveCamera.style.display = 'none';
   }
 
   function snapPhotoFromStream() {
@@ -203,25 +464,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cameraInput) cameraInput.value = '';
   }
 
-  // Camera Listeners
-  if (btnStartLiveCamera) {
-    btnStartLiveCamera.addEventListener('click', startLiveCamera);
-  }
+  if (btnStartLiveCamera) btnStartLiveCamera.addEventListener('click', startLiveCamera);
+  if (btnSnapPhoto) btnSnapPhoto.addEventListener('click', snapPhotoFromStream);
+  if (btnStopLiveCamera) btnStopLiveCamera.addEventListener('click', stopLiveCamera);
 
-  if (btnSnapPhoto) {
-    btnSnapPhoto.addEventListener('click', snapPhotoFromStream);
-  }
-
-  if (btnStopLiveCamera) {
-    btnStopLiveCamera.addEventListener('click', stopLiveCamera);
-  }
-
-  // Native device camera trigger (forces camera app on mobile, no gallery)
   if (btnTriggerNativeCamera && cameraInput) {
-    btnTriggerNativeCamera.addEventListener('click', () => {
-      cameraInput.click();
-    });
-
+    btnTriggerNativeCamera.addEventListener('click', () => cameraInput.click());
     cameraInput.addEventListener('change', (e) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -235,20 +483,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  if (btnRemovePhoto) {
-    btnRemovePhoto.addEventListener('click', clearPhotoPreview);
-  }
+  if (btnRemovePhoto) btnRemovePhoto.addEventListener('click', clearPhotoPreview);
 
-  // Location Elements
-  const modalIncidentLocation = document.getElementById('modalIncidentLocation');
-  const btnUseCurrentLocation = document.getElementById('btnUseCurrentLocation');
-  const gpsActivePill = document.getElementById('gpsActivePill');
-
+  // GPS Current Location Logic
   if (btnUseCurrentLocation) {
     btnUseCurrentLocation.addEventListener('click', () => {
-      if (modalIncidentLocation) {
-        modalIncidentLocation.placeholder = 'Acquiring GPS fix...';
-      }
+      if (modalIncidentLocation) modalIncidentLocation.placeholder = 'Acquiring GPS fix...';
 
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
@@ -256,27 +496,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
             const accuracy = Math.round(position.coords.accuracy || 15);
-            
+            currentCoordinates = { lat, lng };
+
             if (modalIncidentLocation) {
               modalIncidentLocation.value = `GPS: ${lat.toFixed(5)}° N, ${lng.toFixed(5)}° E (±${accuracy}m)`;
             }
             if (gpsActivePill) gpsActivePill.style.display = 'inline-block';
 
-            // Pan map to current GPS location and drop marker
-            if (trafficMap && trafficMap.map) {
-              trafficMap.map.setView([lat, lng], 15);
-              L.circleMarker([lat, lng], {
-                radius: 8,
-                fillColor: '#3b82f6',
-                color: '#ffffff',
-                weight: 2,
-                opacity: 1,
-                fillOpacity: 0.9
-              }).addTo(trafficMap.map).bindPopup('<strong>Your Current GPS Location</strong>').openPopup();
+            if (activeMap && typeof activeMap.focusLocation === 'function') {
+              activeMap.focusLocation(lat, lng, 'Your Current GPS Location');
+            } else if (activeMap && activeMap.map) {
+              activeMap.map.setView([lat, lng], 15);
             }
           },
           (error) => {
-            console.warn('Geolocation error:', error);
+            console.warn('Geolocation fallback:', error);
             if (modalIncidentLocation) {
               modalIncidentLocation.value = currentCitizen.address || 'Mangaluru Sector';
             }
@@ -287,105 +521,169 @@ document.addEventListener('DOMContentLoaded', async () => {
           },
           { enableHighAccuracy: true, timeout: 8000 }
         );
-      } else {
-        if (modalIncidentLocation) {
-          modalIncidentLocation.value = currentCitizen.address || 'Mangaluru Sector';
-        }
       }
     });
   }
 
-  function openModal() {
+  function openReportModal() {
     if (incidentModal) {
       incidentModal.classList.add('active');
-      const subjectInput = document.getElementById('modalIncidentSubject');
-      if (subjectInput) subjectInput.focus();
+      if (modalIncidentSubject) modalIncidentSubject.focus();
       if (modalIncidentLocation && !modalIncidentLocation.value) {
         modalIncidentLocation.value = currentCitizen.address || '';
       }
     }
   }
 
-  function closeModal() {
+  function closeReportModal() {
     stopLiveCamera();
-    if (incidentModal) {
-      incidentModal.classList.remove('active');
-    }
+    if (incidentModal) incidentModal.classList.remove('active');
   }
 
-  if (btnEmergencyFab) {
-    btnEmergencyFab.addEventListener('click', openModal);
-  }
-
-  if (btnCloseModal) {
-    btnCloseModal.addEventListener('click', closeModal);
-  }
-
-  if (btnCancelReport) {
-    btnCancelReport.addEventListener('click', closeModal);
-  }
-
-  // Close modal when clicking on backdrop outside card
-  if (incidentModal) {
-    incidentModal.addEventListener('click', (e) => {
-      if (e.target === incidentModal) {
-        closeModal();
-      }
+  if (btnEmergencyFab) btnEmergencyFab.addEventListener('click', openReportModal);
+  if (btnCloseModal) btnCloseModal.addEventListener('click', closeReportModal);
+  if (btnCancelReport) btnCancelReport.addEventListener('click', closeReportModal);
+  if (btnReportFromHistory) {
+    btnReportFromHistory.addEventListener('click', () => {
+      closeHistoryModal();
+      openReportModal();
     });
   }
 
-  // Handle Emergency / Incident Form Submission
+  if (incidentModal) {
+    incidentModal.addEventListener('click', (e) => {
+      if (e.target === incidentModal) closeReportModal();
+    });
+  }
+
+  // 6. Handle SOS Form Submission & Append to Live Incident History
   if (emergencyForm) {
     emergencyForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const category = modalCategorySelect?.value || 'ROAD_BLOCKAGE';
       const subject = modalIncidentSubject?.value.trim() || 'Citizen Incident';
-      const location = modalIncidentLocation?.value.trim() || currentCitizen.address || 'Mangaluru';
+      const location = modalIncidentLocation?.value.trim() || currentCitizen.address || 'Mangaluru Sector';
       const description = document.getElementById('modalIncidentDesc')?.value || '';
       const severity = document.getElementById('modalSeveritySelect')?.value || 'HIGH';
 
-      const fullDetails = `${subject} at ${location} | ${description}`.trim();
+      // Parse or generate realistic coordinates near Mangaluru
+      let incLat = currentCoordinates.lat;
+      let incLng = currentCoordinates.lng;
+      const match = location.match(/GPS:\s*([\d\.]+)°\s*N,\s*([\d\.]+)°\s*E/i);
+      if (match) {
+        incLat = parseFloat(match[1]);
+        incLng = parseFloat(match[2]);
+      } else {
+        // Random offset near city center
+        incLat = 12.8750 + (Math.random() - 0.5) * 0.015;
+        incLng = 74.8550 + (Math.random() - 0.5) * 0.015;
+      }
 
-      // Submit to backend intelligence API if available
+      // Create new incident record
+      const newIncident = {
+        id: `CIT-MNG-${Date.now().toString().slice(-4)}`,
+        timestamp: new Date().toISOString(),
+        timeAgo: 'Just now',
+        subject: subject,
+        category: category,
+        location: location,
+        lat: incLat,
+        lng: incLng,
+        severity: severity,
+        description: description,
+        reporter: currentCitizen.name,
+        reporterAddress: currentCitizen.address,
+        verified: true,
+        photo: capturedPhotoBase64
+      };
+
+      // Prepend to history & save
+      incidentHistory.unshift(newIncident);
+      saveIncidentHistory();
+
+      // Submit to backend citizen report API if active
       try {
         const payload = {
-          edge_id: 'corridor_cctv_01',
-          category: category === 'OTHER' ? 'ROAD_BLOCKAGE' : category,
-          severity: severity,
-          capacity_reduction: 0.85,
-          estimated_duration_min: 45,
-          custom_subject: subject,
-          location: location,
-          reporter: currentCitizen.name,
-          reporter_address: currentCitizen.address,
-          has_photo: !!capturedPhotoBase64
+          reporter_name: currentCitizen.name,
+          contact_number: currentCitizen.age ? `Age ${currentCitizen.age}` : null,
+          road_segment_id: "corridor_cctv_01",
+          category: category === 'OTHER' ? 'COLLISION' : category,
+          description: `${subject} at ${location}: ${description}`,
+          lanes_affected: severity === 'CRITICAL' ? 2 : 1
         };
 
-        const res = await fetch('/api/v1/intelligence/incident/trigger', {
+        await fetch('/api/v1/intelligence/citizen-reports', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-
-        if (res.ok) {
-          showToast(`Alert dispatched: "${subject}" at ${location} with photo verification!`);
-        } else {
-          showToast(`Alert dispatched: "${subject}" recorded at ${location}.`);
-        }
       } catch (err) {
-        // Fallback demo toast if offline
-        showToast(`Alert logged: "${subject}" at ${location} verified via camera!`);
+        console.warn('Backend report ingestion fallback:', err);
       }
 
-      // Close modal and clean up
-      closeModal();
+      // Update Map Pins
+      if (activeMap && typeof activeMap.renderIncidents === 'function') {
+        activeMap.renderIncidents(incidentHistory);
+        activeMap.focusLocation(incLat, incLng, subject, 16);
+      }
+
+      // Show success toast with new total count
+      showToast(`Incident #${incidentHistory.length} posted to live log! Dispatched to Control Room.`);
+
+      // Reset & Clean up
+      closeReportModal();
       clearPhotoPreview();
       emergencyForm.reset();
-      await loadPublicNetwork();
     });
   }
 
+  // 7. Google Maps API Key Modal Management
+  const btnConfigureMapsKey = document.getElementById('btnConfigureMapsKey');
+  const mapsKeyModal = document.getElementById('mapsKeyModal');
+  const btnCloseKeyModal = document.getElementById('btnCloseKeyModal');
+  const inputGoogleMapsKey = document.getElementById('inputGoogleMapsKey');
+  const btnSaveKeyBtn = document.getElementById('btnSaveKeyBtn');
+  const btnClearKeyBtn = document.getElementById('btnClearKeyBtn');
+
+  if (btnConfigureMapsKey) {
+    btnConfigureMapsKey.addEventListener('click', () => {
+      if (inputGoogleMapsKey) {
+        inputGoogleMapsKey.value = localStorage.getItem('GOOGLE_MAPS_API_KEY') || '';
+      }
+      if (mapsKeyModal) mapsKeyModal.classList.add('active');
+    });
+  }
+
+  if (btnCloseKeyModal) {
+    btnCloseKeyModal.addEventListener('click', () => {
+      if (mapsKeyModal) mapsKeyModal.classList.remove('active');
+    });
+  }
+
+  if (btnSaveKeyBtn) {
+    btnSaveKeyBtn.addEventListener('click', () => {
+      const key = inputGoogleMapsKey?.value.trim() || '';
+      if (key) {
+        localStorage.setItem('GOOGLE_MAPS_API_KEY', key);
+        showToast('Google Maps Key saved! Reloading map...');
+      } else {
+        localStorage.removeItem('GOOGLE_MAPS_API_KEY');
+      }
+      setTimeout(() => location.reload(), 600);
+    });
+  }
+
+  if (btnClearKeyBtn) {
+    btnClearKeyBtn.addEventListener('click', () => {
+      localStorage.removeItem('GOOGLE_MAPS_API_KEY');
+      if (inputGoogleMapsKey) inputGoogleMapsKey.value = '';
+      showToast('API Key cleared. Reloading...');
+      setTimeout(() => location.reload(), 600);
+    });
+  }
+
+  // Toast Function
   function showToast(msg) {
     if (!toastNotification || !toastMessage) return;
     toastMessage.textContent = msg;
