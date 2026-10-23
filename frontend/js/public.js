@@ -725,12 +725,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnZoomOut = document.getElementById('btnGmapsZoomOut');
 
     // Filter Chips
-    const chipDirections = document.getElementById('chipDirections');
     const chipTraffic = document.getElementById('chipTraffic');
     const chipIncidents = document.getElementById('chipIncidents');
     const chipHospitals = document.getElementById('chipHospitals');
-    const chipGreenCorridor = document.getElementById('chipGreenCorridor');
-    const chip3DBuildings = document.getElementById('chip3DBuildings');
 
     // 1. Search Bar Input & Autocomplete
     if (searchInput) {
@@ -855,12 +852,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (destinationSelect) destinationSelect.focus();
       }
       if (suggestionsBox) suggestionsBox.style.display = 'none';
-      if (chipDirections) chipDirections.classList.add('active');
     }
 
     function closeDirectionsPanel() {
       if (directionsCard) directionsCard.style.display = 'none';
-      if (chipDirections) chipDirections.classList.remove('active');
       clearGoogleRouteFromMap();
       currentCalculatedRoute = null;
     }
@@ -874,7 +869,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (closeDirectionsBtn) closeDirectionsBtn.addEventListener('click', closeDirectionsPanel);
-    if (chipDirections) chipDirections.addEventListener('click', openDirectionsPanel);
 
     // Mode Selector Tabs (Driving, Two-Wheeler, Transit, Walking)
     modeTabs.forEach(tab => {
@@ -1306,23 +1300,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         showJunctionPlaceCard(hospitalNode);
         showToast(`Located hospital hub: "${hospitalNode.name}"`);
-      });
-    }
-
-    if (chipGreenCorridor) {
-      chipGreenCorridor.addEventListener('click', () => {
-        openDirectionsPanel();
-        if (originSelect) originSelect.value = 'EMS_STATE_BANK';
-        if (destinationSelect) destinationSelect.value = 'HOSPITAL_KMC_JYOTHI';
-        calculateRouteAction();
-        showToast('Calculated Emergency Green Corridor to KMC Hospital!');
-      });
-    }
-
-    if (chip3DBuildings) {
-      chip3DBuildings.addEventListener('click', () => {
-        const toggleBtn = document.getElementById('btnToggle3DView');
-        if (toggleBtn) toggleBtn.click();
       });
     }
 
