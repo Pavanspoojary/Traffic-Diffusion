@@ -48,3 +48,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Local agent memory
+.agents/
