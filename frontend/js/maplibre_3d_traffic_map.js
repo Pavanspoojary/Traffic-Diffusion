@@ -10,11 +10,14 @@ class MapLibre3DTrafficMap {
     this.isLoaded = false;
     this.nodeMarkers = [];
     this.incidentMarkers = [];
+    this.placeMarkers = [];
+    this.routeMarkers = [];
     this.userGpsMarker = null;
     this.nodeMap = new Map();
     this.pendingEdges = null;
     this.pendingNodes = null;
     this.pendingIncidents = null;
+    this.pendingPlaces = null;
     this.popup = null;
   }
 
@@ -565,5 +568,181 @@ class MapLibre3DTrafficMap {
       .addTo(this.map);
 
     this.userGpsMarker.togglePopup();
+  }
+
+  // Render Connected Street Route on MapLibre Map with Google Style
+  renderRoute(coordinates, originPoint = null, destinationPoint = null) {
+    if (!this.map) return;
+
+    // Normalise coordinates to [lng, lat]
+    const lineCoords = coordinates.map(pt => {
+      if (Array.isArray(pt)) {
+        return pt[0] < pt[1] ? [pt[1], pt[0]] : [pt[0], pt[1]];
+      }
+      return [pt.lng, pt.lat];
+    });
+
+    const geojsonData = {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: lineCoords
+      }
+    };
+
+    if (this.map.getSource('gmaps-route-source')) {
+      this.map.getSource('gmaps-route-source').setData(geojsonData);
+    } else {
+      this.map.addSource('gmaps-route-source', {
+        type: 'geojson',
+        data: geojsonData
+      });
+
+      // White outline casing
+      this.map.addLayer({
+        id: 'gmaps-route-casing',
+        type: 'line',
+        source: 'gmaps-route-source',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 10.0,
+          'line-opacity': 0.98
+        }
+      });
+
+      // Luminous blue core line
+      this.map.addLayer({
+        id: 'gmaps-route-line',
+        type: 'line',
+        source: 'gmaps-route-source',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#1a73e8',
+          'line-width': 6.5,
+          'line-opacity': 1.0
+        }
+      });
+    }
+
+    // Clear previous route markers
+    this.routeMarkers.forEach(m => m.remove());
+    this.routeMarkers = [];
+
+    // Origin "A" Green Marker
+    const startCoord = originPoint && originPoint.lng && originPoint.lat 
+      ? [originPoint.lng, originPoint.lat] 
+      : lineCoords[0];
+    
+    if (startCoord) {
+      const originEl = document.createElement('div');
+      originEl.className = 'maplibre-route-marker maplibre-marker-origin';
+      originEl.innerHTML = 'A';
+      originEl.title = originPoint ? originPoint.name : 'Origin';
+
+      const originMarker = new maplibregl.Marker({ element: originEl, anchor: 'center' })
+        .setLngLat(startCoord)
+        .addTo(this.map);
+      this.routeMarkers.push(originMarker);
+    }
+
+    // Destination "B" Red Marker
+    const endCoord = destinationPoint && destinationPoint.lng && destinationPoint.lat
+      ? [destinationPoint.lng, destinationPoint.lat]
+      : lineCoords[lineCoords.length - 1];
+
+    if (endCoord) {
+      const destEl = document.createElement('div');
+      destEl.className = 'maplibre-route-marker maplibre-marker-destination';
+      destEl.innerHTML = 'B';
+      destEl.title = destinationPoint ? destinationPoint.name : 'Destination';
+
+      const destMarker = new maplibregl.Marker({ element: destEl, anchor: 'center' })
+        .setLngLat(endCoord)
+        .addTo(this.map);
+      this.routeMarkers.push(destMarker);
+    }
+
+    // Smooth camera framing
+    if (lineCoords.length > 1 && typeof maplibregl !== 'undefined') {
+      const bounds = new maplibregl.LngLatBounds();
+      lineCoords.forEach(pt => bounds.extend(pt));
+      this.map.fitBounds(bounds, {
+        padding: { top: 90, bottom: 90, left: 430, right: 90 },
+        duration: 1200,
+        pitch: 45
+      });
+    }
+  }
+
+  clearActiveRoute() {
+    if (!this.map) return;
+    if (this.map.getSource('gmaps-route-source')) {
+      this.map.getSource('gmaps-route-source').setData({
+        type: 'FeatureCollection',
+        features: []
+      });
+    }
+    this.routeMarkers.forEach(m => m.remove());
+    this.routeMarkers = [];
+  }
+
+  // Render Key Place POI Pins on the Map
+  renderPlaces(places, force = false) {
+    if (!this.map || !Array.isArray(places)) return;
+
+    if (!force && this.placeMarkers && this.placeMarkers.length > 0) {
+      return;
+    }
+
+    // Clear previous place markers
+    this.placeMarkers.forEach(m => m.remove());
+    this.placeMarkers = [];
+
+    places.forEach(place => {
+      if (!place.lat || !place.lng) return;
+
+      const el = document.createElement('div');
+      el.className = 'maplibre-marker-anchor';
+      
+      const pin = document.createElement('div');
+      pin.style.cssText = `
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 2px solid #1a73e8;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.15s;
+      `;
+      pin.innerHTML = place.icon || '📍';
+      pin.title = place.name;
+      el.appendChild(pin);
+
+      pin.onmouseenter = () => { pin.style.transform = 'scale(1.2)'; };
+      pin.onmouseleave = () => { pin.style.transform = 'scale(1)'; };
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent('gmaps:place-clicked', { detail: place }));
+      });
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([place.lng, place.lat])
+        .addTo(this.map);
+
+      this.placeMarkers.push(marker);
+    });
   }
 }

@@ -1905,125 +1905,186 @@
   margin: 0 auto;
 }
 
-/* 6. Google Maps Bottom Slide-Up Incident / Place Card */
+/* 6. Google Maps Place & Incident Details Card (Desktop Left Docked / Mobile Bottom) */
 .gmaps-bottom-card {
   position: absolute;
-  bottom: 24px;
+  top: 72px;
   left: 16px;
   z-index: 500;
-  width: 380px;
+  width: 396px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
   background: #ffffff;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(60, 64, 67, 0.35);
+  box-shadow: 0 4px 24px rgba(60, 64, 67, 0.35);
   padding: 16px;
   pointer-events: auto;
-  animation: slideUpGmaps 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInDownGmaps 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes slideUpGmaps {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+@media (max-width: 768px) {
+  .gmaps-bottom-card {
+    top: auto;
+    bottom: 16px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    max-height: 72vh;
+    animation: slideUpGmaps 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }
 
-.gmaps-card-close-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: transparent;
-  border: none;
-  color: #5f6368;
-  font-size: 16px;
-  cursor: pointer;
+.gmaps-badge-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-}
-
-.gmaps-card-close-btn:hover {
-  background: #f1f3f4;
-  color: #202124;
-}
-
-.gmaps-card-badge {
-  display: inline-block;
-  background: #fce8e6;
-  color: #d93025;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 12px;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
-.gmaps-card-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #202124;
-  margin: 0 0 4px 0;
-  padding-right: 24px;
+.gmaps-card-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #e6f4ea;
+  color: #137333;
 }
 
-.gmaps-card-subtitle {
-  font-size: 12px;
-  color: #5f6368;
-}
-
-.gmaps-card-meta-row {
+.gmaps-card-quick-actions {
   display: flex;
-  gap: 12px;
-  margin: 10px 0;
-  padding: 8px 10px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  font-size: 12px;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 14px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f3f4;
+  overflow-x: auto;
 }
 
-.gmaps-card-meta-item {
+.gmaps-btn-icon-only {
+  padding: 7px 10px;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gmaps-place-info-list {
   display: flex;
   flex-direction: column;
-}
-
-.meta-label {
-  font-size: 10px;
-  color: #70757a;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.meta-value {
-  color: #202124;
-  font-weight: 600;
-}
-
-.gmaps-card-desc {
-  font-size: 13px;
-  color: #3c4043;
-  line-height: 1.4;
-  margin-bottom: 12px;
-}
-
-.gmaps-card-photo {
-  width: 100%;
-  height: 140px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid #dadce0;
-}
-
-.gmaps-card-actions {
-  display: flex;
   gap: 8px;
-  margin-top: 10px;
+}
+
+.gmaps-info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f8f9fa;
+  font-size: 13px;
+}
+
+.gmaps-info-icon {
+  font-size: 16px;
+  line-height: 1.2;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.gmaps-info-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.gmaps-info-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #70757a;
+  margin-bottom: 2px;
+  letter-spacing: 0.3px;
+}
+
+.gmaps-info-text {
+  color: #202124;
+  font-weight: 500;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* MapLibre Route Start/End A and B Marker Pins */
+.maplibre-route-marker {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  border: 2.5px solid #ffffff;
+  cursor: pointer;
+  position: relative;
+}
+
+.maplibre-marker-origin {
+  background: #1e8e3e;
+}
+
+.maplibre-marker-destination {
+  background: #d93025;
+}
+
+.maplibre-marker-origin::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #1e8e3e;
+  animation: markerPulse 1.8s infinite ease-out;
+}
+
+@keyframes markerPulse {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.gmaps-suggestion-categories {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dadce0;
+  overflow-x: auto;
+}
+
+.gmaps-sug-cat-pill {
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 14px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #3c4043;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.gmaps-sug-cat-pill:hover, .gmaps-sug-cat-pill.active {
+  background: #e8f0fe;
+  border-color: #1a73e8;
+  color: #1a73e8;
 }
 
 /* 7. Google Maps Floating Report Incident FAB ("Contribute") */

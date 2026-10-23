@@ -248,6 +248,16 @@
           <span style="font-size: 13px;">🏥</span>
           <span>Hospitals</span>
         </button>
+
+        <button type="button" class="gmaps-chip" id="chipTransit" title="Show Railway Stations & Transit Hubs">
+          <span style="font-size: 13px;">🚆</span>
+          <span>Transit Hubs</span>
+        </button>
+
+        <button type="button" class="gmaps-chip" id="chipPlaces" title="Show Malls, Markets & Landmarks">
+          <span style="font-size: 13px;">🛍️</span>
+          <span>Places & Malls</span>
+        </button>
       </div>
 
       <!-- ====================================================================
@@ -301,18 +311,60 @@
       </div>
 
       <!-- ====================================================================
-           Google Maps Bottom Place / Incident Card (Slide-up on Marker Click)
+           Google Maps Place & Incident Details Card (Desktop Left Docked / Mobile Bottom)
            ==================================================================== -->
       <div class="gmaps-bottom-card" id="gmapsPlaceCard" style="display: none;">
         <button type="button" class="gmaps-card-close-btn" id="btnClosePlaceCard" title="Dismiss card">✕</button>
+        
         <div class="gmaps-card-header">
-          <div class="gmaps-card-badge" id="placeCardSeverityBadge">⚠️ CRITICAL HAZARD</div>
-          <h2 class="gmaps-card-title" id="placeCardTitle">Heavy Commercial Freight Rollover</h2>
-          <div class="gmaps-card-subtitle" id="placeCardSubtitle">Circuit House - Nanthoor Road · Mangaluru</div>
+          <div class="gmaps-badge-row">
+            <span class="gmaps-card-badge" id="placeCardSeverityBadge">📍 PLACE</span>
+            <span class="gmaps-card-status-pill" id="placeCardStatusPill">🟢 Open 24/7</span>
+          </div>
+          <h2 class="gmaps-card-title" id="placeCardTitle">Place Name</h2>
+          <div class="gmaps-card-subtitle" id="placeCardSubtitle">Address / Neighborhood · Mangaluru</div>
+        </div>
+
+        <!-- Quick Action Buttons -->
+        <div class="gmaps-card-quick-actions">
+          <button type="button" class="gmaps-btn-primary" id="btnPlaceDirections" title="Calculate Route Here">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21.71 11.29l-9-9a.996.996 0 0 0-1.41 0l-9 9a.996.996 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 0 0 0-1.41zm-10.71 6.29l-6.59-6.59L11 4.41V8h4c1.1 0 2 .9 2 2v4h-2v-4h-4v3.59z"/>
+            </svg>
+            <span>Directions</span>
+          </button>
+          
+          <button type="button" class="gmaps-btn-secondary" id="btnPlaceStartFrom" title="Set as Starting Point">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="8"></circle>
+              <line x1="12" y1="2" x2="12" y2="6"></line>
+              <line x1="12" y1="18" x2="12" y2="22"></line>
+              <line x1="2" y1="12" x2="6" y2="12"></line>
+              <line x1="18" y1="12" x2="22" y2="12"></line>
+            </svg>
+            <span>Start Here</span>
+          </button>
+
+          <button type="button" class="gmaps-btn-secondary" id="btnPlaceReportUpdate" title="Report Hazard or Traffic Disruption">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>Report</span>
+          </button>
+
+          <button type="button" class="gmaps-btn-secondary gmaps-btn-icon-only" id="btnPlaceShare" title="Copy Address & Coordinates">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
         </div>
 
         <div class="gmaps-card-body">
-          <div class="gmaps-card-meta-row">
+          <!-- Incident Specific Alert Row (when showing incident) -->
+          <div class="gmaps-card-meta-row" id="placeCardIncidentMetaRow" style="display: none;">
             <div class="gmaps-card-meta-item">
               <span class="meta-label">Delay:</span>
               <span class="meta-value" id="placeCardDelay" style="color: #d93025; font-weight: 700;">+18 mins</span>
@@ -326,24 +378,65 @@
               <span class="meta-value" id="placeCardReported">15 mins ago</span>
             </div>
           </div>
-          <div class="gmaps-card-desc" id="placeCardDesc">
-            Overturned multi-axle freight truck blocking arterial lanes towards Nanthoor circle approach.
+
+          <!-- Complete Place Details Info Section -->
+          <div class="gmaps-place-info-list" id="placeCardInfoList">
+            <div class="gmaps-info-item" id="infoRowAddress">
+              <span class="gmaps-info-icon">📍</span>
+              <div class="gmaps-info-content">
+                <div class="gmaps-info-label">Address</div>
+                <div class="gmaps-info-text" id="placeCardAddress">Loading address...</div>
+              </div>
+            </div>
+
+            <div class="gmaps-info-item" id="infoRowCoords">
+              <span class="gmaps-info-icon">🌐</span>
+              <div class="gmaps-info-content">
+                <div class="gmaps-info-label">Coordinates</div>
+                <div class="gmaps-info-text" id="placeCardCoords">12.8715° N, 74.8475° E</div>
+              </div>
+            </div>
+
+            <div class="gmaps-info-item" id="infoRowTraffic">
+              <span class="gmaps-info-icon">🚦</span>
+              <div class="gmaps-info-content">
+                <div class="gmaps-info-label">Live Traffic & Speed</div>
+                <div class="gmaps-info-text" id="placeCardTrafficStatus">🟢 Free Flow · Avg 34 km/h</div>
+              </div>
+            </div>
+
+            <div class="gmaps-info-item" id="infoRowHazards">
+              <span class="gmaps-info-icon">⚠️</span>
+              <div class="gmaps-info-content">
+                <div class="gmaps-info-label">Hazards & Incidents Nearby</div>
+                <div class="gmaps-info-text" id="placeCardHazardsStatus">✅ All roads clear in 1.5 km vicinity</div>
+              </div>
+            </div>
+
+            <div class="gmaps-info-item" id="infoRowHours">
+              <span class="gmaps-info-icon">🕒</span>
+              <div class="gmaps-info-content">
+                <div class="gmaps-info-label">Hours / Accessibility</div>
+                <div class="gmaps-info-text" id="placeCardHours">Open 24 Hours</div>
+              </div>
+            </div>
+
+            <div class="gmaps-info-item" id="infoRowPhone" style="display: none;">
+              <span class="gmaps-info-icon">📞</span>
+              <div class="gmaps-info-content">
+                <div class="gmaps-info-label">Emergency / Contact</div>
+                <div class="gmaps-info-text" id="placeCardPhone">+91 824 244 4590</div>
+              </div>
+            </div>
           </div>
+
+          <div class="gmaps-card-desc" id="placeCardDesc" style="margin-top: 10px;">
+            Place description...
+          </div>
+
           <div id="placeCardPhotoWrapper" style="display: none; margin-top: 8px;">
             <img id="placeCardPhoto" class="gmaps-card-photo" alt="Incident view" />
           </div>
-        </div>
-
-        <div class="gmaps-card-actions">
-          <button type="button" class="gmaps-btn-primary" id="btnPlaceDirections">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M21.71 11.29l-9-9a.996.996 0 0 0-1.41 0l-9 9a.996.996 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 0 0 0-1.41zm-10.71 6.29l-6.59-6.59L11 4.41V8h4c1.1 0 2 .9 2 2v4h-2v-4h-4v3.59z"/>
-            </svg>
-            <span>Directions</span>
-          </button>
-          <button type="button" class="gmaps-btn-secondary" id="btnPlaceReportUpdate">
-            <span>Update / Report</span>
-          </button>
         </div>
       </div>
 
