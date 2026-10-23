@@ -10,14 +10,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Google Maps JavaScript API dynamic bootstrap loader -->
-  <!-- Solution Attribution ID: gmp_git_agentskills_v1 -->
-  <script>
-    (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
-      key: localStorage.getItem('GOOGLE_MAPS_API_KEY') || '',
-      v: 'weekly'
-    });
-  </script>
+  <!-- MapLibre GL JS - WebGL 3D Vector Maps with 3D Buildings -->
+  <link rel="stylesheet" href="/css/maplibre-gl.css">
+  <script src="/js/maplibre-gl.js"></script>
 </head>
 <body>
   <div class="public-map-layout">
@@ -44,14 +39,14 @@
           <span id="navIncidentCountBadge" class="incident-counter-badge">3</span>
         </button>
 
-        <!-- Google Maps API Key Config Button -->
-        <button type="button" id="btnConfigureMapsKey" class="btn-maps-key" title="Configure Google Maps API Key">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
-            <line x1="8" y1="2" x2="8" y2="18"></line>
-            <line x1="16" y1="6" x2="16" y2="22"></line>
+        <!-- 3D Perspective Tilt View Toggle -->
+        <button type="button" id="btnToggle3DView" class="btn-3d-toggle active" title="Toggle 3D Building Extrusions Perspective">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
           </svg>
-          <span>Maps Key</span>
+          <span id="label3DView">3D Buildings</span>
         </button>
 
         <!-- Logged-in User Profile Chip -->
@@ -76,7 +71,7 @@
       <div class="map-legend-overlay" style="top: 16px; left: 16px; z-index: 400;">
         <div style="font-weight: 800; font-size: 11px; color: #fff; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
           <span>CITY CORRIDORS</span>
-          <span style="font-size: 9px; color: #38bdf8; font-weight: 700;">GOOGLE MAPS</span>
+          <span style="font-size: 9px; color: #38bdf8; font-weight: 700;">MAPLIBRE 3D</span>
         </div>
         <div class="legend-item">
           <div class="legend-color-box" style="background-color: #ef4444;"></div>
@@ -392,62 +387,10 @@
       </div>
     </div>
 
-    <!-- Google Maps API Key Configuration Modal -->
-    <div id="mapsKeyModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="keyModalTitle">
-      <div class="modal-card">
-        <div class="modal-header" style="background: rgba(59, 130, 246, 0.1); border-bottom-color: rgba(59, 130, 246, 0.25);">
-          <div class="modal-header-title" style="color: #60a5fa;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M21 2l-2 2m-1.5 1.5L16 7m-1.5 1.5L13 10m-1.5 1.5L10 13m0 0l-4 4-2-2 4-4m2-2l3.5-3.5a2.121 2.121 0 0 1 3 3L10 13z"></path>
-            </svg>
-            <span id="keyModalTitle">Google Maps API Key Setup</span>
-          </div>
-          <button type="button" id="btnCloseKeyModal" class="modal-close-btn" aria-label="Close dialog">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <p style="font-size: 13px; color: var(--pub-text); line-height: 1.5; margin-bottom: 14px;">
-            Enter your Google Maps Platform API key or free <strong>Maps Demo Key</strong> for prototyping:
-          </p>
-
-          <div class="login-form-group">
-            <label class="login-label" for="inputGoogleMapsKey">API Key</label>
-            <input 
-              type="text" 
-              id="inputGoogleMapsKey" 
-              class="login-input" 
-              placeholder="AIzaSy..." 
-              autocomplete="off"
-            />
-          </div>
-
-          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--pub-border); border-radius: 8px; padding: 12px; font-size: 12px; color: var(--pub-text-muted); line-height: 1.5;">
-            <div style="font-weight: 700; color: #cbd5e1; margin-bottom: 4px;">Quick Demo Key Guide:</div>
-            1. Visit <a href="https://mapsplatform.google.com/maps-demo-key?utm_campaign=gmp_git_agentskills_v1" target="_blank" style="color: #60a5fa;">Google Maps Demo Key</a><br/>
-            2. Sign in with any Google account (no billing card required)<br/>
-            3. Copy the demo key and paste it here!
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" id="btnClearKeyBtn" class="btn-modal-cancel" style="color: #ef4444;">Clear Key</button>
-          <button type="button" id="btnSaveKeyBtn" class="btn-modal-submit" style="background: linear-gradient(135deg, #2563eb, #1d4ed8);">
-            Save & Reload Map
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 
-  <!-- Fallback Leaflet scripts if Google Maps is in offline mode -->
-  <script src="/js/leaflet.js"></script>
-  <script src="/js/map.js"></script>
-  <script src="/js/google_traffic_map.js"></script>
+  <!-- MapLibre 3D Vector Map & Citizen Controller Scripts -->
+  <script src="/js/maplibre_3d_traffic_map.js"></script>
   <script src="/js/public.js"></script>
 </body>
 </html>

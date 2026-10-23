@@ -163,32 +163,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (countMy) countMy.textContent = myReports;
   }
 
-  // 3. Initialize Google Maps Platform
-  let googleMapController = null;
+  // 3. Initialize MapLibre GL JS 3D Traffic Map
   let activeMap = null;
   let networkEdges = [];
   let networkNodes = [];
 
   try {
-    if (typeof GoogleTrafficMap !== 'undefined') {
-      googleMapController = new GoogleTrafficMap('map');
-      const gmapReady = await googleMapController.init();
-      if (gmapReady) {
-        activeMap = googleMapController;
-      }
+    if (typeof MapLibre3DTrafficMap !== 'undefined') {
+      activeMap = new MapLibre3DTrafficMap('map');
+      await activeMap.init();
+      console.info('MapLibre GL JS 3D Traffic Map initialized successfully.');
     }
   } catch (err) {
-    console.warn('Google Maps initialization encountered fallback:', err);
-  }
-
-  // Fallback to Leaflet if Google Maps failed to initialize
-  if (!activeMap && typeof TrafficMap !== 'undefined') {
-    try {
-      console.info('Loading fallback map controller...');
-      activeMap = new TrafficMap('map');
-    } catch (e) {
-      console.error('Fallback map error:', e);
-    }
+    console.warn('MapLibre GL 3D Map initialization error:', err);
   }
 
   // Load Road Network
@@ -638,48 +625,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 7. Google Maps API Key Modal Management
-  const btnConfigureMapsKey = document.getElementById('btnConfigureMapsKey');
-  const mapsKeyModal = document.getElementById('mapsKeyModal');
-  const btnCloseKeyModal = document.getElementById('btnCloseKeyModal');
-  const inputGoogleMapsKey = document.getElementById('inputGoogleMapsKey');
-  const btnSaveKeyBtn = document.getElementById('btnSaveKeyBtn');
-  const btnClearKeyBtn = document.getElementById('btnClearKeyBtn');
+  // 7. MapLibre 3D Building Extrusions Perspective View Toggle
+  const btnToggle3DView = document.getElementById('btnToggle3DView');
+  const label3DView = document.getElementById('label3DView');
+  let is3DActive = true;
 
-  if (btnConfigureMapsKey) {
-    btnConfigureMapsKey.addEventListener('click', () => {
-      if (inputGoogleMapsKey) {
-        inputGoogleMapsKey.value = localStorage.getItem('GOOGLE_MAPS_API_KEY') || '';
-      }
-      if (mapsKeyModal) mapsKeyModal.classList.add('active');
-    });
-  }
-
-  if (btnCloseKeyModal) {
-    btnCloseKeyModal.addEventListener('click', () => {
-      if (mapsKeyModal) mapsKeyModal.classList.remove('active');
-    });
-  }
-
-  if (btnSaveKeyBtn) {
-    btnSaveKeyBtn.addEventListener('click', () => {
-      const key = inputGoogleMapsKey?.value.trim() || '';
-      if (key) {
-        localStorage.setItem('GOOGLE_MAPS_API_KEY', key);
-        showToast('Google Maps Key saved! Reloading map...');
+  if (btnToggle3DView) {
+    btnToggle3DView.addEventListener('click', () => {
+      if (!activeMap || !activeMap.map) return;
+      is3DActive = !is3DActive;
+      if (is3DActive) {
+        btnToggle3DView.classList.add('active');
+        if (label3DView) label3DView.textContent = '3D Buildings';
+        activeMap.map.easeTo({ pitch: 52, bearing: -17.6, duration: 800 });
+        showToast('Switched to 3D Isometric View with building extrusions.');
       } else {
-        localStorage.removeItem('GOOGLE_MAPS_API_KEY');
+        btnToggle3DView.classList.remove('active');
+        if (label3DView) label3DView.textContent = '2D Top-Down';
+        activeMap.map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+        showToast('Switched to 2D Top-Down View.');
       }
-      setTimeout(() => location.reload(), 600);
-    });
-  }
-
-  if (btnClearKeyBtn) {
-    btnClearKeyBtn.addEventListener('click', () => {
-      localStorage.removeItem('GOOGLE_MAPS_API_KEY');
-      if (inputGoogleMapsKey) inputGoogleMapsKey.value = '';
-      showToast('API Key cleared. Reloading...');
-      setTimeout(() => location.reload(), 600);
     });
   }
 
