@@ -560,6 +560,87 @@ body {
   cursor: pointer;
 }
 
+/* Pulsing Incident Marker Pin */
+.map-incident-pin {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.pin-pulse {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.45);
+  animation: incident-pulse 1.8s infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes incident-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.pin-core {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* MapLibre Popup Customization */
+.maplibregl-popup-content {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18) !important;
+  padding: 8px 10px !important;
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: #ffffff !important;
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: #ffffff !important;
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: #ffffff !important;
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: #ffffff !important;
+}
+.maplibregl-popup-close-button {
+  color: #64748b !important;
+  font-size: 14px !important;
+  padding: 4px 6px !important;
+}
+
 /* ==========================================================================
    4. Compact Impact Summary (3 Key Metrics)
    ========================================================================== */

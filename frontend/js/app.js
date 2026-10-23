@@ -1,11 +1,11 @@
-// Traffic-Diffusion — Traffic Diversion Intelligence for Control Rooms
-// MapLibre GL JS with 3D Buildings Extrusion & Vector Tiles
+// Traffic-Diffusion — Traffic Incident Intelligence & Diversion Decision-Support
+// MapLibre GL JS with Real Physical Geometry Normalization & 3D Urban Buildings
 // Unified Demonstration Geography: Mangaluru Metropolitan Arterials (NH-66 / NH-73)
 
 document.addEventListener('DOMContentLoaded', async () => {
 
   // =========================================================================
-  // 1. Live Digital Clock
+  // 1. Live Operational Clock
   // =========================================================================
   const headerLiveClock = document.getElementById('headerLiveClock');
 
@@ -35,6 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // =========================================================================
   const MANGALURU_CENTER = [74.8550, 12.8750]; // Center around Bunts Hostel / Kadri / Nanthoor
   let mapInstance = null;
+  let isMapReady = false;
+  let pendingScenarioToRender = null;
+  let activeIncidentMarker = null;
   let activeMarkers = [];
   let currentCorridorsData = [];
   let currentNodesMap = new Map();
@@ -43,17 +46,60 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activeBlockagePct = 80;
   let activeDisplacedDemand = 895.0;
   let latestEvaluation = null;
+  let activeSelectedScenarioId = null;
+
+  // Window debug hooks
+  window.__getMap = () => mapInstance;
+  Object.defineProperty(window, '__mapInstance', { get: () => mapInstance });
+  Object.defineProperty(window, '__isMapReady', { get: () => isMapReady });
+  Object.defineProperty(window, '__latestEvaluation', { get: () => latestEvaluation });
+  Object.defineProperty(window, '__currentCorridorsData', { get: () => currentCorridorsData });
+  window.__renderScenarioOnMap = (sc) => renderScenarioOnMap(sc);
+  window.__renderNetworkOnMap = () => renderNetworkOnMap();
+  window.__getEdgeCoords = (id) => getEdgeCoords(id);
 
   // Presets mapping
   const PRESETS = {
-    nanthoor: { corridor: 'corridor_cctv_07', blockage: 80, desc: 'Nanthoor Rollover (80%)' },
-    bunts: { corridor: 'corridor_cctv_05', blockage: 50, desc: 'Bunts Waterlogging (50%)' },
-    mgRoad: { corridor: 'corridor_cctv_10', blockage: 60, desc: 'MG Road Bus Stall (60%)' },
-    hampankatta: { corridor: 'corridor_cctv_01', blockage: 100, desc: 'K.S. Rao Closure (100%)' }
+    nanthoor: { corridor: 'corridor_cctv_07', blockage: 80, desc: 'Nanthoor Rollover (80%)', id: 'presetNanthoor' },
+    bunts: { corridor: 'corridor_cctv_05', blockage: 50, desc: 'Bunts Waterlogging (50%)', id: 'presetBunts' },
+    mgRoad: { corridor: 'corridor_cctv_10', blockage: 60, desc: 'MG Road Bus Stall (60%)', id: 'presetMgRoad' },
+    hampankatta: { corridor: 'corridor_cctv_01', blockage: 100, desc: 'K.S. Rao Closure (100%)', id: 'presetHampankatta' }
   };
 
   // =========================================================================
-  // 3. MapLibre GL JS Map Initialization with 3D Buildings Extrusion
+  // 3. Coordinate Geometry Normalization (GeoJSON RFC 7946: [lng, lat])
+  // =========================================================================
+  function toGeoJSONCoords(rawCoords) {
+    if (!rawCoords || !rawCoords.length) return [];
+    return rawCoords.map(pt => {
+      if (!Array.isArray(pt) || pt.length < 2) return null;
+      const a = Number(pt[0]);
+      const b = Number(pt[1]);
+      if (isNaN(a) || isNaN(b)) return null;
+      // In Mangaluru: latitude is ~12.8 to 13.0, longitude is ~74.8 to 75.0.
+      // GeoJSON standard requires [longitude, latitude].
+      // If a < b (e.g. 12.86 < 74.83), raw is [lat, lng] -> flip to [lng, lat] = [b, a].
+      return (a < b) ? [b, a] : [a, b];
+    }).filter(Boolean);
+  }
+
+  function getEdgeCoords(eid) {
+    const edge = currentCorridorsData.find(e => e.id === eid);
+    if (!edge) return null;
+    if (edge.path_coordinates && edge.path_coordinates.length > 1) {
+      const converted = toGeoJSONCoords(edge.path_coordinates);
+      if (converted.length > 1) return converted;
+    }
+    const u = currentNodesMap.get(edge.source);
+    const v = currentNodesMap.get(edge.target);
+    if (u && v && !isNaN(u.lng) && !isNaN(u.lat) && !isNaN(v.lng) && !isNaN(v.lat)) {
+      return [[u.lng, u.lat], [v.lng, v.lat]];
+    }
+    return null;
+  }
+
+  // =========================================================================
+  // 4. MapLibre GL JS Map Initialization with 3D Buildings Extrusion
   // =========================================================================
   function initMapLibre() {
     const mapContainer = document.getElementById('liveTrafficMap');
@@ -74,16 +120,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       'top-left'
     );
 
-    mapInstance.on('load', () => {
-      setup3DBuildings();
-      renderNetworkOnMap();
-      setupJunctionMarkers();
-      if (latestEvaluation) {
-        renderDetoursOnMap(latestEvaluation);
+    function onMapReady() {
+      if (isMapReady) return;
+      isMapReady = true;
+      try { setup3DBuildings(); } catch (e) { console.warn('3d buildings error:', e); }
+      if (currentCorridorsData.length) {
+        renderNetworkOnMap();
+        setupJunctionMarkers();
       }
-    });
+      const sc = pendingScenarioToRender || getActiveOrRecommendedScenario();
+      if (sc) {
+        renderScenarioOnMap(sc);
+        pendingScenarioToRender = null;
+      }
+    }
 
-    // Immediately load Mangaluru network and trigger initial evaluation without waiting on tile downloads
+    mapInstance.on('load', onMapReady);
+
+    // Concurrently load network data and initial diversion evaluation
     loadMangaluruNetwork().then(() => {
       triggerDiversionEvaluation();
     });
@@ -155,7 +209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // =========================================================================
-  // 4. Load Mangaluru Network from Backend (/api/v1/navigation/network)
+  // 5. Load Mangaluru Network from Backend (/api/v1/navigation/network)
   // =========================================================================
   async function loadMangaluruNetwork() {
     try {
@@ -180,8 +234,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       }
 
-      renderNetworkOnMap();
-      setupJunctionMarkers();
+      // Update initial demand/capacity calculation strip
+      updateDemandPreviewStrip();
+
+      // Render base road network if map is already loaded
+      if (isMapReady && mapInstance) {
+        renderNetworkOnMap();
+        setupJunctionMarkers();
+        const sc = pendingScenarioToRender || getActiveOrRecommendedScenario();
+        if (sc) {
+          renderScenarioOnMap(sc);
+          pendingScenarioToRender = null;
+        }
+      }
 
     } catch (err) {
       console.error('Failed to load Mangaluru network:', err);
@@ -189,20 +254,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderNetworkOnMap() {
-    if (!mapInstance || !currentCorridorsData.length) return;
+    if (!mapInstance || !isMapReady || !currentCorridorsData.length) return;
 
     const features = [];
     currentCorridorsData.forEach(edge => {
-      const s = currentNodesMap.get(edge.source);
-      const t = currentNodesMap.get(edge.target);
-      if (!s || !t) return;
+      const coords = getEdgeCoords(edge.id);
+      if (!coords || coords.length < 2) return;
 
       const isTarget = (edge.id === activeCorridorId);
-      let color = '#22c55e'; // Normal
+      let color = '#94a3b8'; // Base network road color
       if (isTarget) {
-        color = '#ef4444'; // Blocked
+        color = '#ef4444'; // Blocked incident road
       } else if (edge.congestion_level === 'HEAVY') {
-        color = '#fbbf24';
+        color = '#f59e0b';
       } else if (edge.congestion_level === 'MODERATE') {
         color = '#38bdf8';
       }
@@ -218,9 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         },
         geometry: {
           type: 'LineString',
-          coordinates: (edge.path_coordinates && edge.path_coordinates.length > 1)
-            ? edge.path_coordinates
-            : [[s.lng, s.lat], [t.lng, t.lat]]
+          coordinates: coords
         }
       });
     });
@@ -235,16 +297,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         data: geojson
       });
 
-      // Background casing for corridors on light map
+      // Background casing for corridors
       mapInstance.addLayer({
-        id: 'corridors-glow',
+        id: 'corridors-casing',
         type: 'line',
         source: 'mng-corridors',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['case', ['get', 'isTarget'], '#fee2e2', '#ffffff'],
-          'line-width': ['case', ['get', 'isTarget'], 10, 6],
-          'line-opacity': 0.85
+          'line-color': ['case', ['get', 'isTarget'], '#fca5a5', '#ffffff'],
+          'line-width': ['case', ['get', 'isTarget'], 8, 4],
+          'line-opacity': 0.8
         }
       });
 
@@ -256,14 +318,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'isTarget'], 5, 3]
+          'line-width': ['case', ['get', 'isTarget'], 5, 2.5],
+          'line-opacity': 0.95
         }
       });
 
       mapInstance.on('click', 'corridors-core', (e) => {
         if (!e.features || !e.features.length) return;
         const prop = e.features[0].properties;
-        setTargetCorridor(prop.id, prop.name);
+        setIncidentState(prop.id, activeBlockagePct, true);
       });
 
       mapInstance.on('mouseenter', 'corridors-core', () => {
@@ -276,6 +339,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function setupJunctionMarkers() {
+    if (!mapInstance || !isMapReady || !mapInstance.isStyleLoaded()) return;
+
     activeMarkers.forEach(m => m.remove());
     activeMarkers = [];
 
@@ -290,7 +355,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([node.lng, node.lat])
-        .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(`<strong style="color:#0f172a;">${node.name}</strong>`))
+        .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(`<strong style="color:#0f172a; font-size:12px;">${node.name}</strong>`))
         .addTo(mapInstance);
 
       activeMarkers.push(marker);
@@ -298,7 +363,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // =========================================================================
-  // 5. Calculate & Compare Diversions (/api/v1/intelligence/interventions/evaluate)
+  // 6. Stepper & Scenario Helpers
   // =========================================================================
   function updateWorkflowStepper(currentStage) {
     const s1 = document.getElementById('stepDetect');
@@ -326,6 +391,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function getActiveOrRecommendedScenario() {
+    if (!latestEvaluation) return null;
+    if (activeSelectedScenarioId) {
+      if (latestEvaluation.baseline_scenario && latestEvaluation.baseline_scenario.scenario_id === activeSelectedScenarioId) {
+        return latestEvaluation.baseline_scenario;
+      }
+      const match = (latestEvaluation.candidate_scenarios || []).find(s => s.scenario_id === activeSelectedScenarioId);
+      if (match) return match;
+    }
+    const recId = latestEvaluation.recommended_scenario_id;
+    return (latestEvaluation.candidate_scenarios || []).find(s => s.scenario_id === recId)
+      || (latestEvaluation.candidate_scenarios && latestEvaluation.candidate_scenarios[0])
+      || latestEvaluation.baseline_scenario;
+  }
+
+  // =========================================================================
+  // 7. Calculate & Compare Diversions (/api/v1/intelligence/interventions/evaluate)
+  // =========================================================================
   async function triggerDiversionEvaluation() {
     const btnSim = document.getElementById('btnSimulateDiversion');
     if (btnSim) {
@@ -361,7 +444,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       latestEvaluation = await res.json();
       renderEvaluationResults(latestEvaluation);
-      renderDetoursOnMap(latestEvaluation);
+
+      // Select recommended scenario by default
+      const recId = latestEvaluation.recommended_scenario_id;
+      activeSelectedScenarioId = recId;
+      const recScenario = (latestEvaluation.candidate_scenarios || []).find(s => s.scenario_id === recId)
+        || (latestEvaluation.candidate_scenarios && latestEvaluation.candidate_scenarios[0])
+        || latestEvaluation.baseline_scenario;
+
+      if (recScenario) {
+        selectScenario(recScenario.scenario_id);
+      }
+
       updateWorkflowStepper(4);
       showToast('Incident analysis evaluated');
 
@@ -383,10 +477,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // =========================================================================
-  // 6. Render Calculated Diversion Results into UI
+  // 8. Render Calculated Diversion Results into UI
   // =========================================================================
-  let activeSelectedScenarioId = null;
-
   function renderEvaluationResults(data) {
     if (!data) return;
 
@@ -396,20 +488,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const kpiSaturated = document.getElementById('kpiSaturatedCount');
     const kpiDelaySaved = document.getElementById('kpiDelaySaved');
     const kpiDelayPctTag = document.getElementById('kpiDelayPctTag');
-    const kpiActive = document.getElementById('kpiActiveIncidents');
 
     if (kpiDisplaced) kpiDisplaced.textContent = `${data.displaced_demand_veh_hr.toFixed(0)} PCU/hr`;
-    if (kpiActive) kpiActive.textContent = `1 Corridor Active`;
 
     const capLost = Math.max(0, (data.nominal_capacity_veh_hr || 0) - (data.effective_capacity_veh_hr || 0));
-    if (kpiCapacityLost) kpiCapacityLost.textContent = `${capLost.toFixed(0)} PCU/hr`;
+    if (kpiCapacityLost) kpiCapacityLost.textContent = `[${capLost.toFixed(0)} PCU/hr LOST]`;
 
     const provBadge = document.getElementById('provenanceBadge');
     if (provBadge && data.provenance) {
       provBadge.textContent = data.provenance;
     }
 
-    // Displaced demand strip in parameters box
+    // Demand strip in parameters box
     const lblNom = document.getElementById('lblNominalFlow');
     const lblEff = document.getElementById('lblEffectiveCap');
     const lblDisp = document.getElementById('lblDisplacedFlow');
@@ -418,85 +508,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (lblEff) lblEff.textContent = `${data.effective_capacity_veh_hr.toFixed(0)} PCU/hr`;
     if (lblDisp) lblDisp.textContent = `${data.displaced_demand_veh_hr.toFixed(0)} PCU/hr`;
 
-    // 1. STEP 2: Render Discovered Viable Detours List
-    const detoursContainer = document.getElementById('detoursContainer');
-    if (detoursContainer) {
-      detoursContainer.innerHTML = '';
-      if (!data.candidate_detours || !data.candidate_detours.length) {
-        detoursContainer.innerHTML = `
-          <div class="empty-detour-notice" style="padding: 16px; color: #f87171; background: rgba(239, 68, 68, 0.1); border-radius: 6px;">
-            No alternative graph detour exists without traversing closed corridors. Upstream queue gating recommended.
-          </div>
-        `;
-      } else {
-        data.candidate_detours.forEach((d, idx) => {
-          const badgeClass = idx === 0 ? 'badge-route-a' : 'badge-route-b';
-          const badgeLabel = idx === 0 ? 'Route A' : (idx === 1 ? 'Route B' : `Route ${idx+1}`);
-          const div = document.createElement('div');
-          div.className = `detour-item ${idx === 0 ? 'active-detour' : ''}`;
-          div.innerHTML = `
-            <div class="detour-header">
-              <span class="detour-badge ${badgeClass}">${badgeLabel}</span>
-              <span class="detour-name">${d.title}</span>
-            </div>
-            <div class="detour-metrics">
-              <span><strong>${d.total_length_km.toFixed(1)} km</strong> length</span>
-              <span><strong>${d.baseline_travel_time_min.toFixed(1)} min</strong> travel time</span>
-              <span><strong>${d.bottleneck_capacity_pcu.toFixed(0)} PCU/hr</strong> bottleneck cap</span>
-              <span><strong>${(d.max_baseline_vc * 100).toFixed(0)}%</strong> base V/C</span>
-            </div>
-          `;
-          detoursContainer.appendChild(div);
-        });
-      }
-    }
-
-    // Downstream Ripple Summary Box
+    // Downstream Ripple stats
     const rippleCorridors = document.getElementById('rippleCorridorsCount');
     const rippleQueue = document.getElementById('rippleQueueBacklog');
-    const rippleRisk = document.getElementById('rippleSaturatedRisk');
 
     const firstScen = data.candidate_scenarios && data.candidate_scenarios[0];
     if (rippleCorridors && firstScen && firstScen.segment_impacts) {
-      rippleCorridors.textContent = `${firstScen.segment_impacts.length} Network Links`;
+      rippleCorridors.textContent = `${firstScen.segment_impacts.length}`;
     }
     if (rippleQueue) {
       const backlogPcu = Math.round(data.displaced_demand_veh_hr * 0.75);
-      rippleQueue.textContent = `${backlogPcu} PCU (45-min backlog)`;
-    }
-    if (rippleRisk) {
-      const satCount = data.baseline_scenario ? data.baseline_scenario.saturated_segments.length : 1;
-      rippleRisk.textContent = `${satCount} Corridor(s) Saturated in Baseline`;
+      rippleQueue.textContent = `${backlogPcu} PCU`;
     }
 
-    // 2. STEP 3: Render Side-by-Side Comparison Table
+    // Render Side-by-Side Comparison Table
     const tbody = document.getElementById('matrixTableBody');
     if (tbody) {
       tbody.innerHTML = '';
 
       // Baseline Row
       const base = data.baseline_scenario;
-      const baseRow = document.createElement('tr');
-      baseRow.className = 'table-row-baseline';
-      baseRow.dataset.scenarioId = base.scenario_id;
-      baseRow.innerHTML = `
-        <td><strong class="text-red">Baseline</strong> (Unmitigated)</td>
-        <td>0 PCU/hr</td>
-        <td>${base.route_travel_time_min.toFixed(1)} min</td>
-        <td><span class="vc-pill vc-severe">${base.max_vc_ratio.toFixed(2)}</span></td>
-        <td><span class="badge-chokepoints">${base.saturated_segments.length} segment(s)</span></td>
-        <td><span class="text-dim">0 veh-hrs</span></td>
-        <td>
-          <button type="button" class="btn-table-apply" data-id="${base.scenario_id}">
-            Inspect
-          </button>
-        </td>
-      `;
-      baseRow.addEventListener('click', () => selectScenario(base.scenario_id));
-      tbody.appendChild(baseRow);
+      if (base) {
+        const baseRow = document.createElement('tr');
+        baseRow.className = 'table-row-baseline';
+        baseRow.dataset.scenarioId = base.scenario_id;
+        baseRow.innerHTML = `
+          <td><strong style="color: #ef4444;">Baseline</strong> (Unmitigated)</td>
+          <td>0 PCU/hr</td>
+          <td>${base.route_travel_time_min.toFixed(1)} min</td>
+          <td><span class="vc-pill vc-severe">${base.max_vc_ratio.toFixed(2)}</span></td>
+          <td><span class="badge-chokepoints">${base.saturated_segments.length} segment(s)</span></td>
+          <td><span style="color: var(--text-dim);">0 veh-hrs</span></td>
+          <td>
+            <button type="button" class="btn-table-apply" data-id="${base.scenario_id}">
+              Inspect
+            </button>
+          </td>
+        `;
+        baseRow.addEventListener('click', () => selectScenario(base.scenario_id));
+        tbody.appendChild(baseRow);
+      }
 
       // Candidate Scenarios Rows
-      data.candidate_scenarios.forEach(sc => {
+      (data.candidate_scenarios || []).forEach(sc => {
         const isRec = (sc.scenario_id === data.recommended_scenario_id);
         const vcClass = sc.max_vc_ratio >= 1.0 ? 'vc-warning' : 'vc-normal';
         const tr = document.createElement('tr');
@@ -512,7 +566,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <td>${sc.route_travel_time_min.toFixed(1)} min</td>
           <td><span class="vc-pill ${vcClass}">${sc.max_vc_ratio.toFixed(2)}</span></td>
           <td>${sc.downstream_bottlenecks.length > 0 ? `<span class="badge-bottleneck">${sc.downstream_bottlenecks.length} new</span>` : `<span class="badge-clean">0 new</span>`}</td>
-          <td><strong class="text-green">${sc.delay_saved_veh_hours.toFixed(1)} veh-hrs</strong> (-${sc.delay_reduction_pct.toFixed(0)}%)</td>
+          <td><strong style="color: #34d399;">${sc.delay_saved_veh_hours.toFixed(1)} veh-hrs</strong> (-${sc.delay_reduction_pct.toFixed(0)}%)</td>
           <td>
             <button type="button" class="btn-table-apply ${isRec ? 'btn-apply-rec' : ''}" data-id="${sc.scenario_id}">
               ${isRec ? 'Recommended' : 'Inspect'}
@@ -524,60 +578,60 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }
 
-    // 3. STEP 4: Render Recommendation Banner
-    const recTitle = document.getElementById('recTitle');
-    const recDesc = document.getElementById('recDesc');
-    const recTradeoff = document.getElementById('recTradeoff');
-    const recRouteAllocations = document.getElementById('recRouteAllocations');
-    const recAssumptionsList = document.getElementById('recAssumptionsList');
+    // Recommendation Section
+    const recScen = (data.candidate_scenarios || []).find(s => s.scenario_id === data.recommended_scenario_id) || firstScen;
+    if (recScen) {
+      if (kpiDelaySaved) kpiDelaySaved.textContent = `${recScen.delay_saved_veh_hours.toFixed(1)} veh-hrs`;
+      if (kpiDelayPctTag) kpiDelayPctTag.textContent = `-${recScen.delay_reduction_pct.toFixed(0)}%`;
+      if (kpiSaturated) {
+        const botCount = recScen.downstream_bottlenecks.length;
+        kpiSaturated.textContent = `${botCount} New Bottlenecks`;
+      }
 
-    const recScenario = data.candidate_scenarios.find(s => s.scenario_id === data.recommended_scenario_id) || data.candidate_scenarios[0];
-    if (recScenario) {
-      if (kpiDelaySaved) kpiDelaySaved.textContent = `${recScenario.delay_saved_veh_hours.toFixed(1)} veh-hrs`;
-      if (kpiDelayPctTag) kpiDelayPctTag.textContent = `-${recScenario.delay_reduction_pct.toFixed(0)}%`;
-      if (kpiSaturated) kpiSaturated.textContent = `${recScenario.elevated_risk_edges_count} Segments`;
+      const recTitle = document.getElementById('recTitle');
+      const recDesc = document.getElementById('recDesc');
+      const recTradeoff = document.getElementById('recTradeoff');
+      const recRouteAllocations = document.getElementById('recRouteAllocations');
 
-      if (recTitle) recTitle.textContent = `Optimal Intervention: ${recScenario.scenario_name}`;
-      if (recDesc) recDesc.textContent = data.recommendation_rationale;
-      if (recTradeoff) recTradeoff.textContent = data.tradeoff_summary;
+      if (recTitle) recTitle.textContent = `Optimal: ${recScen.scenario_name.split(':')[0]}`;
+      if (recDesc) {
+        recDesc.textContent = `Recommended Strategy: '${recScen.scenario_name}' achieves optimal network relief, saving ${recScen.delay_saved_veh_hours.toFixed(1)} vehicle-hours (-${recScen.delay_reduction_pct.toFixed(0)}% vs baseline) with peak arterial V/C at ${recScen.max_vc_ratio.toFixed(2)}.`;
+      }
+      if (recTradeoff) {
+        const botText = recScen.downstream_bottlenecks.length === 0
+          ? "Creates zero new saturated bottlenecks."
+          : `Creates ${recScen.downstream_bottlenecks.length} secondary bottleneck(s): ${recScen.downstream_bottlenecks.join(', ')}.`;
+        recTradeoff.textContent = `Trade-off Analysis: ${botText} Requires 2 field units (Multi-Junction VMS Signage & Dynamic Guidance).`;
+      }
 
       if (recRouteAllocations) {
-        if (recScenario.actions && recScenario.actions.length > 0) {
-          const actionDetails = recScenario.actions.map((act, i) => {
-            const pct = Math.round(act.diversion_percentage * 100);
-            return `Detour Stream ${i+1}: ${pct}% of displaced demand`;
-          }).join(' &bull; ');
-          recRouteAllocations.innerHTML = `<strong>Volume Allocation:</strong> ${actionDetails} (Total ${recScenario.assigned_demand_pcu.toFixed(0)} PCU/hr redirected)`;
-        } else {
-          recRouteAllocations.innerHTML = `<strong>Volume Allocation:</strong> ${recScenario.assigned_demand_pcu.toFixed(0)} PCU/hr`;
+        if (data.candidate_detours && data.candidate_detours.length) {
+          const splits = recScen.route_allocations || {};
+          const allocHtml = data.candidate_detours.map((d, i) => {
+            const pct = splits[d.title] !== undefined ? splits[d.title] : (i === 0 ? 0.62 : 0.38);
+            const pcu = Math.round(recScen.assigned_demand_pcu * pct);
+            const color = i === 0 ? '#0284c7' : '#9333ea';
+            return `<span style="display:inline-block; margin-right: 12px; font-weight:600;"><span style="color:${color};">&bull; Route ${String.fromCharCode(65+i)} (${d.title}):</span> ${(pct*100).toFixed(0)}% (~${pcu} PCU/hr)</span>`;
+          }).join('');
+          recRouteAllocations.innerHTML = `<strong>Volume Allocation Split:</strong> ${allocHtml}`;
         }
       }
     }
-
-    // Populate Modeling Assumptions
-    if (recAssumptionsList && data.assumptions && data.assumptions.length) {
-      recAssumptionsList.innerHTML = '';
-      data.assumptions.forEach(assump => {
-        const li = document.createElement('li');
-        li.textContent = assump;
-        recAssumptionsList.appendChild(li);
-      });
-    }
-
-    // Automatically select and inspect the recommended scenario
-    const defaultSelectId = data.recommended_scenario_id || (data.candidate_scenarios[0] ? data.candidate_scenarios[0].scenario_id : 'scenario_baseline');
-    selectScenario(defaultSelectId);
   }
 
   // =========================================================================
-  // 7. Interactive Scenario Selection & Road-Segment Breakdown Inspector
+  // 9. Scenario Selection & Map Layer Rendering
   // =========================================================================
   function selectScenario(scenarioId) {
     if (!latestEvaluation) return;
     activeSelectedScenarioId = scenarioId;
 
-    const allScenarios = [latestEvaluation.baseline_scenario, ...latestEvaluation.candidate_scenarios];
-    const sc = allScenarios.find(s => s.scenario_id === scenarioId) || latestEvaluation.candidate_scenarios[0];
+    let sc = null;
+    if (latestEvaluation.baseline_scenario && latestEvaluation.baseline_scenario.scenario_id === scenarioId) {
+      sc = latestEvaluation.baseline_scenario;
+    } else {
+      sc = (latestEvaluation.candidate_scenarios || []).find(s => s.scenario_id === scenarioId);
+    }
     if (!sc) return;
 
     // Highlight row in comparison table
@@ -592,7 +646,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Render Segment Breakdown
     renderScenarioSegmentInspector(sc);
 
-    // Update 3D Map for this specific scenario
+    // Update Map with actual calculated routes for this scenario
     renderScenarioOnMap(sc);
   }
 
@@ -646,251 +700,333 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // =========================================================================
-  // 8. Render Scenario Specific Routes & Bottlenecks on 3D Map
-  // =========================================================================
   function renderScenarioOnMap(scenario) {
-    if (!mapInstance || !latestEvaluation) return;
+    if (!scenario) scenario = getActiveOrRecommendedScenario();
+    if (!scenario || !latestEvaluation) return;
+    if (!mapInstance || !isMapReady) {
+      pendingScenarioToRender = scenario;
+      return;
+    }
+    pendingScenarioToRender = null;
 
     // Refresh base corridors
     renderNetworkOnMap();
 
-    const detourFeatures = [];
+    const overlayFeatures = [];
+    const allRoutePoints = [];
 
-    function getEdgeCoords(eid) {
-      const edge = currentCorridorsData.find(e => e.id === eid);
-      if (!edge) return null;
-      if (edge.path_coordinates && edge.path_coordinates.length > 1) {
-        return edge.path_coordinates;
-      }
-      const u = currentNodesMap.get(edge.source);
-      const v = currentNodesMap.get(edge.target);
-      if (u && v) return [[u.lng, u.lat], [v.lng, v.lat]];
-      return null;
-    }
+    // 1. INCIDENT ROAD (Bold RED with Casing & Pulsing Pin)
+    const targetEdge = currentCorridorsData.find(e => e.id === activeCorridorId);
+    if (targetEdge) {
+      const incCoords = getEdgeCoords(targetEdge.id);
+      if (incCoords && incCoords.length > 1) {
+        overlayFeatures.push({
+          type: 'Feature',
+          properties: {
+            routeType: 'INCIDENT',
+            color: '#ef4444',
+            width: 7.5,
+            name: targetEdge.name,
+            desc: `Active Disruption: ${targetEdge.name} (${activeBlockagePct}% Blocked)`
+          },
+          geometry: { type: 'LineString', coordinates: incCoords }
+        });
+        incCoords.forEach(pt => allRoutePoints.push(pt));
 
-    if (scenario.scenario_id === 'scenario_baseline') {
-      // Baseline: unmitigated, no detour lines active
-    } else if (scenario.scenario_id === 'scenario_detour_1') {
-      // Route A only (Cyan)
-      if (latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 1) {
-        const d1 = latestEvaluation.candidate_detours[0];
-        if (d1.edge_ids) {
-          d1.edge_ids.forEach(eid => {
-            const coords = getEdgeCoords(eid);
-            if (coords) {
-              detourFeatures.push({
-                type: 'Feature',
-                properties: { route: 'ROUTE_A', color: '#38bdf8' },
-                geometry: { type: 'LineString', coordinates: coords }
-              });
-            }
-          });
-        }
-      }
-    } else if (scenario.scenario_id === 'scenario_detour_2') {
-      // Route B only (Purple)
-      if (latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 2) {
-        const d2 = latestEvaluation.candidate_detours[1];
-        if (d2.edge_ids) {
-          d2.edge_ids.forEach(eid => {
-            const coords = getEdgeCoords(eid);
-            if (coords) {
-              detourFeatures.push({
-                type: 'Feature',
-                properties: { route: 'ROUTE_B', color: '#a855f7' },
-                geometry: { type: 'LineString', coordinates: coords }
-              });
-            }
-          });
-        }
-      }
-    } else {
-      // Multi-Corridor Split or other: render Route A (Cyan) and Route B (Purple)
-      if (latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 1) {
-        const d1 = latestEvaluation.candidate_detours[0];
-        if (d1.edge_ids) {
-          d1.edge_ids.forEach(eid => {
-            const coords = getEdgeCoords(eid);
-            if (coords) {
-              detourFeatures.push({
-                type: 'Feature',
-                properties: { route: 'ROUTE_A', color: '#38bdf8' },
-                geometry: { type: 'LineString', coordinates: coords }
-              });
-            }
-          });
-        }
-      }
-      if (latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 2) {
-        const d2 = latestEvaluation.candidate_detours[1];
-        if (d2.edge_ids) {
-          d2.edge_ids.forEach(eid => {
-            const coords = getEdgeCoords(eid);
-            if (coords) {
-              detourFeatures.push({
-                type: 'Feature',
-                properties: { route: 'ROUTE_B', color: '#a855f7' },
-                geometry: { type: 'LineString', coordinates: coords }
-              });
-            }
-          });
+        // Pulsing Incident Pin at midpoint
+        const midIdx = Math.floor(incCoords.length / 2);
+        const midPt = incCoords[midIdx];
+        if (midPt) {
+          if (activeIncidentMarker) activeIncidentMarker.remove();
+          const markerEl = document.createElement('div');
+          markerEl.className = 'map-incident-pin';
+          markerEl.title = `Active Incident: ${targetEdge.name}`;
+          markerEl.innerHTML = `<span class="pin-pulse"></span><span class="pin-core">!</span>`;
+
+          const dispPcu = Math.round(latestEvaluation.displaced_demand_veh_hr || activeDisplacedDemand);
+          const popupContent = `
+            <div style="font-family: var(--font-sans); padding: 4px 6px;">
+              <div style="font-weight: 700; color: #ef4444; font-size: 11px; text-transform: uppercase;">Active Road Incident</div>
+              <div style="font-weight: 600; color: #0f172a; font-size: 12px; margin: 2px 0;">${targetEdge.name}</div>
+              <div style="font-size: 11px; color: #64748b;">${activeBlockagePct}% Blockage &bull; ${dispPcu} PCU/hr Displaced Demand</div>
+            </div>
+          `;
+          activeIncidentMarker = new maplibregl.Marker({ element: markerEl, offset: [0, -4] })
+            .setLngLat(midPt)
+            .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(popupContent))
+            .addTo(mapInstance);
         }
       }
     }
 
-    // Highlight any secondary downstream bottlenecks created under this scenario in amber
-    if (scenario.downstream_bottlenecks && scenario.downstream_bottlenecks.length) {
+    // 2. CANDIDATE DETOUR ROUTES (Route A: Cyan #0284c7, Route B: Purple #9333ea)
+    const scenId = scenario ? scenario.scenario_id : 'scenario_capacity_split';
+    const isCapacitySplit = (scenId === 'scenario_capacity_split');
+    const isDetour1 = (scenId === 'scenario_detour_1' || scenId === 'scenario_metered_corridor');
+    const isDetour2 = (scenId === 'scenario_detour_2');
+
+    // Route A (Detour 1)
+    if ((isCapacitySplit || isDetour1) && latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 1) {
+      const d1 = latestEvaluation.candidate_detours[0];
+      if (d1.edge_ids) {
+        d1.edge_ids.forEach(eid => {
+          const coords = getEdgeCoords(eid);
+          if (coords && coords.length > 1) {
+            overlayFeatures.push({
+              type: 'Feature',
+              properties: {
+                routeType: 'ROUTE_A',
+                color: '#0284c7',
+                width: isCapacitySplit ? 5.5 : 6.5,
+                name: d1.title,
+                desc: `Alternative Route A: ${d1.title}`
+              },
+              geometry: { type: 'LineString', coordinates: coords }
+            });
+            coords.forEach(pt => allRoutePoints.push(pt));
+          }
+        });
+      }
+    }
+
+    // Route B (Detour 2)
+    if ((isCapacitySplit || isDetour2) && latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 2) {
+      const d2 = latestEvaluation.candidate_detours[1];
+      if (d2.edge_ids) {
+        d2.edge_ids.forEach(eid => {
+          const coords = getEdgeCoords(eid);
+          if (coords && coords.length > 1) {
+            overlayFeatures.push({
+              type: 'Feature',
+              properties: {
+                routeType: 'ROUTE_B',
+                color: '#9333ea',
+                width: isCapacitySplit ? 5.0 : 6.5,
+                name: d2.title,
+                desc: `Alternative Route B: ${d2.title}`
+              },
+              geometry: { type: 'LineString', coordinates: coords }
+            });
+            coords.forEach(pt => allRoutePoints.push(pt));
+          }
+        });
+      }
+    }
+
+    // 3. DOWNSTREAM BOTTLENECKS (Amber/Orange #ea580c)
+    if (scenario && scenario.downstream_bottlenecks && scenario.downstream_bottlenecks.length) {
       scenario.downstream_bottlenecks.forEach(botName => {
         const botEdge = currentCorridorsData.find(e => e.name === botName);
         if (botEdge) {
           const coords = getEdgeCoords(botEdge.id);
-          if (coords) {
-            detourFeatures.push({
+          if (coords && coords.length > 1) {
+            overlayFeatures.push({
               type: 'Feature',
-              properties: { route: 'BOTTLENECK', color: '#f59e0b' },
+              properties: {
+                routeType: 'BOTTLENECK',
+                color: '#ea580c',
+                width: 6.5,
+                name: botEdge.name,
+                desc: `Downstream Bottleneck: ${botEdge.name} (Capacity Constrained)`
+              },
               geometry: { type: 'LineString', coordinates: coords }
             });
+            coords.forEach(pt => allRoutePoints.push(pt));
           }
         }
       });
     }
 
-    const detourGeoJSON = { type: 'FeatureCollection', features: detourFeatures };
+    const overlayGeoJSON = { type: 'FeatureCollection', features: overlayFeatures };
 
-    if (mapInstance.getSource('active-detours')) {
-      mapInstance.getSource('active-detours').setData(detourGeoJSON);
+    if (mapInstance.getSource('active-scenario-routes')) {
+      mapInstance.getSource('active-scenario-routes').setData(overlayGeoJSON);
     } else {
-      mapInstance.addSource('active-detours', {
+      mapInstance.addSource('active-scenario-routes', {
         type: 'geojson',
-        data: detourGeoJSON
+        data: overlayGeoJSON
       });
 
+      // White casing behind overlay routes
       mapInstance.addLayer({
-        id: 'detours-casing-layer',
+        id: 'scenario-routes-casing',
         type: 'line',
-        source: 'active-detours',
+        source: 'active-scenario-routes',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': '#ffffff',
-          'line-width': 8.5,
+          'line-width': ['+', ['get', 'width'], 3.5],
           'line-opacity': 0.95
         }
       });
 
+      // Sharp Core Line for overlay routes
       mapInstance.addLayer({
-        id: 'detours-pulse-layer',
+        id: 'scenario-routes-core',
         type: 'line',
-        source: 'active-detours',
+        source: 'active-scenario-routes',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': 5.5,
+          'line-width': ['get', 'width'],
           'line-opacity': 0.95
         }
       });
+
+      // Popup on clicking scenario route
+      mapInstance.on('click', 'scenario-routes-core', (e) => {
+        if (!e.features || !e.features.length) return;
+        const p = e.features[0].properties;
+        new maplibregl.Popup({ offset: 10 })
+          .setLngLat(e.lngLat)
+          .setHTML(`<strong style="font-family:sans-serif; font-size:12px; color:#0f172a;">${p.desc}</strong>`)
+          .addTo(mapInstance);
+      });
+
+      mapInstance.on('mouseenter', 'scenario-routes-core', () => {
+        mapInstance.getCanvas().style.cursor = 'pointer';
+      });
+      mapInstance.on('mouseleave', 'scenario-routes-core', () => {
+        mapInstance.getCanvas().style.cursor = '';
+      });
     }
 
-    // Smoothly pan and frame the affected corridor
-    const targetEdge = currentCorridorsData.find(e => e.id === activeCorridorId);
-    if (targetEdge) {
-      const s = currentNodesMap.get(targetEdge.source);
-      const t = currentNodesMap.get(targetEdge.target);
-      if (s && t) {
-        mapInstance.flyTo({
-          center: [(s.lng + t.lng) / 2.0, (s.lat + t.lat) / 2.0],
-          zoom: 14.5,
-          pitch: 45,
-          bearing: -15,
-          essential: true
-        });
-      }
+    // Automatically fit bounds so the incident and detour routes are centered and visible!
+    if (allRoutePoints.length > 1) {
+      const bounds = new maplibregl.LngLatBounds();
+      allRoutePoints.forEach(pt => bounds.extend(pt));
+      mapInstance.fitBounds(bounds, {
+        padding: { top: 40, bottom: 40, left: 40, right: 40 },
+        maxZoom: 15.2,
+        duration: 700
+      });
+    }
+  }
+
+  function renderDetoursOnMap(evalData) {
+    const sc = getActiveOrRecommendedScenario();
+    if (sc) {
+      renderScenarioOnMap(sc);
     }
   }
 
   // =========================================================================
-  // 9. Event Handlers, Severity Selector & Preset Interactivity
+  // 10. Unified Incident State Management & Event Handlers
   // =========================================================================
-  function setTargetCorridor(corridorId, roadName) {
-    activeCorridorId = corridorId;
+  function updateDemandPreviewStrip() {
+    const edge = currentCorridorsData.find(e => e.id === activeCorridorId);
+    const lanes = (edge && edge.lanes) ? edge.lanes : 2;
+    const nominalCap = lanes * 900.0;
+    const nominalFlow = (edge && edge.baseline_flow_veh_hr) ? edge.baseline_flow_veh_hr : (nominalCap * 0.7);
+    const effCap = Math.max(0, nominalCap * (1.0 - (activeBlockagePct / 100.0)));
+    const dispDemand = Math.max(0, nominalFlow - effCap);
+
+    activeDisplacedDemand = dispDemand;
+
+    const lblNom = document.getElementById('lblNominalFlow');
+    const lblEff = document.getElementById('lblEffectiveCap');
+    const lblDisp = document.getElementById('lblDisplacedFlow');
+
+    if (lblNom) lblNom.textContent = `${Math.round(nominalFlow)} PCU/hr`;
+    if (lblEff) lblEff.textContent = `${Math.round(effCap)} PCU/hr`;
+    if (lblDisp) lblDisp.textContent = `${Math.round(dispDemand)} PCU/hr`;
+  }
+
+  function setIncidentState(newCorridorId, newBlockagePct, shouldTriggerEval = true) {
+    if (newCorridorId) activeCorridorId = newCorridorId;
+    if (newBlockagePct !== undefined && newBlockagePct !== null) {
+      activeBlockagePct = parseInt(newBlockagePct, 10);
+    }
+
+    // 1. Sync corridor dropdown
     const select = document.getElementById('selectCorridor');
-    if (select) select.value = corridorId;
+    if (select && select.value !== activeCorridorId) {
+      select.value = activeCorridorId;
+    }
+
+    // 2. Sync slider & readout
+    const slider = document.getElementById('sliderBlockage');
+    const lbl = document.getElementById('lblBlockagePct');
+    if (slider) slider.value = activeBlockagePct;
+    if (lbl) lbl.textContent = `${activeBlockagePct}% Blocked`;
+
+    // 3. Sync severity quick-chips
+    const severityBtns = document.querySelectorAll('.severity-chip');
+    severityBtns.forEach(btn => {
+      const bPct = parseInt(btn.dataset.block, 10);
+      if (bPct === activeBlockagePct) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // 4. Sync preset chips: active ONLY if BOTH corridor and blockage match!
+    const presetBtns = document.querySelectorAll('.preset-chip');
+    presetBtns.forEach(btn => {
+      const pCorridor = btn.dataset.corridor;
+      const pBlock = parseInt(btn.dataset.block, 10);
+      if (pCorridor === activeCorridorId && pBlock === activeBlockagePct) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // 5. Update demand & capacity preview strip immediately
+    updateDemandPreviewStrip();
+
+    // 6. Update workflow stepper to Stage 1 (Detect)
     updateWorkflowStepper(1);
-    triggerDiversionEvaluation();
+
+    // 7. Refresh base corridors so the new target corridor is highlighted in red
+    if (isMapReady && mapInstance && mapInstance.isStyleLoaded()) {
+      renderNetworkOnMap();
+    }
+
+    // 8. Trigger evaluation if requested
+    if (shouldTriggerEval) {
+      triggerDiversionEvaluation();
+    }
   }
 
   // Corridor Select dropdown change
   const selectCorridor = document.getElementById('selectCorridor');
   if (selectCorridor) {
     selectCorridor.addEventListener('change', (e) => {
-      activeCorridorId = e.target.value;
-      updateWorkflowStepper(1);
-      triggerDiversionEvaluation();
+      setIncidentState(e.target.value, activeBlockagePct, true);
     });
   }
 
   // Severity Quick-Chips
   const severityButtons = document.querySelectorAll('.severity-chip');
   severityButtons.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      severityButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      activeBlockagePct = parseInt(btn.dataset.block, 10);
-      if (sliderBlockage) sliderBlockage.value = activeBlockagePct;
-      if (lblBlockagePct) lblBlockagePct.textContent = `${activeBlockagePct}% Blocked`;
-
-      updateWorkflowStepper(1);
-      triggerDiversionEvaluation();
+    btn.addEventListener('click', () => {
+      const bPct = parseInt(btn.dataset.block, 10);
+      setIncidentState(activeCorridorId, bPct, true);
     });
   });
 
   // Blockage Slider change
   const sliderBlockage = document.getElementById('sliderBlockage');
-  const lblBlockagePct = document.getElementById('lblBlockagePct');
   if (sliderBlockage) {
     sliderBlockage.addEventListener('input', (e) => {
-      activeBlockagePct = parseInt(e.target.value, 10);
-      if (lblBlockagePct) lblBlockagePct.textContent = `${activeBlockagePct}% Blocked`;
-
-      severityButtons.forEach(b => {
-        if (parseInt(b.dataset.block, 10) === activeBlockagePct) {
-          b.classList.add('active');
-        } else {
-          b.classList.remove('active');
-        }
-      });
-      updateWorkflowStepper(1);
+      // Live UI sync during dragging without triggering API storm
+      setIncidentState(activeCorridorId, e.target.value, false);
     });
-    sliderBlockage.addEventListener('change', () => {
-      triggerDiversionEvaluation();
+    sliderBlockage.addEventListener('change', (e) => {
+      // API calculation on release
+      setIncidentState(activeCorridorId, e.target.value, true);
     });
   }
 
   // Presets
   const presetButtons = document.querySelectorAll('.preset-chip');
   presetButtons.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      presetButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      activeCorridorId = btn.dataset.corridor;
-      activeBlockagePct = parseInt(btn.dataset.block, 10);
-
-      if (sliderBlockage) sliderBlockage.value = activeBlockagePct;
-      if (lblBlockagePct) lblBlockagePct.textContent = `${activeBlockagePct}% Blocked`;
-      if (selectCorridor) selectCorridor.value = activeCorridorId;
-
-      severityButtons.forEach(b => {
-        if (parseInt(b.dataset.block, 10) === activeBlockagePct) {
-          b.classList.add('active');
-        } else {
-          b.classList.remove('active');
-        }
-      });
-
-      updateWorkflowStepper(1);
-      triggerDiversionEvaluation();
+    btn.addEventListener('click', () => {
+      const pCorridor = btn.dataset.corridor;
+      const pBlock = parseInt(btn.dataset.block, 10);
+      setIncidentState(pCorridor, pBlock, true);
     });
   });
 
@@ -903,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // =========================================================================
-  // 10. Global Toast Notification
+  // 11. Global Toast Notification
   // =========================================================================
   const actionToast = document.getElementById('actionToast');
   let toastTimer = null;
