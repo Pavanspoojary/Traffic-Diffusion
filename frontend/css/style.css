@@ -546,6 +546,222 @@ body {
   display: none !important;
 }
 
+/* Incident Review & Operational Console Styles */
+.incident-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.incident-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.incident-card.confirmed {
+  border-left: 4px solid var(--accent-red);
+}
+
+.incident-card.suspected {
+  border-left: 4px solid var(--accent-amber);
+}
+
+.incident-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.incident-road {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.incident-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.incident-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.btn-xs {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-confirm {
+  background-color: var(--accent-red);
+  color: #fff;
+}
+
+.btn-clear {
+  background-color: var(--bg-input);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+.btn-override {
+  background-color: var(--accent-green);
+  color: #fff;
+}
+
+/* Corridor Junctions Table */
+.junction-table-wrap {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.junction-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.junction-table th {
+  background-color: var(--bg-input);
+  color: var(--text-muted);
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.junction-table td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.badge-simulated {
+  background-color: rgba(6, 182, 212, 0.15);
+  color: var(--accent-cyan);
+  font-size: 9px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+}
+
+/* Route Alternative Selector */
+.route-selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.route-option-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.route-option-card.selected {
+  border-color: var(--accent-green);
+  background-color: rgba(16, 185, 129, 0.08);
+}
+
+.route-option-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.route-option-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.route-option-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 12px;
+}
+
+.route-option-reason {
+  font-size: 10px;
+  color: var(--accent-cyan);
+  margin-top: 4px;
+}
+
+/* Hospital Readiness Card */
+.hospital-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 8px;
+}
+
+.hospital-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.hospital-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.hospital-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.specialties-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.specialty-tag {
+  background-color: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* System Transparency Notice */
+.transparency-bar {
+  background-color: rgba(6, 182, 212, 0.08);
+  border-bottom: 1px solid rgba(6, 182, 212, 0.25);
+  color: var(--accent-cyan);
+  font-size: 11px;
+  padding: 6px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }

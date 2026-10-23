@@ -1,6 +1,6 @@
 import pytest
 from backend.app.services.routing_service import RoutingService
-from backend.app.models.schemas import CongestionLevel
+from backend.app.models.schemas import CongestionLevel, IncidentStatus
 
 def test_network_initialization():
     service = RoutingService()
@@ -36,6 +36,11 @@ def test_emergency_route_free_flow():
     assert len(route.path_node_ids) >= 3
     assert route.total_distance_km > 0
     assert route.estimated_travel_time_min > 0
+    assert route.baseline_travel_time_min >= route.estimated_travel_time_min
+    assert route.primary_route is not None
+    assert route.coordination_plan is not None
+    assert route.hospital_readiness is not None
+    assert route.hospital_readiness.trauma_bay_status in ["READY", "PREPARING", "STANDBY"]
 
 def test_dynamic_rerouting_around_blockage():
     service = RoutingService()
@@ -62,3 +67,52 @@ def test_dynamic_rerouting_around_blockage():
     # Verify that it took the green bypass route via Lalbagh / Bejai
     assert "INT_LALBAGH" in route.path_node_ids
     assert route.is_green_corridor_active is True
+
+def test_alternative_routes_available():
+    service = RoutingService()
+    # Clear any incident on corridor_cctv_07
+    service.simulate_incident(
+        edge_id="corridor_cctv_07",
+        congestion_level=CongestionLevel.FREE_FLOW,
+        has_incident=False
+    )
+    service.simulate_incident(
+        edge_id="corridor_cctv_05",
+        congestion_level=CongestionLevel.FREE_FLOW,
+        has_incident=False
+    )
+
+    route = service.calculate_emergency_route(
+        origin_node_id="EMS_STATE_BANK",
+        destination_node_id="HOSPITAL_AJ_KUNTIKAN",
+        is_emergency=True,
+    )
+
+    # Alternative viable route should be present
+    assert len(route.alternative_routes) >= 1
+    alt = route.alternative_routes[0]
+    assert alt.route_id == "route_alt_02"
+    assert alt.total_distance_km > 0
+    assert alt.estimated_travel_time_min > 0
+    assert alt.path_node_ids != route.primary_route.path_node_ids
+
+def test_severed_network_raises_no_viable_route():
+    service = RoutingService()
+    
+    # Block both avenues into A.J. Hospital (corridor_cctv_12)
+    service.simulate_incident(
+        edge_id="corridor_cctv_12",
+        congestion_level=CongestionLevel.BLOCKED,
+        has_incident=True,
+        incident_description="Catastrophic flyover collapse",
+        is_confirmed=True,
+    )
+
+    # Attempting to route must NOT silently traverse the collapsed flyover
+    with pytest.raises(ValueError, match="NO_VIABLE_ROUTE"):
+        service.calculate_emergency_route(
+            origin_node_id="EMS_STATE_BANK",
+            destination_node_id="HOSPITAL_AJ_KUNTIKAN",
+            is_emergency=True,
+            avoid_congestion=True,
+        )

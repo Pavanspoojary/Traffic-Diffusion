@@ -22,7 +22,7 @@
         </div>
         <div>
           <h1 class="brand-title">TRAFFIC DIFFUSION</h1>
-          <p class="brand-subtitle">Smart Mobility & Emergency Traffic Intelligence</p>
+          <p class="brand-subtitle">Smart Mobility & Emergency Traffic Intelligence (Mangaluru)</p>
         </div>
       </div>
 
@@ -32,23 +32,29 @@
           <span>CV SENSING ACTIVE</span>
         </div>
         <div class="status-pill status-incident" id="incidentBadge">
-          <span class="incident-count" id="activeIncidentsCount">1</span>
+          <span class="incident-count" id="activeIncidentsCount">0</span>
           <span>BLOCKAGES DETECTED</span>
         </div>
-        <a href="/" class="btn btn-primary btn-sm" style="text-decoration: none;">Driver View</a>
+        <a href="/" class="btn btn-primary btn-sm" style="text-decoration: none;">Driver Navigation</a>
         <button id="btnResetNetwork" class="btn btn-outline-sm">Reset Grid</button>
       </div>
     </header>
+
+    <!-- Operational Transparency Banner -->
+    <div class="transparency-bar">
+      <span><strong>Operational Notice:</strong> Road intelligence measured via CCTV Computer Vision & Centroid Tracking. Signal preemption operated via Simulated Controller Adapter.</span>
+      <span class="badge-simulated">SIMULATED ADAPTER MODE</span>
+    </div>
 
     <!-- Main Workspace -->
     <main class="main-content">
       <!-- Left Controls Column -->
       <aside class="control-sidebar">
-        <!-- Tab 1: Video Ingestion & CV -->
+        <!-- Panel 1: Video Ingestion & CV Pipeline -->
         <section class="card panel-section">
           <div class="card-header">
             <h2 class="card-title">CCTV Footage Upload & Vision Sensing</h2>
-            <span class="badge badge-subtle">Phase 1</span>
+            <span class="badge badge-subtle">Vision Pipeline</span>
           </div>
 
           <form id="uploadForm" class="control-group">
@@ -66,8 +72,8 @@
             <input type="file" id="videoFileInput" class="form-file" accept="video/mp4,video/avi,video/quicktime,video/x-matroska">
 
             <div class="sample-actions">
-              <button type="button" id="btnLoadHeavySample" class="btn btn-sm btn-secondary">Load Heavy Traffic Sample</button>
-              <button type="button" id="btnLoadFreeflowSample" class="btn btn-sm btn-secondary">Load Free-Flow Sample</button>
+              <button type="button" id="btnLoadHeavySample" class="btn btn-sm btn-secondary">Heavy Traffic Sample</button>
+              <button type="button" id="btnLoadFreeflowSample" class="btn btn-sm btn-secondary">Free-Flow Sample</button>
             </div>
 
             <button type="submit" id="btnUploadSubmit" class="btn btn-primary btn-block">
@@ -113,6 +119,11 @@
               </div>
             </div>
 
+            <div class="status-row" style="margin-top: 6px;">
+              <span class="mono-label">Tracking Flow:</span>
+              <span id="resTrackingFlow" class="mono-val" style="color: var(--accent-cyan);">0.0 vpm</span>
+            </div>
+
             <div class="status-row">
               <span class="mono-label">Congestion:</span>
               <span id="resCongestionBadge" class="status-tag tag-free">FREE_FLOW</span>
@@ -120,13 +131,31 @@
 
             <!-- Preview Image Snapshot -->
             <div id="previewContainer" class="preview-container hidden">
-              <p class="preview-title">Annotated CV Detection Frame</p>
+              <p class="preview-title">Annotated CV Detection Frame (YOLOv8 + Centroid Tracker)</p>
               <img id="previewImage" alt="Vehicle Detection Frame" class="preview-img">
             </div>
           </div>
         </section>
 
-        <!-- Tab 2: Emergency Green Corridor Dispatcher -->
+        <!-- Panel 2: Incident Review & Verification Console -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Incident Evidence & Operator Verification</h2>
+            <span class="badge badge-accent">Review Console</span>
+          </div>
+
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+            Operator verification ensures suspected camera bottlenecks are confirmed before blocking emergency routes.
+          </p>
+
+          <div id="incidentReviewList" class="incident-list">
+            <div style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 12px;">
+              No active unverified incidents in sector.
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 3: Emergency Green Corridor Dispatcher -->
         <section class="card panel-section">
           <div class="card-header">
             <h2 class="card-title">Emergency Green Corridor Routing</h2>
@@ -147,16 +176,17 @@
               <option value="HOSPITAL_FATHER_MULLER">Father Muller Medical College Hospital (Kankanady)</option>
               <option value="HOSPITAL_KMC_JYOTHI">KMC Hospital (Ambedkar Circle)</option>
               <option value="HOSPITAL_WENLOCK">Wenlock District Hospital (Hampankatta)</option>
+              <option value="COLLEGE_SHREE_DEVI">Shree Devi College Medical Unit (Ballalbagh)</option>
             </select>
 
             <div class="toggle-row">
               <label class="toggle-label">
                 <input type="checkbox" id="chkAvoidCongestion" checked>
-                <span>Dynamic Incident Avoidance</span>
+                <span>Impassable Closure Avoidance</span>
               </label>
               <label class="toggle-label">
                 <input type="checkbox" id="chkPreemption" checked>
-                <span>Traffic Light Preemption</span>
+                <span>Signal Preemption Wave</span>
               </label>
             </div>
 
@@ -164,20 +194,75 @@
               Dispatch Green Corridor
             </button>
           </div>
+
+          <!-- Alternative Route Options Switcher -->
+          <div id="routeSelectorSection" class="hidden" style="margin-top: 10px;">
+            <label class="form-label">Calculated Corridor Options</label>
+            <div id="routeOptionCards" class="route-selector-group"></div>
+          </div>
         </section>
 
-        <!-- Tab 3: Interactive Incident Simulator -->
+        <!-- Panel 4: Green Corridor Coordination & Signal Preemption State -->
         <section class="card panel-section">
           <div class="card-header">
-            <h2 class="card-title">Live Roadblock Simulator</h2>
+            <h2 class="card-title">Signal Coordination & Junction Lifecycle</h2>
+            <span id="corridorStatusBadge" class="badge badge-subtle">PLANNED</span>
+          </div>
+
+          <div class="junction-table-wrap">
+            <table class="junction-table">
+              <thead>
+                <tr>
+                  <th>Junction</th>
+                  <th>State</th>
+                  <th>ETA</th>
+                  <th>Override</th>
+                </tr>
+              </thead>
+              <tbody id="junctionTableBody">
+                <tr>
+                  <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 12px;">
+                    Dispatch a route to activate signal preemption wave.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Panel 5: Destination Hospital Trauma Readiness -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Hospital Trauma Bay Readiness</h2>
+            <span class="badge badge-accent">Intake Telemetry</span>
+          </div>
+
+          <div id="hospitalCard" class="hospital-card">
+            <div class="hospital-header">
+              <span id="hospName" class="hospital-title">A.J. Hospital & Research Centre</span>
+              <span id="hospBayStatus" class="status-tag tag-free">BAY READY</span>
+            </div>
+            <div class="hospital-meta">
+              <span>ETA: <strong id="hospEta">-</strong></span> &bull; 
+              <span>Triage: <strong id="hospTriage">Level 1 Trauma</strong></span>
+            </div>
+            <div class="specialties-tags" id="hospSpecialties">
+              <span class="specialty-tag">Emergency Medicine</span>
+              <span class="specialty-tag">Trauma ICU</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 6: Interactive Roadblock Simulator -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Roadblock Injection Simulator</h2>
             <span class="badge badge-subtle">Stress Test</span>
           </div>
 
           <div class="control-group">
             <label class="form-label" for="simEdgeSelect">Select Target Edge</label>
-            <select id="simEdgeSelect" class="form-select">
-              <!-- Dynamically populated -->
-            </select>
+            <select id="simEdgeSelect" class="form-select"></select>
 
             <div class="button-row">
               <button id="btnInjectBlockage" class="btn btn-danger btn-sm">Inject Blockage</button>
@@ -203,7 +288,7 @@
             <span class="metric-value highlight-green" id="valEmsTime">0.0 min</span>
           </div>
           <div class="metric-card">
-            <span class="metric-title">Standard Route Transit</span>
+            <span class="metric-title">Fair Baseline Transit</span>
             <span class="metric-value highlight-muted" id="valStandardTime">0.0 min</span>
           </div>
           <div class="metric-card">

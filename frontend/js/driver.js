@@ -240,6 +240,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     preemptedSignalsCount.textContent = route.signals_preempted;
 
+    const clearanceHeading = document.getElementById('clearanceHeading');
+    const clearanceDetails = document.getElementById('clearanceDetails');
+    if (clearanceHeading && route.coordination_plan) {
+      clearanceHeading.textContent = `${route.coordination_plan.status.replace(/_/g, ' ')} CORRIDOR`;
+    }
+    if (clearanceDetails && route.hospital_readiness) {
+      const cleanHosp = route.hospital_readiness.hospital_name.split('(')[0].trim();
+      clearanceDetails.innerHTML = `${cleanHosp} Trauma Bay: <strong>${route.hospital_readiness.trauma_bay_status}</strong> &bull; ${route.signals_preempted} signals cleared [Simulated]`;
+    }
+
     // Use detailed OSRM maneuvers if available
     if (route.turn_instructions && route.turn_instructions.length > 0) {
       const m1 = route.turn_instructions[0];

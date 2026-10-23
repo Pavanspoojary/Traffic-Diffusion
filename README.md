@@ -1,183 +1,111 @@
 # Traffic Diffusion
 
-**Smart Mobility and Traffic Intelligence Platform for Emergency Green Corridors**
+**Emergency Green Corridor Orchestrator & Traffic Intelligence System (Mangaluru Sector)**
 
 ---
 
 ## 1. Executive Summary
 
-Traffic Diffusion is an intelligent urban mobility platform built for emergency response optimization during heavy traffic congestion and road incident blockages. Designed for rapid emergency transit, the system ingests CCTV traffic video feeds across critical city corridors, calculates dynamic vehicular density and lane blockage status using Computer Vision, and computes real-time Green Corridors for emergency medical services (EMS).
+Traffic Diffusion is an intelligent urban emergency mobility platform connecting camera-derived road intelligence, emergency ambulance routing, signal preemption coordination, and hospital readiness telemetry. Rather than competing with general consumer navigation maps, Traffic Diffusion provides the operational workflow and infrastructure coordination required to guide an emergency vehicle swiftly through a congested city.
+
+The system distinguishes between:
+- Detected and verified incidents.
+- Estimated and measured traffic flow.
+- Primary and alternative corridor candidates.
+- Requested and acknowledged signal preemption.
+- Live vision feeds and explicitly simulated controller adapters.
 
 ---
 
 ## 2. Key Capabilities
 
-- **Ambulance Driver PWA**: Progressive Web App with Google Maps-style navigation UI (turn-by-turn maneuvers, ETA, speed limits, free OpenStreetMap tiles with zero API keys or watermarks).
-- **CCTV Video Sensing**: Supports automated vehicle detection (cars, trucks, buses, motorcycles) and flow density tracking from uploaded traffic surveillance footage.
-- **Dynamic Congestion Scoring**: Continuous calculation of corridor congestion indices (`FREE_FLOW`, `MODERATE`, `HEAVY`, `BLOCKED`) based on weighted vehicle capacity.
-- **Emergency Green Corridor Dispatch**: Graph-based shortest-path routing (Dijkstra / A*) that dynamically diverts ambulances around active collisions and heavy bottlenecks.
-- **Signal Preemption Telemetry**: Quantifies traffic signals along the emergency corridor to coordinate priority signal green waves.
-- **Dual Presentation Layer**: Ambulance Driver mobile navigation (`/`) and CCTV Operations Command Center (`/operations`).
+### A. Road Intelligence (CCTV Computer Vision)
+- **Vehicle Detection & Classification**: Powered by YOLOv8 nano (cars, trucks, buses, motorcycles) with edge contour fallbacks.
+- **Centroid Tracking Across Frames**: Tracks individual vehicles over time to estimate movement status (moving vs. stopped), queue buildup, and stationary duration.
+- **Decoupled Congestion & Incident Classification**: Congestion index (`FREE_FLOW`, `MODERATE`, `HEAVY`, `BLOCKED`, `STALE`, `UNKNOWN`) is decoupled from incident status (`SUSPECTED`, `VERIFICATION_PENDING`, `CONFIRMED`, `CLEARED`). A crowded frame is never treated as a blockage unless multi-vehicle stationary queuing is detected.
+- **No Fabricated Live Data**: Corrupted streams return structured unavailable errors rather than synthetic vehicle counts. Explicit demo simulations are clearly flagged `[SIMULATED]`.
+
+### B. Emergency Routing Engine
+- **Impassable Road Avoidance**: Confirmed closures are strictly excluded from candidate paths using filtered NetworkX subgraphs. If a route is severed, the system returns an explicit `NO_VIABLE_ROUTE` escalation rather than silently routing an ambulance through an accident.
+- **Alternative Corridor Candidates**: Calculates both the Primary Green Corridor and secondary viable alternatives with comparative ETAs, distance, and recommendation rationale.
+- **Fair Baseline Comparison**: Time-saved metrics are calculated against a fair baseline route under nominal commuter conditions on the same passable network.
+- **Rerouting Hysteresis & Audit History**: Suppresses minor ETA jitter (< 15%) while immediately rerouting upon confirmed upstream road blockages.
+
+### C. Green Corridor Orchestrator
+- **Junction-Level Request Lifecycle**: Progressively coordinates signals along the corridor:
+  `NOT_REQUESTED` -> `REQUESTED` -> `ACKNOWLEDGED` -> `APPROVED` -> `ACTIVE` -> `COMPLETED` / `CANCELLED`.
+- **Corridor Coordination State**: Aggregates overall clearance status (`PLANNED`, `COORDINATION_PENDING`, `PARTIALLY_COORDINATED`, `COORDINATED`, `DEGRADED`).
+- **Simulated Controller Adapter**: Explicitly labeled `[SIMULATED_ADAPTER]` with operator manual override controls to force an active green wave.
+- **Destination Hospital Readiness**: Tracks trauma bay readiness (`READY`, `PREPARING`, `STANDBY`), triage tier (`Level 1 Critical Trauma`), and available specialties.
+
+### D. Dual Mobile & Operations Interfaces
+- **Ambulance Driver PWA (`/`)**: High-fidelity Google Maps-style mobile view with turn-by-turn maneuvers, speed limit, road-snapped OSRM geometry, clearance status, and hospital intake telemetry. Free OpenStreetMap tiles with zero API keys or watermarks.
+- **Operations Command Center (`/operations`)**: Incident evidence review console, CCTV telemetry, junction coordination table, manual signal overrides, and route option switcher.
 
 ---
 
 ## 3. Architecture
 
 ```
-                                  Traffic Diffusion Platform
+                             Traffic Diffusion Platform
     +-----------------------------------------------------------------------------------+
     |                                 Presentation Layer                                |
-    |      - Interactive Operations Dashboard (Leaflet Dark Matter CartoDB)             |
-    |      - CCTV Video Ingestion & Annotated Detection Frame Viewer                   |
-    |      - Emergency Route Telemetry & Signal Preemption Metrics                      |
+    |      - Ambulance Driver PWA: Google Maps Mobile Turn-by-Turn Engine (/)           |
+    |      - Operations Command Center: Incident Review, Signals & Readiness (/ops)     |
     +------------------------------------------+----------------------------------------+
                                                |
                                                v
     +-----------------------------------------------------------------------------------+
     |                              FastAPI Service Gateway                              |
     |      - REST Endpoints: /api/v1/cv/* and /api/v1/navigation/*                      |
-    |      - Static Asset & Dashboard Hosting                                           |
     +------------------------------------------+----------------------------------------+
                                                |
-                     +-------------------------+-------------------------+
-                     |                                                   |
-                     v                                                   v
-    +----------------------------------+       +----------------------------------+
-    |      Computer Vision Engine      |       |    Routing Intelligence Engine   |
-    |  - YOLOv8 Vehicle Detection      |       |  - NetworkX Directed Graph       |
-    |  - Sampled Frame Processing      |       |  - Dynamic Weight Penalty Matrix |
-    |  - Capacity Density Estimator    |       |  - Emergency Dijkstra Optimizer  |
-    |  - Bottleneck & Accident Flag    |       |  - Real-time Incident Avoidance  |
-    +----------------------------------+       +----------------------------------+
+         +-------------------------------------+-----------------------------------+
+         |                                     |                                   |
+         v                                     v                                   v
++-------------------------------+ +-------------------------------+ +-------------------------------+
+|    Computer Vision Engine     | |   Emergency Routing Engine    | |   Green Corridor Coordinator  |
+| - YOLOv8 Vehicle Detection    | | - NetworkX Bidirectional Graph| | - Junction Request Lifecycle  |
+| - Frame-to-Frame Centroid Trk | | - Impassable Closure Filter   | | - Dynamic Clearance Waves     |
+| - Movement & Queue Estimation | | - Yen's Alternative Corridors | | - Simulated Controller Adapter|
+| - Operator Incident Registry  | | - Fair Baseline Calculation   | | - Hospital Bay Readiness      |
++-------------------------------+ +-------------------------------+ +-------------------------------+
 ```
 
 ---
 
-## 4. Repository Structure
+## 4. API Reference
 
-```
-Traffic-Diffusion/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py                     # FastAPI application entrypoint & static mount
-│   │   ├── config.py                   # System configuration & thresholds
-│   │   ├── api/
-│   │   │   ├── __init__.py
-│   │   │   ├── routes_cv.py            # Video upload, processing & preview endpoints
-│   │   │   └── routes_navigation.py    # Road network, routing & incident simulation
-│   │   ├── models/
-│   │   │   ├── __init__.py
-│   │   │   └── schemas.py              # Pydantic schemas for telemetry and requests
-│   │   └── services/
-│   │       ├── __init__.py
-│   │       ├── cv_service.py           # Computer vision video analysis & vehicle detection
-│   │       └── routing_service.py      # NetworkX graph model & emergency green corridor
-│   ├── tests/
-│   │   ├── __init__.py
-│   │   ├── test_cv.py                  # Computer vision and density tests
-│   │   ├── test_routing.py             # Dijkstra and dynamic rerouting unit tests
-│   │   └── test_api_integration.py    # FastAPI endpoint integration tests
-│   └── requirements.txt
-├── data/
-│   ├── seed_network.json               # Seed urban road network with EMS & hospitals
-│   └── samples/
-│       ├── generate_sample_video.py    # Synthetic CCTV traffic video generator
-│       ├── cctv_sample_heavy.mp4       # Generated sample heavy traffic footage
-│       └── cctv_sample_freeflow.mp4    # Generated sample free-flow traffic footage
-├── frontend/
-│   ├── index.html                      # Single-page operations dashboard
-│   ├── css/
-│   │   └── style.css                   # Enterprise control center styling
-│   └── js/
-│       ├── app.js                      # Application state and API integration
-│       └── map.js                      # Leaflet map controller and corridor visualizer
-├── .gitignore
-├── pytest.ini
-└── README.md
-```
+### Computer Vision & Traffic Sensing (`/api/v1/cv`)
+- `POST /upload`: Uploads CCTV video clip, runs YOLOv8 + Centroid Tracking, returns density and movement telemetry.
+- `POST /analyze-sample`: Analyzes pre-packaged heavy or freeflow traffic sample.
+- `GET /incidents`: Lists active road incidents in sector.
+- `POST /incidents/{incident_id}/verify`: Operator action to `CONFIRM`, `DISMISS`, or `CLEAR` a suspected blockage.
+- `GET /preview/{filename}`: Returns annotated detection snapshot image.
+
+### Navigation & Corridor Coordination (`/api/v1/navigation`)
+- `GET /network`: Returns Mangaluru road network, nodes, edges, active incidents, and telemetry.
+- `POST /route`: Calculates Primary Green Corridor, viable alternatives, baseline time, and junction preemption wave.
+- `GET /corridor/{route_id}`: Returns junction-by-junction clearance states and ETAs.
+- `POST /corridor/override`: Operator manual preemption command to force an active green wave on a specific junction.
+- `POST /simulate-incident`: Injects or clears a road blockage on an edge.
+- `POST /reset`: Resets network state back to clean seed values.
 
 ---
 
-## 5. Team Collaboration & Git Hygiene Guide
+## 5. Quickstart & Verification
 
-This repository supports a 4-person engineering team working under accelerated hackathon timelines:
-
-### Branch Governance
-- `main`: Protected production branch, managed strictly by the repository leads. Direct pushes to `main` are restricted.
-- Feature branches: All team members develop on dedicated feature branches:
-  - `feat/cv-pipeline`: Video frame extraction, vehicle counting, model optimization.
-  - `feat/routing-engine`: Graph modeling, signal coordination, multi-destination dispatch.
-  - `feat/dashboard-ui`: Frontend enhancements, heatmaps, responsive layouts.
-  - `feat/telemetry-api`: Real-time streaming, WebSocket events, export services.
-
-### Synchronization Standard
-Always sync before starting work or submitting pull requests:
 ```bash
-git fetch origin
-git checkout main
-git pull origin main
-git checkout -b feat/your-feature-name
-```
-
-### Commit Standard
-Follow the Conventional Commits specification:
-- `feat: add real-time vehicle speed estimation`
-- `fix: resolve edge weight overflow in Dijkstra routing`
-- `docs: update API documentation for corridor upload`
-- `test: add unit test for multi-hospital triage`
-
----
-
-## 6. Quickstart Guide
-
-### Prerequisites
-- Python 3.10 or 3.11
-- Git
-
-### 1. Clone & Set Up Environment
-```bash
-git clone https://github.com/Pavanspoojary/Traffic-Diffusion.git
-cd Traffic-Diffusion
-
-python3 -m venv .venv
+# 1. Activate environment
 source .venv/bin/activate
-pip install -r backend/requirements.txt
+
+# 2. Run automated test suite (16 tests)
+pytest
+
+# 3. Start development server
+uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 2. Run the Platform
-Start the unified application (FastAPI backend + integrated dashboard):
-```bash
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
-```
-Open your browser to:
-- **Ambulance Driver Navigator (PWA)**: `http://localhost:8000`
-- **CCTV & Operations Command Center**: `http://localhost:8000/operations`
-- **Interactive API Documentation (Swagger)**: `http://localhost:8000/docs`
-
-### 3. Run Test Suite
-Verify all systems and integration tests:
-```bash
-pytest -v
-```
-
----
-
-## 7. Core API Specifications
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | Service health status check |
-| `GET` | `/api/v1/navigation/network` | Retrieves the complete road network state, nodes, and live edge conditions |
-| `POST` | `/api/v1/navigation/route` | Computes dynamic Green Corridor ambulance route with incident avoidance |
-| `POST` | `/api/v1/navigation/simulate-incident` | Injects or clears road blockages to test real-time rerouting |
-| `POST` | `/api/v1/navigation/reset` | Resets all edge weights and incidents to seed baseline |
-| `POST` | `/api/v1/cv/upload` | Ingests a CCTV video file, runs CV detection, and updates corridor congestion |
-| `POST` | `/api/v1/cv/analyze-sample` | Evaluates packaged CCTV footage (`heavy` or `freeflow`) for instant testing |
-| `GET` | `/api/v1/cv/preview/{filename}` | Serves annotated frame snapshot with vehicle bounding boxes |
-
----
-
-## 8. License
-
-Developed for the 2026 Smart Mobility & Traffic Intelligence Hackathon.
+- Ambulance Driver Navigation PWA: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+- Operations Command Center: [http://127.0.0.1:8000/operations](http://127.0.0.1:8000/operations)
+- Interactive API Documentation: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)

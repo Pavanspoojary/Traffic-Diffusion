@@ -65,8 +65,21 @@ class TrafficMap {
     });
   }
 
-  renderGreenCorridor(pathCoordinates, routeData) {
+  renderGreenCorridor(pathCoordinates, routeData, altCoordinates = null) {
     this.routeLayer.clearLayers();
+
+    // Draw Alternative Route in subtle dashed slate/cyan if present
+    if (altCoordinates && altCoordinates.length >= 2) {
+      const altPolyline = L.polyline(altCoordinates, {
+        color: '#64748b',
+        weight: 4,
+        opacity: 0.75,
+        dashArray: '6, 10',
+        lineCap: 'round',
+      });
+      altPolyline.bindTooltip('<div style="font-size: 11px;"><strong>Alternative Backup Corridor</strong></div>', { sticky: true });
+      this.routeLayer.addLayer(altPolyline);
+    }
 
     if (!pathCoordinates || pathCoordinates.length < 2) return;
 
