@@ -69,7 +69,7 @@ class PredictiveIncidentEngine:
             severity=severity,
             blocked_lanes=blocked_lanes,
             total_lanes=edge.lanes if edge else 2,
-            capacity_reduction_pct=min(1.0, max(0.1, capacity_reduction_pct)),
+            capacity_reduction_pct=min(1.0, max(0.0, capacity_reduction_pct)),
             estimated_duration_min=max(5.0, estimated_duration_min),
             provenance=provenance,
             verification_status=VerificationStatus.VERIFIED,

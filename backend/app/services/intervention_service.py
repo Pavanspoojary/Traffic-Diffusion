@@ -49,12 +49,19 @@ class WhatIfInterventionPlanner:
     def _compute_bpr_travel_time(self, edge, volume: float, capacity: float) -> float:
         """
         Bureau of Public Roads (BPR) volume-delay travel time:
-        t = t0 * [1.0 + alpha * (V/C)^beta], with standard parameters alpha=0.15, beta=4.0.
-        Exponent growth is capped at 8.0x to reflect realistic urban saturated crawl speeds.
+        t = t0 * [1.0 + alpha * (V/C)^beta]
+        Units & Parameters:
+        - t0: Free-flow link travel time (minutes) = (Length_km / Speed_kmh) * 60
+        - V: Traffic demand / volume in Passenger Car Units per hour (PCU/hr)
+        - C: Practical road capacity in Passenger Car Units per hour (PCU/hr)
+        - alpha: Standard BPR scaling coefficient = 0.15 (dimensionless)
+        - beta: Standard BPR exponent = 4.0 (dimensionless)
+        - Numerical bound: Travel time growth is bounded at 8.0x free-flow time to reflect
+          realistic urban crawl speeds (e.g. 5 km/h) under hyper-congested queue conditions.
         """
         t0 = self._compute_free_flow_time(edge)
         vc = max(0.0, volume) / max(1.0, capacity)
-        delay_factor = 1.0 + 0.15 * min(8.0, vc ** 4)
+        delay_factor = min(8.0, 1.0 + 0.15 * min(50.0, vc ** 4))
         return round(t0 * delay_factor, 3)
 
     # =========================================================================
@@ -80,21 +87,26 @@ class WhatIfInterventionPlanner:
 
         # Construct isolated subgraph excluding the blocked segment and confirmed impassable edges
         subgraph = graph.copy()
-        if subgraph.has_edge(source_node_id, target_node_id):
-            # Check edge_id
-            edge_data = subgraph.get_edge_data(source_node_id, target_node_id)
-            if edge_data and edge_data.get("edge_id") == blocked_edge_id:
-                subgraph.remove_edge(source_node_id, target_node_id)
-            else:
-                # Direct edge removal
-                subgraph.remove_edge(source_node_id, target_node_id)
 
-        # Remove any other active incidents that represent total road blocks
+        # Remove the target blocked edge from the subgraph
+        target_edge_obj = edges_map.get(blocked_edge_id)
+        if target_edge_obj and subgraph.has_edge(target_edge_obj.source, target_edge_obj.target):
+            subgraph.remove_edge(target_edge_obj.source, target_edge_obj.target)
+        elif subgraph.has_edge(source_node_id, target_node_id):
+            subgraph.remove_edge(source_node_id, target_node_id)
+
+        # Remove any other confirmed impassable edges or total road blocks
         for inc in self.prediction_service.list_incidents():
-            if inc.affected_edge_id != blocked_edge_id and inc.capacity_reduction_pct >= 0.95:
+            if inc.affected_edge_id != blocked_edge_id and inc.capacity_reduction_pct >= 0.90:
                 other_edge = edges_map.get(inc.affected_edge_id)
                 if other_edge and subgraph.has_edge(other_edge.source, other_edge.target):
                     subgraph.remove_edge(other_edge.source, other_edge.target)
+
+        # Also remove edges explicitly marked BLOCKED in the road network state
+        for eid, e in edges_map.items():
+            if eid != blocked_edge_id and e.congestion_level == CongestionLevel.BLOCKED:
+                if subgraph.has_edge(e.source, e.target):
+                    subgraph.remove_edge(e.source, e.target)
 
         viable_routes: List[Dict[str, Any]] = []
 
@@ -209,7 +221,7 @@ class WhatIfInterventionPlanner:
         nominal_capacity = self._compute_edge_capacity(target_edge)
         nominal_flow = self._compute_edge_nominal_flow(target_edge)
         blockage_pct = override_blockage_pct if override_blockage_pct is not None else incident.capacity_reduction_pct
-        blockage_pct = min(1.0, max(0.05, float(blockage_pct)))
+        blockage_pct = min(1.0, max(0.0, float(blockage_pct)))
 
         effective_capacity = max(0.0, nominal_capacity * (1.0 - blockage_pct))
         if override_displaced_demand is not None and override_displaced_demand >= 0:
@@ -481,17 +493,30 @@ class WhatIfInterventionPlanner:
         # 6. CANDIDATE SCENARIO 3: Capacity-Aware Multi-Route Split
         # ---------------------------------------------------------------------
         if len(viable_detours) >= 2:
-            # Distribute displaced demand proportionally based on available bottleneck reserve capacity
+            # Genuine capacity-aware allocation:
+            # Evaluate spare capacity at the bottleneck edge of each route without artificial floors
             reserves = []
             for d in viable_detours[:2]:
-                res = max(10.0, d["bottleneck_capacity_pcu"] * (1.0 - d["max_baseline_vc"]))
-                reserves.append(res)
-            total_reserve = sum(reserves)
-            w1 = reserves[0] / total_reserve
-            w2 = reserves[1] / total_reserve
+                spare_cap = max(0.0, d["bottleneck_capacity_pcu"] * (1.0 - d["max_baseline_vc"]))
+                reserves.append(spare_cap)
 
+            total_reserve = sum(reserves)
+            if total_reserve > 0.0:
+                # Assign proportionally to available reserve capacity
+                w1 = reserves[0] / total_reserve
+                w2 = reserves[1] / total_reserve
+            else:
+                # When both alternative routes are already at or above capacity (V/C >= 1.0),
+                # allocate inversely to their (V/C)^2 so the least overloaded route receives more demand
+                inv1 = 1.0 / (max(1.0, viable_detours[0]["max_baseline_vc"]) ** 2)
+                inv2 = 1.0 / (max(1.0, viable_detours[1]["max_baseline_vc"]) ** 2)
+                sum_inv = inv1 + inv2
+                w1 = inv1 / sum_inv
+                w2 = inv2 / sum_inv
+
+            # Exact conservation: ensure sum of splits equals displaced_demand exactly
             vol_split_1 = round(displaced_demand * w1, 1)
-            vol_split_2 = round(displaced_demand * w2, 1)
+            vol_split_2 = round(displaced_demand - vol_split_1, 1)
 
             scen_c_volumes = dict(baseline_volumes)
             scen_c_volumes[target_edge_id] = remaining_flow_on_blocked
@@ -664,43 +689,55 @@ class WhatIfInterventionPlanner:
         # ---------------------------------------------------------------------
         # 7. Fair Multi-Criteria Ranking & Explainable Recommendation
         # ---------------------------------------------------------------------
-        # Score = Delay_Saved (veh-hrs) - Penalty for New Bottlenecks - Penalty for Peak V/C Overload
-        def _score_scenario(s: InterventionScenario) -> float:
-            bottleneck_penalty = float(len(s.downstream_bottlenecks)) * 8.0
-            overload_penalty = max(0.0, (s.max_vc_ratio - 1.0)) * 15.0
-            return s.delay_saved_veh_hours - (bottleneck_penalty + overload_penalty)
+        # Rank candidate scenarios directly from physical model outcomes:
+        # 1. Bottleneck safety: prefer strategies that avoid creating new saturated chokepoints (downstream_bottlenecks == 0).
+        # 2. Net travel delay saved (vehicle-hours): higher delay reduction is preferred.
+        # 3. Peak V/C ratio: lower peak link saturation is preferred.
+        def _scenario_rank_key(s: InterventionScenario):
+            avoids_new_bottlenecks = 1 if len(s.downstream_bottlenecks) == 0 else 0
+            return (avoids_new_bottlenecks, s.delay_saved_veh_hours, -s.max_vc_ratio)
 
-        candidate_scenarios.sort(key=_score_scenario, reverse=True)
+        candidate_scenarios.sort(key=_scenario_rank_key, reverse=True)
         for idx, sc in enumerate(candidate_scenarios, 1):
             sc.rank = idx
 
         recommended = candidate_scenarios[0]
 
-        rationale = (
-            f"Recommended Strategy: '{recommended.scenario_name}' achieves the best balance of traffic relief and stability. "
-            f"It reduces network delay by {recommended.delay_saved_veh_hours:.1f} vehicle-hours "
-            f"({recommended.delay_reduction_pct:.1f}% reduction relative to unmitigated baseline), "
-            f"with a maximum corridor V/C of {recommended.max_vc_ratio:.2f}."
-        )
-
-        if recommended.downstream_bottlenecks:
+        # Check if another scenario has higher raw delay savings but creates secondary bottlenecks
+        highest_delay_scenario = max(candidate_scenarios, key=lambda s: s.delay_saved_veh_hours)
+        if highest_delay_scenario.scenario_id != recommended.scenario_id and highest_delay_scenario.downstream_bottlenecks:
+            rationale = (
+                f"Recommended Strategy: '{recommended.scenario_name}' delivers {recommended.delay_saved_veh_hours:.1f} vehicle-hours of delay savings "
+                f"(-{recommended.delay_reduction_pct:.1f}% vs baseline) while successfully avoiding secondary bottleneck formation (all corridors V/C <= {recommended.max_vc_ratio:.2f})."
+            )
             tradeoff = (
-                f"Trade-off Notice: '{recommended.scenario_name}' creates secondary saturation on: "
-                f"{', '.join(recommended.downstream_bottlenecks)}. Consider deploying field officers at those junctions "
-                f"to maintain continuous discharge flow."
+                f"Trade-off Analysis: '{highest_delay_scenario.scenario_name}' offers higher unconstrained delay reduction "
+                f"({highest_delay_scenario.delay_saved_veh_hours:.1f} veh-hrs), but pushes {', '.join(highest_delay_scenario.downstream_bottlenecks)} into saturation (V/C {highest_delay_scenario.max_vc_ratio:.2f}). "
+                f"'{recommended.scenario_name}' is recommended to prevent secondary junction gridlock."
             )
         else:
-            tradeoff = (
-                f"Trade-off Analysis: '{recommended.scenario_name}' introduces zero new saturated bottlenecks "
-                f"(all detour corridors remain V/C <= {recommended.max_vc_ratio:.2f}). "
-                f"Requires {recommended.resource_summary}."
+            rationale = (
+                f"Recommended Strategy: '{recommended.scenario_name}' achieves optimal network relief, saving "
+                f"{recommended.delay_saved_veh_hours:.1f} vehicle-hours (-{recommended.delay_reduction_pct:.1f}% vs baseline) "
+                f"with peak arterial V/C at {recommended.max_vc_ratio:.2f}."
             )
+            if recommended.downstream_bottlenecks:
+                tradeoff = (
+                    f"Trade-off Notice: '{recommended.scenario_name}' introduces secondary saturation on {', '.join(recommended.downstream_bottlenecks)}. "
+                    f"Deploy tactical field officers to regulate signal cycles at those intersections."
+                )
+            else:
+                tradeoff = (
+                    f"Trade-off Analysis: '{recommended.scenario_name}' creates zero new saturated bottlenecks. "
+                    f"Requires {recommended.resource_summary}."
+                )
 
         assumptions_list = [
             f"Nominal segment demand estimated at {nominal_flow:.0f} PCU/hr; road capacity is {nominal_capacity:.0f} PCU/hr.",
             f"Blockage severity of {blockage_pct*100.0:.0f}% reduces effective capacity to {effective_capacity:.0f} PCU/hr.",
             f"Net displaced demand requiring detour diversion: {displaced_demand:.0f} PCU/hr.",
             "Detour link travel times calculated via Bureau of Public Roads (BPR) volume-delay curves: t = t0 * [1 + 0.15*(V/C)^4].",
+            "Total delay and delay saved are measured in vehicle-hours over a standardized 1-hour operational analysis horizon (Flow in PCU/hr, Delay in (t_bpr - t0)/60 hours).",
             "Initial network conditions are strictly isolated and identical across all candidate scenarios.",
             "Provenance: ESTIMATED FROM ROAD GRAPH TOPOLOGY & MACROSCOPIC FLOW LAWS.",
         ]

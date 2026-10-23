@@ -210,7 +210,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         },
         geometry: {
           type: 'LineString',
-          coordinates: [[s.lng, s.lat], [t.lng, t.lat]]
+          coordinates: (edge.path_coordinates && edge.path_coordinates.length > 1)
+            ? edge.path_coordinates
+            : [[s.lng, s.lat], [t.lng, t.lat]]
         }
       });
     });
@@ -353,6 +355,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (kpiDisplaced) kpiDisplaced.textContent = `${data.displaced_demand_veh_hr.toFixed(0)} PCU/hr`;
     if (kpiActive) kpiActive.textContent = `1 Corridor Active`;
 
+    const provBadge = document.getElementById('provenanceBadge');
+    if (provBadge && data.provenance) {
+      provBadge.textContent = data.provenance;
+    }
+
     // Displaced demand strip in parameters box
     const lblNom = document.getElementById('lblNominalFlow');
     const lblEff = document.getElementById('lblEffectiveCap');
@@ -474,17 +481,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const detourFeatures = [];
 
+    // Helper to get coordinates for an edge (curved path if available, or endpoints)
+    function getEdgeCoords(eid, uId, vId) {
+      const edge = currentCorridorsData.find(e => e.id === eid);
+      if (edge && edge.path_coordinates && edge.path_coordinates.length > 1) {
+        return edge.path_coordinates;
+      }
+      const u = currentNodesMap.get(uId);
+      const v = currentNodesMap.get(vId);
+      if (u && v) return [[u.lng, u.lat], [v.lng, v.lat]];
+      return null;
+    }
+
     // Detour 1 (Route A) - Vivid Cyan / Blue
     if (data.candidate_detours.length >= 1) {
       const d1 = data.candidate_detours[0];
       for (let i = 0; i < d1.node_path.length - 1; i++) {
-        const u = currentNodesMap.get(d1.node_path[i]);
-        const v = currentNodesMap.get(d1.node_path[i+1]);
-        if (u && v) {
+        const eid = d1.edge_ids ? d1.edge_ids[i] : null;
+        const coords = getEdgeCoords(eid, d1.node_path[i], d1.node_path[i+1]);
+        if (coords) {
           detourFeatures.push({
             type: 'Feature',
             properties: { route: 'ROUTE_A', color: '#38bdf8' },
-            geometry: { type: 'LineString', coordinates: [[u.lng, u.lat], [v.lng, v.lat]] }
+            geometry: { type: 'LineString', coordinates: coords }
           });
         }
       }
@@ -494,13 +513,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (data.candidate_detours.length >= 2) {
       const d2 = data.candidate_detours[1];
       for (let i = 0; i < d2.node_path.length - 1; i++) {
-        const u = currentNodesMap.get(d2.node_path[i]);
-        const v = currentNodesMap.get(d2.node_path[i+1]);
-        if (u && v) {
+        const eid = d2.edge_ids ? d2.edge_ids[i] : null;
+        const coords = getEdgeCoords(eid, d2.node_path[i], d2.node_path[i+1]);
+        if (coords) {
           detourFeatures.push({
             type: 'Feature',
             properties: { route: 'ROUTE_B', color: '#a855f7' },
-            geometry: { type: 'LineString', coordinates: [[u.lng, u.lat], [v.lng, v.lat]] }
+            geometry: { type: 'LineString', coordinates: coords }
           });
         }
       }
