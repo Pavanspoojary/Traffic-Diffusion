@@ -166,26 +166,46 @@ class GoogleTrafficMap {
 
     nodes.forEach(n => this.nodeMap.set(n.id, n));
 
-    // Render Edges as Google Maps Polylines
+    // Render Edges as Street-Following Google Maps Polylines
     edges.forEach(edge => {
       const sourceNode = this.nodeMap.get(edge.source);
       const targetNode = this.nodeMap.get(edge.target);
       if (!sourceNode || !targetNode) return;
 
-      const path = [
-        { lat: sourceNode.lat, lng: sourceNode.lng },
-        { lat: targetNode.lat, lng: targetNode.lng }
-      ];
+      // Extract real road-following street geometry
+      let path = [];
+      if (edge.path_coordinates && Array.isArray(edge.path_coordinates) && edge.path_coordinates.length >= 2) {
+        path = edge.path_coordinates.map(pt => ({ lat: pt[0], lng: pt[1] }));
+      } else {
+        path = [
+          { lat: sourceNode.lat, lng: sourceNode.lng },
+          { lat: targetNode.lat, lng: targetNode.lng }
+        ];
+      }
 
       const strokeConfig = this._getEdgeColorAndWeight(edge);
 
+      // Road Casing (subtle dark outline for distinct contrast on Google Maps)
+      const casingPolyline = new google.maps.Polyline({
+        path: path,
+        geodesic: true,
+        strokeColor: "#0f172a",
+        strokeOpacity: 0.85,
+        strokeWeight: strokeConfig.weight + 3,
+        map: this.map,
+        zIndex: 10
+      });
+      this.edgePolylines.push(casingPolyline);
+
+      // Core Road Traffic Line
       const polyline = new google.maps.Polyline({
         path: path,
         geodesic: true,
         strokeColor: strokeConfig.color,
         strokeOpacity: strokeConfig.opacity,
         strokeWeight: strokeConfig.weight,
-        map: this.map
+        map: this.map,
+        zIndex: 20
       });
 
       // Hover / Click info

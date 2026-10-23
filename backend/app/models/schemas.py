@@ -107,6 +107,7 @@ class RoadEdge(BaseModel):
     data_status: DataStatus = DataStatus.LIVE
     is_simulated: bool = False
     last_updated_at: Optional[str] = None
+    path_coordinates: Optional[List[List[float]]] = None
 
 # Incident Management Models
 class TrafficIncident(BaseModel):
