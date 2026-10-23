@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>EMS Navigator - Emergency Green Corridor</title>
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1e8e3e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EMS Nav">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <!-- Leaflet Free Map Engine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="/css/driver.css">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="nav-app-container">
+    
+    <!-- Top Google Maps Maneuver Card -->
+    <header class="gmaps-turn-card" id="turnCard">
+      <div class="turn-icon-box">
+        <svg id="turnIconSvg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Default straight / right arrow -->
+          <line x1="12" y1="19" x2="12" y2="5"></line>
+          <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+      </div>
+      <div class="turn-instructions">
+        <div class="turn-distance" id="turnDistance">In 250 m</div>
+        <div class="turn-street" id="turnStreet">Continue onto K.S. Rao Arterial Road</div>
+        <div class="turn-next-preview" id="turnNext">Then proceed toward Light House Hill Road</div>
+      </div>
+      <div class="turn-badges">
+        <div class="preemption-pill">
+          <span class="pulse-indicator"></span>
+          <span>GREEN WAVE ACTIVE</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Destination Selector Bar (Google Maps Search Style) -->
+    <div class="gmaps-dest-bar">
+      <div class="dest-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v20M2 12h20"/>
+        </svg>
+      </div>
+      <div class="dest-info">
+        <div class="dest-label">EMERGENCY DESTINATION (MANGALURU)</div>
+        <select id="driverDestSelect" class="dest-select">
+          <option value="COLLEGE_SHREE_DEVI">Shree Devi College (Ballalbagh / Lalbagh)</option>
+          <option value="HOSPITAL_AJ_KUNTIKAN">A.J. Hospital & Research Centre (Kuntikan)</option>
+          <option value="HOSPITAL_FATHER_MULLER">Father Muller Medical College Hospital (Kankanady)</option>
+          <option value="HOSPITAL_KMC_JYOTHI">KMC Hospital (Dr. B.R. Ambedkar Circle)</option>
+          <option value="HOSPITAL_WENLOCK">Wenlock District Hospital (Hampankatta)</option>
+        </select>
+      </div>
+      <a href="/operations" class="ops-switch-btn" title="Open CCTV Operations Control Dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <span>Ops Center</span>
+      </a>
+    </div>
+
+    <!-- Floating Incident Reroute Banner -->
+    <div class="gmaps-incident-banner hidden" id="incidentBanner">
+      <div class="banner-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <div class="banner-text">
+        <strong>Traffic Incident Ahead</strong>
+        <p id="incidentBannerMsg">Old Airport Ring Road blocked. Green corridor automatically diverted. Saved 3.8 min.</p>
+      </div>
+      <button class="banner-dismiss" id="btnDismissBanner" aria-label="Dismiss">&times;</button>
+    </div>
+
+    <!-- Free OpenStreetMap Fullscreen Map View -->
+    <main id="driverMap" class="driver-map"></main>
+
+    <!-- Floating Right Navigation Utilities (Google Maps Style) -->
+    <div class="gmaps-floating-controls">
+      <!-- Speed Limit Badge -->
+      <div class="speed-limit-badge" title="Corridor Speed Limit">
+        <div class="speed-number" id="speedLimitVal">55</div>
+        <div class="speed-unit">KM/H</div>
+      </div>
+
+      <!-- Recenter Button -->
+      <button id="btnRecenter" class="fab-btn" title="Re-center on Ambulance" aria-label="Re-center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="2">
+          <circle cx="12" cy="12" r="7"/>
+          <polyline points="12 1 12 5"/>
+          <polyline points="12 19 12 23"/>
+          <polyline points="1 12 5 12"/>
+          <polyline points="19 12 23 12"/>
+        </svg>
+      </button>
+
+      <!-- Toggle Traffic Congestion Layer -->
+      <button id="btnToggleTraffic" class="fab-btn active" title="Toggle Adjacent Traffic Conditions" aria-label="Traffic Layer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="2">
+          <line x1="4" y1="9" x2="20" y2="9"/>
+          <line x1="4" y1="15" x2="20" y2="15"/>
+          <line x1="10" y1="3" x2="8" y2="21"/>
+          <line x1="16" y1="3" x2="14" y2="21"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Bottom Google Maps Navigation Sheet -->
+    <footer class="gmaps-bottom-sheet">
+      <div class="sheet-handle"></div>
+
+      <div class="sheet-main-row">
+        <div class="eta-cluster">
+          <div class="route-via-title" id="driverViaRoad">via MG Rd</div>
+          <div class="eta-time-large" id="driverEtaMin">8 <span class="eta-unit">min</span></div>
+          <div class="eta-subinfo">
+            <span id="driverDistance">4.6 km</span>
+            <span class="dot-separator">&bull;</span>
+            <span id="driverClockEta">13:12 ETA</span>
+          </div>
+        </div>
+
+        <div class="drive-actions">
+          <button id="btnSimulateDrive" class="btn-start-nav">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span id="driveBtnLabel">Start Transit</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Corridor Clearance Status Banner -->
+      <div class="sheet-clearance-bar">
+        <div class="clearance-status">
+          <div class="clearance-dot"></div>
+          <div>
+            <strong id="clearanceHeading">FASTEST EMERGENCY CORRIDOR ACTIVE</strong>
+            <div class="clearance-details" id="clearanceDetails">
+              Automatic CV clearance active &bull; <span id="preemptedSignalsCount">4</span> signals preempted
+            </div>
+          </div>
+        </div>
+        <button id="btnRefreshRoute" class="btn-text-action">Update</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/js/driver.js"></script>
+  <script>
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          console.log('EMS PWA ServiceWorker registered:', reg.scope);
+        }).catch((err) => {
+          console.warn('EMS PWA ServiceWorker registration failed:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

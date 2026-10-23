@@ -2,183 +2,301 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>EMS Navigator - Emergency Green Corridor</title>
-  
-  <!-- PWA Meta Tags -->
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#1e8e3e">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="EMS Nav">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
-
-  <!-- Leaflet Free Map Engine -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traffic Diffusion - Predictive Traffic Intelligence & Intervention Planning Platform</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-  <link rel="stylesheet" href="/css/driver.css">
-  
+  <link rel="stylesheet" href="/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="nav-app-container">
-    
-    <!-- Top Google Maps Maneuver Card -->
-    <header class="gmaps-turn-card" id="turnCard">
-      <div class="turn-icon-box">
-        <svg id="turnIconSvg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-          <!-- Default straight / right arrow -->
-          <line x1="12" y1="19" x2="12" y2="5"></line>
-          <polyline points="5 12 12 5 19 12"></polyline>
-        </svg>
-      </div>
-      <div class="turn-instructions">
-        <div class="turn-distance" id="turnDistance">In 250 m</div>
-        <div class="turn-street" id="turnStreet">Continue onto K.S. Rao Arterial Road</div>
-        <div class="turn-next-preview" id="turnNext">Then proceed toward Light House Hill Road</div>
-      </div>
-      <div class="turn-badges">
-        <div class="preemption-pill">
-          <span class="pulse-indicator"></span>
-          <span>GREEN WAVE ACTIVE</span>
+  <div class="app-layout">
+    <!-- Top Analytical Header Bar -->
+    <header class="top-nav">
+      <div class="brand-section">
+        <div class="brand-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
         </div>
+        <div>
+          <h1 class="brand-title">TRAFFIC DIFFUSION</h1>
+          <p class="brand-subtitle">Predictive Traffic Intelligence & Intervention Planning Platform (Mangaluru Sector)</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="status-pill status-active">
+          <span class="status-dot"></span>
+          <span>PREDICTIVE ENGINE ONLINE</span>
+        </div>
+        <span class="badge-simulated">MODEL: GRAPH QUEUE SPILLBACK v2.0</span>
+        <a href="/operations" class="btn btn-outline-sm" style="text-decoration: none;">CCTV Console</a>
+        <a href="/driver" class="btn btn-outline-sm" style="text-decoration: none;">Field EMS Navigator</a>
+        <button id="btnResetAll" class="btn btn-outline-sm">Reset Grid</button>
       </div>
     </header>
 
-    <!-- Destination Selector Bar (Google Maps Search Style) -->
-    <div class="gmaps-dest-bar">
-      <div class="dest-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2v20M2 12h20"/>
-        </svg>
-      </div>
-      <div class="dest-info">
-        <div class="dest-label">EMERGENCY DESTINATION (MANGALURU)</div>
-        <select id="driverDestSelect" class="dest-select">
-          <option value="COLLEGE_SHREE_DEVI">Shree Devi College (Ballalbagh / Lalbagh)</option>
-          <option value="HOSPITAL_AJ_KUNTIKAN">A.J. Hospital & Research Centre (Kuntikan)</option>
-          <option value="HOSPITAL_FATHER_MULLER">Father Muller Medical College Hospital (Kankanady)</option>
-          <option value="HOSPITAL_KMC_JYOTHI">KMC Hospital (Dr. B.R. Ambedkar Circle)</option>
-          <option value="HOSPITAL_WENLOCK">Wenlock District Hospital (Hampankatta)</option>
-        </select>
-      </div>
-      <a href="/operations" class="ops-switch-btn" title="Open CCTV Operations Control Dashboard">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <line x1="8" y1="21" x2="16" y2="21"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-        <span>Ops Center</span>
-      </a>
+    <!-- Operational Transparency Banner -->
+    <div class="transparency-bar">
+      <span><strong>Platform Mode:</strong> Spatiotemporal Incident Impact Forecasting & What-If Intervention Simulation. Model estimates queue spillback, bottleneck saturation, and diversion loading.</span>
+      <span class="badge-simulated">PROVENANCE: SIMULATION-BASED ESTIMATE</span>
     </div>
 
-    <!-- Floating Incident Reroute Banner -->
-    <div class="gmaps-incident-banner hidden" id="incidentBanner">
-      <div class="banner-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-      </div>
-      <div class="banner-text">
-        <strong>Traffic Incident Ahead</strong>
-        <p id="incidentBannerMsg">Old Airport Ring Road blocked. Green corridor automatically diverted. Saved 3.8 min.</p>
-      </div>
-      <button class="banner-dismiss" id="btnDismissBanner" aria-label="Dismiss">&times;</button>
-    </div>
-
-    <!-- Free OpenStreetMap Fullscreen Map View -->
-    <main id="driverMap" class="driver-map"></main>
-
-    <!-- Floating Right Navigation Utilities (Google Maps Style) -->
-    <div class="gmaps-floating-controls">
-      <!-- Speed Limit Badge -->
-      <div class="speed-limit-badge" title="Corridor Speed Limit">
-        <div class="speed-number" id="speedLimitVal">55</div>
-        <div class="speed-unit">KM/H</div>
-      </div>
-
-      <!-- Recenter Button -->
-      <button id="btnRecenter" class="fab-btn" title="Re-center on Ambulance" aria-label="Re-center">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="2">
-          <circle cx="12" cy="12" r="7"/>
-          <polyline points="12 1 12 5"/>
-          <polyline points="12 19 12 23"/>
-          <polyline points="1 12 5 12"/>
-          <polyline points="19 12 23 12"/>
-        </svg>
-      </button>
-
-      <!-- Toggle Traffic Congestion Layer -->
-      <button id="btnToggleTraffic" class="fab-btn active" title="Toggle Adjacent Traffic Conditions" aria-label="Traffic Layer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="2">
-          <line x1="4" y1="9" x2="20" y2="9"/>
-          <line x1="4" y1="15" x2="20" y2="15"/>
-          <line x1="10" y1="3" x2="8" y2="21"/>
-          <line x1="16" y1="3" x2="14" y2="21"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- Bottom Google Maps Navigation Sheet -->
-    <footer class="gmaps-bottom-sheet">
-      <div class="sheet-handle"></div>
-
-      <div class="sheet-main-row">
-        <div class="eta-cluster">
-          <div class="route-via-title" id="driverViaRoad">via MG Rd</div>
-          <div class="eta-time-large" id="driverEtaMin">8 <span class="eta-unit">min</span></div>
-          <div class="eta-subinfo">
-            <span id="driverDistance">4.6 km</span>
-            <span class="dot-separator">&bull;</span>
-            <span id="driverClockEta">13:12 ETA</span>
+    <!-- Main Workspace -->
+    <main class="main-content">
+      <!-- Left Controls Column (Scrollable Analytical Workspace) -->
+      <aside class="control-sidebar">
+        <!-- Panel 1: Disruption Generator & Demo Scenarios -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Disruption Event & Incident Controller</h2>
+            <span class="badge badge-accent">Scenario Input</span>
           </div>
-        </div>
 
-        <div class="drive-actions">
-          <button id="btnSimulateDrive" class="btn-start-nav">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-            <span id="driveBtnLabel">Start Transit</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Corridor Clearance Status Banner -->
-      <div class="sheet-clearance-bar">
-        <div class="clearance-status">
-          <div class="clearance-dot"></div>
-          <div>
-            <strong id="clearanceHeading">FASTEST EMERGENCY CORRIDOR ACTIVE</strong>
-            <div class="clearance-details" id="clearanceDetails">
-              Automatic CV clearance active &bull; <span id="preemptedSignalsCount">4</span> signals preempted
+          <div style="margin-bottom: 8px;">
+            <label class="form-label">Deterministic Demo Presets (Hackathon Jury)</label>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" id="btnDemoNanthoor" class="btn btn-sm btn-secondary" style="flex: 1;">
+                Freight Rollover (Nanthoor)
+              </button>
+              <button type="button" id="btnDemoBunts" class="btn btn-sm btn-secondary" style="flex: 1;">
+                Flood (Bunts Hostel)
+              </button>
+              <button type="button" id="btnDemoMgRoad" class="btn btn-sm btn-secondary" style="flex: 1;">
+                Bus Breakdown (MG Rd)
+              </button>
             </div>
           </div>
-        </div>
-        <button id="btnRefreshRoute" class="btn-text-action">Update</button>
-      </div>
-    </footer>
 
+          <form id="incidentForm" class="control-group">
+            <label class="form-label" for="incidentEdgeSelect">Disrupted Road Corridor</label>
+            <select id="incidentEdgeSelect" class="form-select">
+              <option value="corridor_cctv_07">Circuit House - Nanthoor Road (corridor_cctv_07)</option>
+              <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
+              <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
+              <option value="corridor_cctv_11">Bejai Green Bypass Expressway (corridor_cctv_11)</option>
+              <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial (corridor_cctv_13)</option>
+              <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
+            </select>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div>
+                <label class="form-label" for="incidentCategorySelect">Category</label>
+                <select id="incidentCategorySelect" class="form-select">
+                  <option value="COLLISION">Collision</option>
+                  <option value="ROAD_BLOCKAGE">Road Blockage</option>
+                  <option value="VEHICLE_BREAKDOWN">Vehicle Breakdown</option>
+                  <option value="ROADWORKS">Roadworks</option>
+                  <option value="WEATHER_WATERLOGGING">Weather Waterlogging</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="incidentSeveritySelect">Severity</label>
+                <select id="incidentSeveritySelect" class="form-select">
+                  <option value="CRITICAL">Critical</option>
+                  <option value="HIGH" selected>High</option>
+                  <option value="MODERATE">Moderate</option>
+                  <option value="LOW">Low</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div>
+                <label class="form-label" for="capacityReductionInput">Capacity Cut (%)</label>
+                <input type="number" id="capacityReductionInput" class="form-select" min="10" max="100" value="80" step="5">
+              </div>
+              <div>
+                <label class="form-label" for="durationInput">Est Duration (min)</label>
+                <input type="number" id="durationInput" class="form-select" min="10" max="180" value="60" step="5">
+              </div>
+            </div>
+
+            <button type="submit" id="btnRunForecast" class="btn btn-primary btn-block" style="margin-top: 6px;">
+              Run Spatiotemporal Impact Forecast
+            </button>
+          </form>
+
+          <!-- Active Incident Metadata Box -->
+          <div id="activeIncidentBox" class="cv-results-box" style="margin-top: 8px;">
+            <div class="results-meta">
+              <span class="mono-label">INCIDENT ID:</span>
+              <span id="txtIncidentId" class="mono-val">-</span>
+              <span class="mono-label">STATUS:</span>
+              <span id="txtIncidentStatus" class="mono-val" style="color: var(--accent-red);">ACTIVE</span>
+            </div>
+            <div id="txtIncidentDesc" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
+              Loading scenario parameters...
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 2: Spatiotemporal Impact Forecast Horizons -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Network Impact Forecast & Spillback Propagation</h2>
+            <span class="badge badge-subtle">Forecast Horizons</span>
+          </div>
+
+          <div class="horizon-btn-group">
+            <button type="button" class="horizon-pill" data-horizon="15">T+15m Forecast</button>
+            <button type="button" class="horizon-pill active" data-horizon="30">T+30m Forecast</button>
+            <button type="button" class="horizon-pill" data-horizon="60">T+60m Forecast</button>
+          </div>
+
+          <div id="forecastSummaryBox" style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-top: 8px;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;" id="forecastHorizonTitle">
+              Forecast Horizon: T+30 Minutes
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" id="forecastNarrative">
+              Simulating queue spillback, downstream bottlenecks, and diversion load...
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+            <div class="stat-pill">
+              <div class="stat-num" id="statQueueMeters">0 m</div>
+              <div class="stat-name">Queue Length</div>
+            </div>
+            <div class="stat-pill">
+              <div class="stat-num" id="statExcessPcu">0 PCU</div>
+              <div class="stat-name">Accumulated Volume</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 3: Prioritized Risk Assessment & Hotspots -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Prioritized Risk Ranking & Critical Junctions</h2>
+            <span class="badge badge-accent">Risk Score 0-100</span>
+          </div>
+
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+            Composite risk decomposing Incident Severity (25), V/C Load (25), Downstream Dependency (25), and Diversion Deficit (25).
+          </p>
+
+          <div id="riskRankList" class="risk-rank-list">
+            <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 12px;">
+              Generating risk assessment...
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 4: What-If Intervention Planner -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">What-If Intervention Planner</h2>
+            <span class="badge badge-accent">Scenario Comparison</span>
+          </div>
+
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+            Evaluates candidate operational interventions under identical baseline conditions to identify the optimal action plan.
+          </p>
+
+          <!-- Recommendation Banner -->
+          <div id="recomPlanBanner" style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-green); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <strong style="color: var(--accent-green); font-size: 12px;">RECOMMENDED ACTION PLAN</strong>
+              <span class="badge-recom">OPTIMAL</span>
+            </div>
+            <div id="recomRationaleTxt" style="font-size: 11px; color: var(--text-primary); line-height: 1.4;">
+              Evaluating candidate response scenarios...
+            </div>
+          </div>
+
+          <!-- Scenario Comparison Cards -->
+          <div id="intervScenarioList" class="interv-scenario-list"></div>
+        </section>
+
+        <!-- Panel 5: Historical Road Intelligence & Recurring Hotspots -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Historical Intelligence & Recurring Hotspots</h2>
+            <span class="badge badge-subtle">Empirical Analysis</span>
+          </div>
+
+          <div class="historical-stats-grid">
+            <div class="hist-stat-card">
+              <div class="hist-stat-val" id="histTotalRecords">0</div>
+              <div class="hist-stat-lbl">Incidents Analyzed</div>
+            </div>
+            <div class="hist-stat-card">
+              <div class="hist-stat-val" id="histTopHotspotName">-</div>
+              <div class="hist-stat-lbl">Primary Recurring Hotspot</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 8px;">
+            <label class="form-label">Top Recurring Disruption Locations</label>
+            <div id="hotspotMiniList" class="hotspot-mini-list"></div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- Right Visualization Column -->
+      <section class="map-container-wrapper">
+        <!-- Interactive Leaflet Map -->
+        <div id="map" class="map-view"></div>
+
+        <!-- Floating Map Legend Overlay -->
+        <div class="map-legend-overlay">
+          <div style="font-weight: 800; font-size: 11px; color: #fff; margin-bottom: 6px;">
+            SPATIOTEMPORAL IMPACT LEGEND
+          </div>
+          <div class="legend-item">
+            <div class="legend-color-box" style="background-color: #ef4444;"></div>
+            <span>Direct Disruption Blockage</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color-box" style="background-color: #f97316;"></div>
+            <span>Upstream Queue Spillback</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color-box" style="background-color: #06b6d4;"></div>
+            <span>Diversion Loaded Bypass</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color-box" style="background-color: #ef4444; border-radius: 4px; width: 14px; height: 10px;"></div>
+            <span>Saturated Junction (&ge;70% Cap)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color-box" style="background-color: #334155;"></div>
+            <span>Nominal Arterial Flow</span>
+          </div>
+        </div>
+
+        <!-- Executive Telemetry & Performance Metrics Banner -->
+        <div class="metrics-banner" id="metricsBanner">
+          <div class="metric-card">
+            <span class="metric-title">Active Horizon</span>
+            <span class="metric-value highlight-cyan" id="valActiveHorizon">T+30 min</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Total Network Delay</span>
+            <span class="metric-value highlight-red" id="valNetworkDelay">+0.0 min</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Elevated Risk Corridors</span>
+            <span class="metric-value highlight-amber" id="valElevatedCorridors">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Saturated Junctions</span>
+            <span class="metric-value highlight-amber" id="valSaturatedJunctions">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Recommended Mitigation</span>
+            <span class="metric-value highlight-green" id="valOptimalMitigation">Scenario D (-74%)</span>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="/js/driver.js"></script>
-  <script>
-    // PWA Service Worker Registration
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then((reg) => {
-          console.log('EMS PWA ServiceWorker registered:', reg.scope);
-        }).catch((err) => {
-          console.warn('EMS PWA ServiceWorker registration failed:', err);
-        });
-      });
-    }
-  </script>
+  <script src="/js/map.js"></script>
+  <script src="/js/app.js"></script>
 </body>
 </html>

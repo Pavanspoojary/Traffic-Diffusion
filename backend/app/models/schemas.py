@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
+# Core Status & Category Enums
 class CongestionLevel(str, Enum):
     FREE_FLOW = "FREE_FLOW"
     MODERATE = "MODERATE"
@@ -9,6 +10,35 @@ class CongestionLevel(str, Enum):
     BLOCKED = "BLOCKED"
     UNKNOWN = "UNKNOWN"
     STALE = "STALE"
+
+class IncidentCategory(str, Enum):
+    COLLISION = "COLLISION"
+    ROAD_BLOCKAGE = "ROAD_BLOCKAGE"
+    VEHICLE_BREAKDOWN = "VEHICLE_BREAKDOWN"
+    ROADWORKS = "ROADWORKS"
+    LANE_CLOSURE = "LANE_CLOSURE"
+    ABNORMAL_CONGESTION = "ABNORMAL_CONGESTION"
+    SIGNAL_MALFUNCTION = "SIGNAL_MALFUNCTION"
+    WEATHER_WATERLOGGING = "WEATHER_WATERLOGGING"
+    OTHER = "OTHER"
+
+class IncidentSeverity(str, Enum):
+    LOW = "LOW"
+    MODERATE = "MODERATE"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+class EventProvenance(str, Enum):
+    OBSERVED = "OBSERVED"
+    MANUAL_ENTRY = "MANUAL_ENTRY"
+    SIMULATED = "SIMULATED"
+
+class VerificationStatus(str, Enum):
+    UNVERIFIED = "UNVERIFIED"
+    VERIFICATION_PENDING = "VERIFICATION_PENDING"
+    VERIFIED = "VERIFIED"
+    DISMISSED = "DISMISSED"
+    RESOLVED = "RESOLVED"
 
 class IncidentStatus(str, Enum):
     SUSPECTED = "SUSPECTED"
@@ -42,6 +72,263 @@ class CorridorCoordinationStatus(str, Enum):
     DEGRADED = "DEGRADED"
     CANCELLED = "CANCELLED"
 
+class InterventionType(str, Enum):
+    TRAFFIC_DIVERSION = "TRAFFIC_DIVERSION"
+    INCIDENT_CLEARANCE_DISPATCH = "INCIDENT_CLEARANCE_DISPATCH"
+    LANE_CAPACITY_RESTORATION = "LANE_CAPACITY_RESTORATION"
+    JUNCTION_SIGNAL_TIMING = "JUNCTION_SIGNAL_TIMING"
+    COMBINED_ACTION_PLAN = "COMBINED_ACTION_PLAN"
+
+# Basic Road Models
+class RoadNode(BaseModel):
+    id: str
+    name: str
+    type: str  # intersection | hospital | ems_station
+    lat: float
+    lng: float
+    address: Optional[str] = None
+
+class RoadEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    name: str
+    corridor_id: str
+    length_km: float
+    base_speed_kmh: float
+    lanes: int
+    density_score: float = 0.25
+    congestion_level: CongestionLevel = CongestionLevel.FREE_FLOW
+    has_incident: bool = False
+    incident_status: IncidentStatus = IncidentStatus.UNKNOWN
+    incident_description: Optional[str] = None
+    traffic_signals: int = 1
+    estimated_travel_time_min: float = 0.0
+    data_status: DataStatus = DataStatus.LIVE
+    is_simulated: bool = False
+    last_updated_at: Optional[str] = None
+
+# Incident Management Models
+class TrafficIncident(BaseModel):
+    incident_id: str
+    category: IncidentCategory = IncidentCategory.COLLISION
+    affected_edge_id: str
+    road_name: Optional[str] = None
+    start_timestamp: str
+    severity: IncidentSeverity = IncidentSeverity.HIGH
+    blocked_lanes: Optional[int] = 1
+    total_lanes: Optional[int] = 2
+    capacity_reduction_pct: float = Field(0.50, ge=0.0, le=1.0)
+    estimated_duration_min: float = Field(45.0, ge=1.0)
+    provenance: EventProvenance = EventProvenance.SIMULATED
+    verification_status: VerificationStatus = VerificationStatus.VERIFIED
+    confidence_score: float = Field(0.85, ge=0.0, le=1.0)
+    description: Optional[str] = None
+    reported_by: Optional[str] = "TRAFFIC_OPERATOR"
+
+class IncidentCreateRequest(BaseModel):
+    category: IncidentCategory = IncidentCategory.COLLISION
+    affected_edge_id: str
+    severity: IncidentSeverity = IncidentSeverity.HIGH
+    blocked_lanes: Optional[int] = 1
+    capacity_reduction_pct: Optional[float] = 0.60
+    estimated_duration_min: Optional[float] = 45.0
+    description: Optional[str] = "Traffic disruption causing arterial queue buildup"
+    provenance: EventProvenance = EventProvenance.SIMULATED
+
+class IncidentRecord(BaseModel):
+    incident_id: str
+    corridor_id: str
+    road_name: Optional[str] = None
+    status: IncidentStatus = IncidentStatus.UNKNOWN
+    description: str
+    confidence_score: float = 0.85
+    detected_at: str
+    verified_at: Optional[str] = None
+    verified_by: Optional[str] = None
+    preview_image_url: Optional[str] = None
+    is_simulated: bool = False
+
+class IncidentVerificationRequest(BaseModel):
+    incident_id: str
+    action: str  # "CONFIRM" | "DISMISS" | "CLEAR"
+    notes: Optional[str] = None
+    operator_id: Optional[str] = "DISPATCH_OP_01"
+
+# Impact Forecasting Models
+class EdgeImpactForecast(BaseModel):
+    edge_id: str
+    road_name: str
+    source: str
+    target: str
+    baseline_travel_time_min: float
+    predicted_travel_time_min: float
+    expected_delay_min: float
+    predicted_volume_capacity_ratio: float
+    predicted_congestion_level: CongestionLevel
+    queue_length_meters: float
+    impact_type: str  # DIRECT_INCIDENT | UPSTREAM_SPILLBACK | DOWNSTREAM_BOTTLENECK | DIVERSION_LOADED | NOMINAL
+    risk_score: float  # 0.0 - 100.0
+
+class JunctionSaturationForecast(BaseModel):
+    junction_id: str
+    junction_name: str
+    saturation_index: float  # 0.0 - 1.0
+    inflow_spillback_risk: str  # LOW | MODERATE | CRITICAL
+    incoming_delayed_edges: List[str] = []
+
+class NetworkForecastSnapshot(BaseModel):
+    horizon_minutes: int  # 15, 30, 60
+    forecast_timestamp: str
+    model_method: str = "Graph-Based Queue Spillback & Diversion Flow Model v2.0"
+    provenance: str = "SIMULATION_BASED_ESTIMATE"
+    confidence_score: float = 0.85
+    total_network_travel_time_min: float
+    network_delay_relative_to_baseline_min: float
+    elevated_risk_corridors_count: int
+    saturated_junctions_count: int
+    edge_impacts: List[EdgeImpactForecast]
+    junction_saturations: List[JunctionSaturationForecast]
+    propagation_summary: str
+
+class MultiHorizonForecastResponse(BaseModel):
+    incident: TrafficIncident
+    baseline_total_network_travel_time_min: float
+    forecasts: Dict[int, NetworkForecastSnapshot]  # 15, 30, 60 min
+    primary_affected_corridors: List[str]
+    next_probable_bottlenecks: List[str]
+    model_assumptions: List[str]
+
+class ForecastRequest(BaseModel):
+    incident: Optional[TrafficIncident] = None
+    incident_id: Optional[str] = None
+    horizons: List[int] = [15, 30, 60]
+
+# Risk Assessment Models
+class RiskComponentBreakdown(BaseModel):
+    severity_component: float       # max 25
+    capacity_load_component: float  # max 25
+    downstream_dependency: float    # max 25
+    diversion_deficit: float        # max 25
+    total_risk_score: float         # 0 - 100
+
+class PrioritizedRoadRisk(BaseModel):
+    rank: int
+    edge_id: str
+    road_name: str
+    risk_level: str  # CRITICAL | HIGH | MODERATE | LOW
+    risk_score: float
+    components: RiskComponentBreakdown
+    contributing_factors: List[str]
+    expected_consequences: str
+    recommended_action: str
+
+class PrioritizedJunctionRisk(BaseModel):
+    rank: int
+    junction_id: str
+    junction_name: str
+    saturation_risk: str  # CRITICAL | HIGH | MODERATE | LOW
+    risk_score: float
+    critical_feeder_corridors: List[str]
+    recommended_action: str
+
+class RiskAssessmentResponse(BaseModel):
+    generated_at: str
+    forecast_horizon_minutes: int
+    high_risk_roads: List[PrioritizedRoadRisk]
+    critical_junctions: List[PrioritizedJunctionRisk]
+    highest_vulnerability_sector: str
+
+# What-If Intervention Planner Models
+class InterventionAction(BaseModel):
+    type: InterventionType
+    target_edge_or_junction_id: str
+    diversion_route_ids: Optional[List[str]] = None
+    diversion_percentage: Optional[float] = 0.50
+    dispatch_delay_minutes: Optional[float] = 8.0
+    duration_reduction_pct: Optional[float] = 0.50
+    capacity_restored_pct: Optional[float] = 0.60
+    signal_capacity_boost_pct: Optional[float] = 0.25
+    resource_units_required: int = 2
+
+class InterventionScenario(BaseModel):
+    scenario_id: str
+    scenario_name: str
+    description: str
+    actions: List[InterventionAction]
+    dispatch_delay_min: float = 0.0
+    resource_summary: str
+    estimated_network_travel_time_min: float
+    delay_reduction_relative_to_baseline_min: float
+    delay_reduction_pct: float
+    elevated_risk_edges_count: int
+    saturated_junctions_count: int
+    expected_incident_duration_min: float
+    feasibility_rating: str  # HIGH | MODERATE | COMPLEX
+    key_tradeoffs: str
+    rank: int = 1
+
+class InterventionEvaluationRequest(BaseModel):
+    incident_id: Optional[str] = None
+    incident: Optional[TrafficIncident] = None
+    custom_scenarios: Optional[List[InterventionScenario]] = None
+    optimization_objective: str = "MINIMIZE_NETWORK_DELAY_AND_PREVENT_JUNCTION_GRIDLOCK"
+
+class InterventionEvaluationResponse(BaseModel):
+    incident_id: str
+    evaluation_timestamp: str
+    optimization_objective: str
+    baseline_scenario: InterventionScenario
+    candidate_scenarios: List[InterventionScenario]
+    recommended_scenario_id: str
+    recommendation_rationale: str
+    tradeoff_summary: str
+
+# Historical Analytics & Recurring Hotspot Models
+class HistoricalIncidentRecord(BaseModel):
+    record_id: str
+    category: IncidentCategory
+    edge_id: str
+    road_name: str
+    junction_id: Optional[str] = None
+    timestamp: str  # ISO string
+    day_of_week: str  # Monday - Sunday
+    hour_of_day: int  # 0 - 23
+    severity: IncidentSeverity
+    duration_minutes: float
+    lanes_blocked: int = 1
+    observed_delay_min: float = 0.0
+    clearance_team_dispatched: bool = True
+    provenance: EventProvenance = EventProvenance.HISTORICAL_OBSERVATION if hasattr(EventProvenance, "HISTORICAL_OBSERVATION") else EventProvenance.SIMULATED
+
+class RecurringHotspotSummary(BaseModel):
+    location_id: str
+    location_name: str
+    incident_count: int
+    primary_category: IncidentCategory
+    mean_duration_minutes: float
+    recurring_peak_hours: List[int]
+    recurring_peak_days: List[str]
+    recurring_risk_score: float
+    recurring_pattern_summary: str
+
+class HistoricalAnalyticsResponse(BaseModel):
+    total_records_analyzed: int
+    observed_records_count: int
+    simulated_records_count: int
+    top_recurring_hotspots: List[RecurringHotspotSummary]
+    category_distribution: Dict[str, int]
+    hourly_distribution: Dict[int, int]
+    weekday_distribution: Dict[str, int]
+    mean_duration_by_category_min: Dict[str, float]
+    data_provenance_summary: str
+
+class HistoricalImportRequest(BaseModel):
+    records: List[Dict[str, Any]]
+    source_name: str = "MANGALURU_TRAFFIC_LOGS"
+    is_simulated: bool = False
+
+# Supporting Legacy Models (Ambulance & CCTV)
 class VehicleCounts(BaseModel):
     cars: int = 0
     trucks: int = 0
@@ -55,7 +342,7 @@ class VehicleTrackingSummary(BaseModel):
     stopped_vehicles: int = 0
     queue_detected: bool = False
     max_stopped_duration_sec: float = 0.0
-    estimated_flow_rate_vpm: float = 0.0  # vehicles per minute
+    estimated_flow_rate_vpm: float = 0.0
     confidence: float = 0.90
 
 class VideoAnalysisResult(BaseModel):
@@ -80,53 +367,6 @@ class VideoAnalysisResult(BaseModel):
     processed_at: str
     last_successful_update: Optional[str] = None
 
-class RoadNode(BaseModel):
-    id: str
-    name: str
-    type: str  # intersection | hospital | ems_station
-    lat: float
-    lng: float
-    address: Optional[str] = None
-
-class RoadEdge(BaseModel):
-    id: str
-    source: str
-    target: str
-    name: str
-    corridor_id: str
-    length_km: float
-    base_speed_kmh: float
-    lanes: int
-    density_score: float
-    congestion_level: CongestionLevel
-    has_incident: bool = False
-    incident_status: IncidentStatus = IncidentStatus.UNKNOWN
-    incident_description: Optional[str] = None
-    traffic_signals: int = 1
-    estimated_travel_time_min: float = 0.0
-    data_status: DataStatus = DataStatus.LIVE
-    is_simulated: bool = False
-    last_updated_at: Optional[str] = None
-
-class IncidentRecord(BaseModel):
-    incident_id: str
-    corridor_id: str
-    road_name: Optional[str] = None
-    status: IncidentStatus
-    description: str
-    confidence_score: float = 0.85
-    detected_at: str
-    verified_at: Optional[str] = None
-    verified_by: Optional[str] = None
-    preview_image_url: Optional[str] = None
-    is_simulated: bool = False
-
-class IncidentVerificationRequest(BaseModel):
-    incident_id: str
-    action: str  # "CONFIRM" | "DISMISS" | "CLEAR"
-    notes: Optional[str] = None
-    operator_id: Optional[str] = "DISPATCH_OP_01"
-
 class JunctionCoordinationRequest(BaseModel):
     junction_id: str
     junction_name: str
@@ -136,7 +376,7 @@ class JunctionCoordinationRequest(BaseModel):
     requested_at: Optional[str] = None
     acknowledged_at: Optional[str] = None
     cleared_at: Optional[str] = None
-    controller_type: str = "SIMULATED_ADAPTER"  # Clearly marked as simulated
+    controller_type: str = "SIMULATED_ADAPTER"
     is_simulated: bool = True
     status_message: Optional[str] = None
 
@@ -154,7 +394,7 @@ class HospitalReadiness(BaseModel):
     hospital_id: str
     hospital_name: str
     eta_minutes: float
-    trauma_bay_status: str = "READY"  # READY | PREPARING | STANDBY | BUSY
+    trauma_bay_status: str = "READY"
     triage_level: str = "LEVEL_1_TRAUMA"
     notification_sent: bool = True
     specialties_available: List[str] = ["Emergency Medicine", "Trauma ICU", "Vascular Surgery"]
@@ -204,8 +444,6 @@ class RouteCalculationResponse(BaseModel):
     baseline_travel_time_min: float = 0.0
     time_saved_min: float = 0.0
     recent_reroutes: List[RouteChangeEvent] = []
-    
-    # Backward compatibility fields
     path_node_ids: List[str] = []
     path_coordinates: List[List[float]] = []
     segments: List[RouteSegment] = []

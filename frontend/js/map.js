@@ -161,4 +161,98 @@ class TrafficMap {
     `);
     return marker;
   }
+
+  // Render Predictive Cascading Impact Forecast across selected horizon
+  renderPredictiveForecast(snapshot, nodes, activeIncident = null) {
+    this.edgeLayers.clearLayers();
+    this.routeLayer.clearLayers();
+
+    // Cache nodes
+    nodes.forEach(n => this.nodeMap.set(n.id, n));
+
+    snapshot.edge_impacts.forEach(impact => {
+      const sourceNode = this.nodeMap.get(impact.source);
+      const targetNode = this.nodeMap.get(impact.target);
+      if (!sourceNode || !targetNode) return;
+
+      const latlngs = [
+        [sourceNode.lat, sourceNode.lng],
+        [targetNode.lat, targetNode.lng]
+      ];
+
+      let color = '#475569';
+      let weight = 3;
+      let opacity = 0.7;
+      let dashArray = null;
+
+      if (impact.impact_type === 'DIRECT_INCIDENT') {
+        color = '#ef4444';
+        weight = 7;
+        opacity = 1.0;
+        dashArray = '8, 6';
+      } else if (impact.impact_type === 'UPSTREAM_SPILLBACK') {
+        color = '#f97316';
+        weight = 5.5;
+        opacity = 0.95;
+      } else if (impact.impact_type === 'DIVERSION_LOADED') {
+        color = '#06b6d4';
+        weight = 4.5;
+        opacity = 0.9;
+        dashArray = '6, 6';
+      } else if (impact.impact_type === 'DOWNSTREAM_BOTTLENECK') {
+        color = '#a855f7';
+        weight = 4;
+        opacity = 0.85;
+      } else {
+        color = impact.predicted_volume_capacity_ratio > 0.85 ? '#eab308' : '#334155';
+        weight = 2.5;
+        opacity = 0.65;
+      }
+
+      const polyline = L.polyline(latlngs, {
+        color: color,
+        weight: weight,
+        opacity: opacity,
+        dashArray: dashArray,
+        lineCap: 'round',
+      });
+
+      const tooltipContent = `
+        <div style="font-family: var(--font-sans); font-size: 11px; line-height: 1.4;">
+          <div style="font-weight: 800; color: #fff;">${impact.road_name}</div>
+          <div style="color: ${color}; font-weight: 700; font-size: 10px;">${impact.impact_type.replace(/_/g, ' ')} [T+${snapshot.horizon_minutes}m]</div>
+          <div style="color: #94a3b8; margin-top: 2px;">
+            Pred Travel Time: <strong>${impact.predicted_travel_time_min.toFixed(1)} min</strong> (+${impact.expected_delay_min.toFixed(1)}m delay)<br/>
+            V/C Load: <strong>${impact.predicted_volume_capacity_ratio.toFixed(2)}</strong> | Queue: <strong>${Math.round(impact.queue_length_meters)}m</strong><br/>
+            Risk Score: <strong>${impact.risk_score.toFixed(1)} / 100</strong>
+          </div>
+        </div>
+      `;
+      polyline.bindTooltip(tooltipContent, { sticky: true });
+      this.edgeLayers.addLayer(polyline);
+    });
+
+    // Highlight Saturated Junctions
+    snapshot.junction_saturations.forEach(junc => {
+      const node = this.nodeMap.get(junc.junction_id);
+      if (!node) return;
+
+      if (junc.saturation_index >= 0.70) {
+        const satPercent = Math.round(junc.saturation_index * 100);
+        const satIcon = L.divIcon({
+          className: 'saturated-junc-icon',
+          html: `
+            <div style="background: #ef4444; border: 2px solid #ffffff; color: white; border-radius: 6px; padding: 2px 5px; font-weight: 800; font-size: 10px; font-family: var(--font-mono); box-shadow: 0 2px 10px rgba(0,0,0,0.5);">
+              ${satPercent}% SAT
+            </div>
+          `,
+          iconSize: [52, 22],
+          iconAnchor: [26, 11],
+        });
+        L.marker([node.lat, node.lng], { icon: satIcon })
+          .bindTooltip(`<strong>${junc.junction_name}</strong><br/>Gridlock Risk: ${junc.inflow_spillback_risk}<br/>Saturation: ${satPercent}%`)
+          .addTo(this.routeLayer);
+      }
+    });
+  }
 }
