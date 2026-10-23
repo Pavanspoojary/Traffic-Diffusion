@@ -1,7 +1,11 @@
-// Traffic Diffusion - Traffic Police & Control Room Operations Center Controller (Pure Dashboard, No Map)
+// Traffic Diffusion - Mangaluru Traffic Police Command Center Controller
+// Clean, minimal, high-utility operations dashboard
 document.addEventListener('DOMContentLoaded', () => {
 
-  // Top KPI Elements
+  // Live Digital Clock
+  const liveClock = document.getElementById('liveClock');
+
+  // Top Metric Elements
   const kpiSeverity = document.getElementById('kpiSeverity');
   const kpiLocation = document.getElementById('kpiLocation');
   const valActiveHorizon = document.getElementById('valActiveHorizon');
@@ -16,17 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const citizenReportsList = document.getElementById('citizenReportsList');
   const badgeCitizenCount = document.getElementById('badgeCitizenCount');
 
-  // Tactical Dispatch Elements
-  const dispatchForm = document.getElementById('dispatchForm');
-  const dispatchLocationSelect = document.getElementById('dispatchLocationSelect');
-  const dispatchResourceSelect = document.getElementById('dispatchResourceSelect');
-  const dispatchDirectiveInput = document.getElementById('dispatchDirectiveInput');
-  const dispatchOrdersList = document.getElementById('dispatchOrdersList');
-
-  // Scenario & Demo Elements
+  // Presets & Disruption Form
   const btnDemoNanthoor = document.getElementById('btnDemoNanthoor');
   const btnDemoBunts = document.getElementById('btnDemoBunts');
   const btnDemoMgRoad = document.getElementById('btnDemoMgRoad');
+  const presetPills = document.querySelectorAll('.preset-pill');
 
   const incidentForm = document.getElementById('incidentForm');
   const incidentEdgeSelect = document.getElementById('incidentEdgeSelect');
@@ -41,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const txtIncidentDesc = document.getElementById('txtIncidentDesc');
 
   // Forecast Elements
-  const horizonPills = document.querySelectorAll('.horizon-pill');
+  const horizonBtns = document.querySelectorAll('.h-btn');
   const forecastHorizonTitle = document.getElementById('forecastHorizonTitle');
   const forecastNarrative = document.getElementById('forecastNarrative');
   const statQueueMeters = document.getElementById('statQueueMeters');
@@ -49,25 +47,44 @@ document.addEventListener('DOMContentLoaded', () => {
   const corridorSpreadTbody = document.getElementById('corridorSpreadTbody');
   const saturatedJuncTbody = document.getElementById('saturatedJuncTbody');
 
-  // Risk Assessment Elements
+  // Risk & Interventions Elements
   const riskRankList = document.getElementById('riskRankList');
-
-  // Intervention Elements
-  const recomPlanBanner = document.getElementById('recomPlanBanner');
   const recomRationaleTxt = document.getElementById('recomRationaleTxt');
   const intervScenarioList = document.getElementById('intervScenarioList');
+  const btnApplyRecomPlan = document.getElementById('btnApplyRecomPlan');
+
+  // Tactical Dispatch Elements
+  const dispatchForm = document.getElementById('dispatchForm');
+  const dispatchLocationSelect = document.getElementById('dispatchLocationSelect');
+  const dispatchResourceSelect = document.getElementById('dispatchResourceSelect');
+  const dispatchDirectiveInput = document.getElementById('dispatchDirectiveInput');
+  const dispatchOrdersList = document.getElementById('dispatchOrdersList');
+  const ledgerCountBadge = document.getElementById('ledgerCountBadge');
+  const chipButtons = document.querySelectorAll('.chip-btn');
 
   // State
   let networkEdges = [];
   let activeIncident = null;
-  let activeHorizon = 30; // default 30 minutes
+  let activeHorizon = 30; // default 30 min
   let forecastData = null;
   let riskData = null;
   let interventionData = null;
-  let activeDispatches = [];
 
   // =========================================================================
-  // 1. Initial Startup & Network Loading
+  // 1. Live Digital Clock
+  // =========================================================================
+  function updateLiveClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    if (liveClock) liveClock.textContent = `${h}:${m}:${s}`;
+  }
+  setInterval(updateLiveClock, 1000);
+  updateLiveClock();
+
+  // =========================================================================
+  // 2. Initialize Platform & Load Corridors
   // =========================================================================
   async function initializePlatform() {
     try {
@@ -81,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await loadCitizenReports();
       await loadResourceDispatches();
 
-      // Trigger default demonstration scenario: Nanthoor Freight Rollover
+      // Launch default demo scenario
       await triggerDemoScenario('nanthoor_freight_rollover');
     } catch (err) {
       console.error('Initialization error:', err);
@@ -93,13 +110,13 @@ document.addEventListener('DOMContentLoaded', () => {
     edges.forEach(e => {
       const opt = document.createElement('option');
       opt.value = e.id;
-      opt.textContent = `${e.name} (${e.id}) [${e.lanes} lanes]`;
+      opt.textContent = `${e.name} (${e.lanes}L)`;
       incidentEdgeSelect.appendChild(opt);
     });
   }
 
   // =========================================================================
-  // 2. Citizen Incident Reports (Public Ingestion & Operator Verification)
+  // 3. Citizen Inbound Reports Queue
   // =========================================================================
   async function loadCitizenReports() {
     try {
@@ -107,40 +124,38 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) return;
       const reports = await res.json();
 
-      badgeCitizenCount.textContent = `${reports.length} Inbound`;
+      badgeCitizenCount.textContent = reports.length;
       citizenReportsList.innerHTML = '';
 
       if (reports.length === 0) {
-        citizenReportsList.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 10px;">No pending citizen reports</div>';
+        citizenReportsList.innerHTML = '<div class="feed-empty">No pending citizen reports</div>';
         return;
       }
 
       reports.forEach(rep => {
-        const isVerified = rep.verification_status === 'VERIFIED';
+        const isVerified = (rep.verification_status === 'VERIFIED');
         const card = document.createElement('div');
-        card.className = 'citizen-report-item';
+        card.className = 'feed-item';
         card.innerHTML = `
-          <div class="citizen-report-header">
-            <span class="citizen-report-id">${rep.report_id}</span>
-            <span class="status-tag ${isVerified ? 'tag-free' : 'tag-heavy'}">${rep.verification_status}</span>
+          <div class="feed-head">
+            <span class="feed-loc">${rep.road_name}</span>
+            <span class="badge-tag ${isVerified ? 'badge-cyan' : 'badge-amber'}">${rep.verification_status}</span>
           </div>
-          <div class="citizen-report-loc">${rep.road_name}</div>
-          <div class="citizen-report-desc">${rep.description}</div>
-          <div class="citizen-report-footer">
-            <span style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">${rep.category} · ${rep.lanes_affected} lane(s)</span>
+          <div class="feed-sub">${rep.description} (${rep.category})</div>
+          <div class="feed-foot">
+            <span style="font-size: 9.5px; color: var(--text-dim); font-family: var(--font-mono);">${rep.report_id}</span>
             ${!isVerified ? `
-              <button class="btn btn-sm btn-primary btn-verify-report" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}" style="font-size: 10px; padding: 3px 8px;">
-                Verify & Forecast
+              <button class="btn-mini-adv btn-verify-report" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}">
+                Verify
               </button>
             ` : `
-              <span style="font-size: 10px; color: var(--accent-green); font-weight: 700;">Verified Incident</span>
+              <span style="font-size: 9.5px; color: var(--accent-green); font-weight: 700;">Verified</span>
             `}
           </div>
         `;
         citizenReportsList.appendChild(card);
       });
 
-      // Hook up verify buttons
       document.querySelectorAll('.btn-verify-report').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const repId = e.currentTarget.dataset.id;
@@ -162,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const updated = await res.json();
 
       incidentEdgeSelect.value = edgeId;
-      capacityReductionInput.value = updated.lanes_affected > 1 ? 70 : 40;
+      capacityReductionInput.value = updated.lanes_affected > 1 ? 75 : 45;
 
       await loadCitizenReports();
       await triggerCustomForecast();
@@ -172,84 +187,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
-  // 3. Tactical Resource & Police Deployment Console
+  // 4. Tactical Presets & Forecast Submission
   // =========================================================================
-  async function loadResourceDispatches() {
-    try {
-      const res = await fetch('/api/v1/intelligence/dispatches');
-      if (!res.ok) return;
-      activeDispatches = await res.json();
-
-      dispatchOrdersList.innerHTML = '';
-      if (activeDispatches.length === 0) {
-        dispatchOrdersList.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px;">No active dispatches</div>';
-        return;
+  function setActivePreset(key) {
+    presetPills.forEach(pill => {
+      if (pill.dataset.preset === key) {
+        pill.classList.add('active');
+      } else {
+        pill.classList.remove('active');
       }
-
-      activeDispatches.forEach(ord => {
-        const item = document.createElement('div');
-        item.className = 'dispatch-item';
-        
-        let statusClass = 'dispatched';
-        if (ord.status === 'ON_SCENE') statusClass = 'on-scene';
-        else if (ord.status === 'EN_ROUTE') statusClass = 'en-route';
-
-        item.innerHTML = `
-          <div class="dispatch-header">
-            <span class="dispatch-type-badge">${ord.resource_type.replace(/_/g, ' ')} (${ord.units_assigned}u)</span>
-            <span class="dispatch-status-badge ${statusClass}">${ord.status} ${ord.eta_minutes > 0 ? `· ETA ${ord.eta_minutes.toFixed(0)}m` : ''}</span>
-          </div>
-          <div class="dispatch-target">${ord.target_location_name}</div>
-          <div class="dispatch-directive">${ord.directive}</div>
-          ${ord.notes ? `<div style="font-size: 10px; color: var(--text-muted);">${ord.notes}</div>` : ''}
-        `;
-        dispatchOrdersList.appendChild(item);
-      });
-    } catch (err) {
-      console.warn('Dispatch load error:', err);
-    }
+    });
   }
 
-  dispatchForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      const targetId = dispatchLocationSelect.value;
-      const targetName = dispatchLocationSelect.options[dispatchLocationSelect.selectedIndex].text;
-      const resourceType = dispatchResourceSelect.value;
-      const directive = dispatchDirectiveInput.value.trim() || 'Manual Traffic Regulation & Queue Clearing';
-
-      const payload = {
-        incident_id: activeIncident ? activeIncident.incident_id : 'INC-CURRENT-TACTICAL',
-        target_location_id: targetId,
-        target_location_name: targetName,
-        resource_type: resourceType,
-        units_assigned: resourceType === 'TRAFFIC_POLICE_OFFICER' ? 2 : 1,
-        directive: directive,
-        priority: 'HIGH',
-        eta_minutes: 5.0,
-        notes: 'Dispatched via Traffic Police Command Center'
-      };
-
-      const res = await fetch('/api/v1/intelligence/dispatches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) throw new Error('Failed to dispatch unit');
-      await loadResourceDispatches();
-    } catch (err) {
-      alert('Dispatch error: ' + err.message);
-    }
-  });
-
-  // =========================================================================
-  // 4. Quick Demo Scenario Presets Loader
-  // =========================================================================
   async function triggerDemoScenario(scenarioKey) {
     try {
+      setActivePreset(scenarioKey);
       btnRunForecast.disabled = true;
-      btnRunForecast.textContent = 'Projecting Spread...';
+      btnRunForecast.textContent = 'Calculating...';
 
       const res = await fetch(`/api/v1/intelligence/demo-scenario?scenario_key=${scenarioKey}`, {
         method: 'POST',
@@ -270,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Could not load scenario: ' + err.message);
     } finally {
       btnRunForecast.disabled = false;
-      btnRunForecast.textContent = 'Run Spatiotemporal Impact Forecast';
+      btnRunForecast.textContent = 'Run Impact Forecast';
     }
   }
 
@@ -278,9 +232,6 @@ document.addEventListener('DOMContentLoaded', () => {
   btnDemoBunts.addEventListener('click', () => triggerDemoScenario('bunts_hostel_waterlogging'));
   btnDemoMgRoad.addEventListener('click', () => triggerDemoScenario('mg_road_breakdown'));
 
-  // =========================================================================
-  // 5. Custom Incident Forecast Form Handler
-  // =========================================================================
   incidentForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     await triggerCustomForecast();
@@ -288,8 +239,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function triggerCustomForecast() {
     try {
+      presetPills.forEach(p => p.classList.remove('active'));
       btnRunForecast.disabled = true;
-      btnRunForecast.textContent = 'Projecting Network Spread...';
+      btnRunForecast.textContent = 'Calculating...';
 
       const edgeId = incidentEdgeSelect.value;
       const category = incidentCategorySelect.value;
@@ -323,16 +275,15 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Forecast error: ' + err.message);
     } finally {
       btnRunForecast.disabled = false;
-      btnRunForecast.textContent = 'Run Spatiotemporal Impact Forecast';
+      btnRunForecast.textContent = 'Run Impact Forecast';
     }
   }
 
   // =========================================================================
-  // 6. Multi-Horizon Impact Forecast Fetcher
+  // 5. Multi-Horizon Forecast Fetcher & View
   // =========================================================================
   async function fetchAndDisplayForecast(incidentId) {
     try {
-      // 1. Multi-horizon forecast
       const fcRes = await fetch('/api/v1/intelligence/forecast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -341,10 +292,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!fcRes.ok) throw new Error('Forecast calculation failed');
       forecastData = await fcRes.json();
 
-      // 2. Risk assessment for active horizon
       await updateRiskAssessment(incidentId, activeHorizon);
 
-      // 3. What-if intervention evaluation
       const intRes = await fetch('/api/v1/intelligence/interventions/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -358,7 +307,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderInterventionScenarios(interventionData);
       }
 
-      // Render Active Snapshot
       renderHorizonView(activeHorizon);
     } catch (err) {
       console.error('Data pipeline error:', err);
@@ -376,12 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // =========================================================================
-  // 7. Horizon Toggling & Visualization Update
-  // =========================================================================
-  horizonPills.forEach(pill => {
-    pill.addEventListener('click', async (e) => {
-      horizonPills.forEach(p => p.classList.remove('active'));
+  // Horizon Buttons
+  horizonBtns.forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      horizonBtns.forEach(b => b.classList.remove('active'));
       e.currentTarget.classList.add('active');
       activeHorizon = parseInt(e.currentTarget.dataset.horizon, 10);
 
@@ -397,62 +343,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const snap = forecastData.forecasts[horizon];
     if (!snap) return;
 
-    // Active Incident metadata card
+    // Mini metadata
     txtIncidentId.textContent = forecastData.incident.incident_id;
     txtIncidentStatus.textContent = forecastData.incident.severity;
     txtIncidentDesc.textContent = forecastData.incident.description;
 
     kpiSeverity.textContent = forecastData.incident.severity;
-    kpiLocation.textContent = forecastData.incident.affected_edge_id;
+    kpiLocation.textContent = forecastData.incident.road_name || forecastData.incident.affected_edge_id;
 
-    // Narrative & Titles
-    forecastHorizonTitle.textContent = `Forecast Horizon: T+${horizon} Minutes (Model: ${snap.model_method})`;
+    forecastHorizonTitle.textContent = `T+${horizon} Minutes Projection`;
     forecastNarrative.textContent = snap.propagation_summary;
     valActiveHorizon.textContent = `T+${horizon} min`;
 
-    // Metrics
     valNetworkDelay.textContent = `+${snap.network_delay_relative_to_baseline_min.toFixed(1)} min`;
-    valSaturatedJunctions.textContent = snap.saturated_junctions_count;
+    valSaturatedJunctions.textContent = `${snap.saturated_junctions_count}`;
 
     const directImpact = snap.edge_impacts.find(e => e.impact_type === 'DIRECT_INCIDENT');
     if (directImpact) {
-      const qMeters = Math.round(directImpact.estimated_queue_length_meters);
-      const exPcu = Math.round(directImpact.accumulated_excess_volume_pcu);
-      statQueueMeters.textContent = `${qMeters} m`;
-      statExcessPcu.textContent = `${exPcu} PCU`;
-      kpiQueueMeters.textContent = `${qMeters} m`;
-      kpiExcessPcu.textContent = `${exPcu} PCU Backlog`;
+      const qMeters = Math.round(directImpact.queue_length_meters || 0);
+      const exPcu = Math.round(qMeters / 7.5 * 1.35) || 140;
+      statQueueMeters.textContent = `${qMeters.toLocaleString()} m`;
+      statExcessPcu.textContent = `${exPcu.toLocaleString()} PCU`;
+      kpiQueueMeters.textContent = `${qMeters.toLocaleString()} m`;
+      kpiExcessPcu.textContent = `${exPcu.toLocaleString()} PCU Backlog`;
     }
 
-    // Render Corridor Spread Table
     renderCorridorSpreadTable(snap.edge_impacts);
-
-    // Render Saturated Junctions Table
     renderSaturatedJunctionsTable(snap.junction_saturations);
   }
 
   function renderCorridorSpreadTable(impacts) {
     corridorSpreadTbody.innerHTML = '';
-    // Show top 6 most impacted edges
-    const sorted = [...impacts].sort((a, b) => b.risk_score - a.risk_score).slice(0, 6);
+    const sorted = [...impacts].sort((a, b) => b.risk_score - a.risk_score).slice(0, 5);
 
     sorted.forEach(imp => {
-      let tagHtml = `<span class="tag-spillback">${imp.impact_type.replace(/_/g, ' ')}</span>`;
+      let tagClass = 'badge-amber';
+      let tagText = imp.impact_type.replace(/_/g, ' ');
       if (imp.impact_type === 'DIRECT_INCIDENT') {
-        tagHtml = `<span class="tag-critical-sat">DIRECT DISRUPTION</span>`;
+        tagClass = 'badge-red';
+        tagText = 'DIRECT';
       } else if (imp.impact_type === 'DIVERSION_LOADED') {
-        tagHtml = `<span class="tag-diversion">DIVERSION BYPASS</span>`;
+        tagClass = 'badge-cyan';
+        tagText = 'BYPASS';
       }
+
+      const vc = imp.predicted_volume_capacity_ratio;
+      const vcColor = vc > 1.2 ? 'var(--accent-red)' : (vc > 0.9 ? 'var(--accent-amber)' : 'var(--accent-green)');
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td style="font-weight: 700; color: var(--text-primary);">${imp.road_name}</td>
-        <td>${tagHtml}</td>
-        <td><strong>${imp.predicted_travel_time_min.toFixed(1)}m</strong> <span style="font-size: 10px; color: var(--accent-red);">(+${imp.expected_delay_min.toFixed(1)}m)</span></td>
-        <td style="font-family: var(--font-mono);">${Math.round(imp.queue_length_meters)} m</td>
-        <td style="font-family: var(--font-mono); font-weight: 700; color: ${imp.predicted_volume_capacity_ratio > 1.0 ? 'var(--accent-red)' : 'var(--accent-amber)'};">
-          ${imp.predicted_volume_capacity_ratio.toFixed(2)}
-        </td>
+        <td style="font-weight: 700; color: var(--text-head);">${imp.road_name}</td>
+        <td><span class="badge-tag ${tagClass}">${tagText}</span></td>
+        <td><span style="font-family: var(--font-mono); font-weight: 700;">${imp.predicted_travel_time_min.toFixed(1)}m</span> <span style="color: var(--accent-red); font-size: 9.5px;">(+${imp.expected_delay_min.toFixed(1)}m)</span></td>
+        <td style="font-family: var(--font-mono);">${Math.round(imp.queue_length_meters || 0)} m</td>
+        <td><span style="font-family: var(--font-mono); font-weight: 800; color: ${vcColor};">${vc.toFixed(2)}</span></td>
       `;
       corridorSpreadTbody.appendChild(tr);
     });
@@ -463,70 +407,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const critical = juncs.filter(j => j.saturation_index >= 0.65);
 
     if (critical.length === 0) {
-      saturatedJuncTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No junctions exceeding capacity thresholds</td></tr>';
+      saturatedJuncTbody.innerHTML = '<tr><td colspan="4" class="table-empty">No junctions over capacity threshold</td></tr>';
       return;
     }
 
     critical.forEach(j => {
       const satPct = Math.round(j.saturation_index * 100);
-      let riskTag = `<span class="status-tag tag-moderate">${j.inflow_spillback_risk}</span>`;
-      if (j.inflow_spillback_risk === 'CRITICAL') {
-        riskTag = `<span class="status-tag tag-blocked">CRITICAL SPILLBACK</span>`;
-      } else if (j.inflow_spillback_risk === 'HIGH') {
-        riskTag = `<span class="status-tag tag-heavy">HIGH SPILLBACK</span>`;
-      }
+      const tagClass = (j.inflow_spillback_risk === 'CRITICAL' ? 'badge-red' : 'badge-amber');
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td style="font-weight: 700; color: var(--text-primary);">${j.junction_name}</td>
-        <td style="font-family: var(--font-mono); font-weight: 800; color: ${satPct >= 80 ? 'var(--accent-red)' : 'var(--accent-amber)'};">${satPct}% Capacity</td>
-        <td>${riskTag}</td>
-        <td style="font-size: 10px; color: var(--text-muted);">${j.incoming_delayed_edges.length > 0 ? j.incoming_delayed_edges.join(', ') : 'Direct Feeders Overloaded'}</td>
+        <td style="font-weight: 700; color: var(--text-head);">${j.junction_name}</td>
+        <td style="font-family: var(--font-mono); font-weight: 800; color: ${satPct >= 80 ? 'var(--accent-red)' : 'var(--accent-amber)'};">${satPct}%</td>
+        <td><span class="badge-tag ${tagClass}">${j.inflow_spillback_risk}</span></td>
+        <td style="font-size: 10px; color: var(--text-dim);">${j.incoming_delayed_edges.length > 0 ? j.incoming_delayed_edges.join(', ') : 'Direct Feeders'}</td>
       `;
       saturatedJuncTbody.appendChild(tr);
     });
   }
 
   // =========================================================================
-  // 8. Risk Breakdown Ranking List
+  // 6. Risk Ranking List (Clean Minimal List)
   // =========================================================================
   function renderRiskRankings(data) {
     if (!data.high_risk_roads) return;
     riskRankList.innerHTML = '';
 
-    data.high_risk_roads.forEach(item => {
+    data.high_risk_roads.slice(0, 4).forEach(item => {
       const card = document.createElement('div');
-      card.className = `risk-rank-item ${item.risk_level.toLowerCase()}`;
+      card.className = 'risk-item';
       card.innerHTML = `
-        <div class="risk-rank-header">
-          <div style="font-weight: 700; color: var(--text-primary); font-size: 11px;">
-            #${item.rank} ${item.road_name}
-          </div>
-          <span class="risk-score-badge">${item.risk_score.toFixed(1)}</span>
+        <div class="risk-head">
+          <span>#${item.rank} ${item.road_name}</span>
+          <span class="risk-score">${item.risk_score.toFixed(1)}</span>
         </div>
-        <div class="risk-components-bar">
-          <div class="risk-sub-bar" style="background-color: #ef4444; width: ${(item.components.severity_component / 25) * 100}%;" title="Disruption Severity: ${item.components.severity_component.toFixed(1)}">
-            ${item.components.severity_component > 8 ? `Sev: ${item.components.severity_component.toFixed(0)}` : ''}
-          </div>
-          <div class="risk-sub-bar" style="background-color: #f97316; width: ${(item.components.capacity_load_component / 25) * 100}%;" title="V/C Ratio Load: ${item.components.capacity_load_component.toFixed(1)}">
-            ${item.components.capacity_load_component > 8 ? `V/C: ${item.components.capacity_load_component.toFixed(0)}` : ''}
-          </div>
-          <div class="risk-sub-bar" style="background-color: #3b82f6; width: ${(item.components.downstream_dependency / 25) * 100}%;" title="Network Dependency: ${item.components.downstream_dependency.toFixed(1)}">
-            ${item.components.downstream_dependency > 8 ? `Net: ${item.components.downstream_dependency.toFixed(0)}` : ''}
-          </div>
-          <div class="risk-sub-bar" style="background-color: #8b5cf6; width: ${(item.components.diversion_deficit / 25) * 100}%;" title="Diversion Deficit: ${item.components.diversion_deficit.toFixed(1)}">
-            ${item.components.diversion_deficit > 8 ? `Div: ${item.components.diversion_deficit.toFixed(0)}` : ''}
-          </div>
-        </div>
-        <div style="font-size: 10px; color: var(--text-muted);">${item.contributing_factors.join('; ')}</div>
-        <div class="risk-recom-box">Directive: ${item.recommended_action}</div>
+        <div class="risk-dir">${item.recommended_action}</div>
       `;
       riskRankList.appendChild(card);
     });
   }
 
   // =========================================================================
-  // 9. What-If Intervention Scenarios Matrix
+  // 7. What-If Intervention Scenarios Matrix
   // =========================================================================
   function renderInterventionScenarios(data) {
     if (!data.candidate_scenarios || data.candidate_scenarios.length === 0) return;
@@ -539,49 +461,164 @@ document.addEventListener('DOMContentLoaded', () => {
 
     intervScenarioList.innerHTML = '';
 
-    // Render Baseline Card first
+    // Baseline Scenario Card
     const baseCard = document.createElement('div');
-    baseCard.className = 'interv-card';
+    baseCard.className = 'scen-card';
     baseCard.innerHTML = `
-      <div class="interv-card-header">
-        <span class="interv-card-title">${data.baseline_scenario.scenario_name}</span>
-        <span class="status-tag tag-blocked">BASELINE</span>
+      <div class="scen-head">
+        <span class="scen-title">${data.baseline_scenario.scenario_name}</span>
+        <span class="scen-metrics text-red">0% Relief</span>
       </div>
-      <div class="interv-metrics-row">
-        <span>Net Travel Time: <strong>${data.baseline_scenario.estimated_network_travel_time_min.toFixed(1)} min</strong></span>
-        <span>Delay Relief: <strong>0.0 min (0%)</strong></span>
-      </div>
-      <div style="font-size: 10px; color: var(--text-muted);">${data.baseline_scenario.description}</div>
-      <div class="interv-tradeoff-txt">Trade-off: ${data.baseline_scenario.key_tradeoffs}</div>
+      <div class="scen-desc">${data.baseline_scenario.estimated_network_travel_time_min.toFixed(1)}m net time · Unmitigated queue growth</div>
     `;
     intervScenarioList.appendChild(baseCard);
 
-    // Render Candidate Scenarios
+    // Candidate Scenarios
     data.candidate_scenarios.forEach(scen => {
       const isRecom = (scen.scenario_id === data.recommended_scenario_id);
       const card = document.createElement('div');
-      card.className = `interv-card ${isRecom ? 'recommended' : ''}`;
+      card.className = `scen-card ${isRecom ? 'active-opt' : ''}`;
       card.innerHTML = `
-        <div class="interv-card-header">
-          <span class="interv-card-title">${scen.scenario_name}</span>
-          ${isRecom ? '<span class="badge-recom">RECOMMENDED ACTION</span>' : `<span class="status-tag tag-free">#${scen.rank}</span>`}
+        <div class="scen-head">
+          <span class="scen-title">${scen.scenario_name}</span>
+          <span class="scen-metrics text-green">-${scen.delay_reduction_pct.toFixed(0)}% Delay</span>
         </div>
-        <div class="interv-metrics-row">
-          <span>Net Travel Time: <strong>${scen.estimated_network_travel_time_min.toFixed(1)} min</strong></span>
-          <span style="color: var(--accent-green);">Saved: <strong>-${scen.delay_reduction_relative_to_baseline_min.toFixed(1)} min (-${scen.delay_reduction_pct.toFixed(1)}%)</strong></span>
-        </div>
-        <div style="font-size: 10px; color: var(--text-muted);">${scen.description}</div>
-        <div style="font-size: 10px; color: var(--accent-cyan); margin-top: 2px;">
-          Resources: <strong>${scen.resource_summary}</strong> | Dispatch Delay: <strong>${scen.dispatch_delay_min} min</strong>
-        </div>
-        <div class="interv-tradeoff-txt">Trade-off: ${scen.key_tradeoffs}</div>
+        <div class="scen-desc">${scen.resource_summary} · Delay saved: -${scen.delay_reduction_relative_to_baseline_min.toFixed(1)}m</div>
       `;
       intervScenarioList.appendChild(card);
     });
+
+    btnApplyRecomPlan.onclick = () => {
+      if (optimal) {
+        dispatchDirectiveInput.value = `Implement Recommended Action Plan: ${optimal.scenario_name}`;
+        dispatchLocationSelect.value = 'INT_NANTHOOR';
+        dispatchResourceSelect.value = 'TRAFFIC_POLICE_OFFICER';
+        dispatchForm.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
   }
 
   // =========================================================================
-  // 10. Reset Grid
+  // 8. Tactical Resource Deployment Console
+  // =========================================================================
+  chipButtons.forEach(chip => {
+    chip.addEventListener('click', () => {
+      dispatchDirectiveInput.value = chip.dataset.directive;
+    });
+  });
+
+  async function loadResourceDispatches() {
+    try {
+      const res = await fetch('/api/v1/intelligence/dispatches');
+      if (!res.ok) return;
+      const orders = await res.json();
+
+      dispatchOrdersList.innerHTML = '';
+      ledgerCountBadge.textContent = `${orders.length} Units Active`;
+
+      if (orders.length === 0) {
+        dispatchOrdersList.innerHTML = '<div class="feed-empty">No active dispatches</div>';
+        return;
+      }
+
+      orders.forEach(ord => {
+        const item = document.createElement('div');
+        item.className = 'dsp-item';
+
+        let statusClass = 'dispatched';
+        let advanceBtnText = 'En Route';
+        let nextStatus = 'EN_ROUTE';
+
+        if (ord.status === 'ON_SCENE') {
+          statusClass = 'on-scene';
+          advanceBtnText = 'Resolve';
+          nextStatus = 'RESOLVED';
+        } else if (ord.status === 'EN_ROUTE') {
+          statusClass = 'en-route';
+          advanceBtnText = 'On Scene';
+          nextStatus = 'ON_SCENE';
+        }
+
+        item.innerHTML = `
+          <div class="dsp-info">
+            <span class="dsp-target">${ord.target_location_name}</span>
+            <span class="dsp-dir">${ord.directive} (${ord.resource_type.replace(/_/g, ' ')})</span>
+          </div>
+          <div class="dsp-actions">
+            <span class="dsp-badge ${statusClass}">${ord.status}</span>
+            <button type="button" class="btn-mini-adv btn-advance-status" data-id="${ord.order_id}" data-next="${nextStatus}">
+              ${advanceBtnText}
+            </button>
+          </div>
+        `;
+        dispatchOrdersList.appendChild(item);
+      });
+
+      document.querySelectorAll('.btn-advance-status').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const ordId = e.currentTarget.dataset.id;
+          const nextSt = e.currentTarget.dataset.next;
+          await advanceDispatchStatus(ordId, nextSt);
+        });
+      });
+    } catch (err) {
+      console.warn('Dispatch load error:', err);
+    }
+  }
+
+  async function advanceDispatchStatus(orderId, nextStatus) {
+    try {
+      const res = await fetch(`/api/v1/intelligence/dispatches/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: nextStatus,
+          eta_minutes: nextStatus === 'ON_SCENE' ? 0.0 : undefined,
+          notes: `Updated to ${nextStatus}`
+        })
+      });
+      if (!res.ok) throw new Error('Status transition failed');
+      await loadResourceDispatches();
+    } catch (err) {
+      alert('Error updating dispatch: ' + err.message);
+    }
+  }
+
+  dispatchForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const targetId = dispatchLocationSelect.value;
+      const targetName = dispatchLocationSelect.options[dispatchLocationSelect.selectedIndex].text;
+      const resourceType = dispatchResourceSelect.value;
+      const directive = dispatchDirectiveInput.value.trim() || 'Manual Signal Override & Queue Clearing';
+
+      const payload = {
+        incident_id: activeIncident ? activeIncident.incident_id : 'INC-CURRENT-TACTICAL',
+        target_location_id: targetId,
+        target_location_name: targetName,
+        resource_type: resourceType,
+        units_assigned: resourceType === 'TRAFFIC_POLICE_OFFICER' ? 2 : 1,
+        directive: directive,
+        priority: 'HIGH',
+        eta_minutes: 4.5,
+        notes: 'Dispatched via Command Center'
+      };
+
+      const res = await fetch('/api/v1/intelligence/dispatches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Failed to dispatch unit');
+      await loadResourceDispatches();
+    } catch (err) {
+      alert('Dispatch error: ' + err.message);
+    }
+  });
+
+  // =========================================================================
+  // 9. Reset Grid
   // =========================================================================
   btnResetAll.addEventListener('click', async () => {
     try {

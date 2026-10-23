@@ -3,161 +3,128 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Traffic Police & Control Room Command Center - Traffic Diffusion</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <title>Traffic Command Center - Mangaluru ITMS</title>
+  <link rel="stylesheet" href="/css/style.css?v=4.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="app-layout">
-    <!-- Top Command & Control Header Bar -->
+
+    <!-- Clean, Streamlined Top Navigation -->
     <header class="top-nav">
       <div class="brand-section">
-        <div class="brand-badge" style="background: linear-gradient(135deg, #1d4ed8, #0284c7);">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <div class="brand-badge">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           </svg>
         </div>
-        <div>
-          <h1 class="brand-title">MANGALURU TRAFFIC POLICE — COMMAND & CONTROL ROOM</h1>
-          <p class="brand-subtitle">ITMS Predictive Incident Intelligence, Congestion Spread Forecasting & Tactical Resource Deployment</p>
+        <div class="brand-text">
+          <h1 class="brand-title">TRAFFIC COMMAND</h1>
+          <span class="brand-meta">Mangaluru Metropolitan Sector</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="live-pill">
+          <span class="pulse-dot"></span>
+          <span>LIVE</span>
+          <span class="live-time" id="liveClock">--:--:--</span>
         </div>
       </div>
 
       <div class="header-actions">
-        <div class="status-pill status-active">
-          <span class="status-dot"></span>
-          <span>COMMAND CENTER ACTIVE</span>
-        </div>
-        <span class="badge-simulated">17 JUNCTIONS · 38 CORRIDORS</span>
-        <a href="/login" class="btn btn-outline-sm" style="text-decoration: none; border-color: rgba(59, 130, 246, 0.4); color: #60a5fa;" target="_blank">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+        <a href="/public" class="nav-link" target="_blank" rel="noopener noreferrer">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
             <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
           </svg>
-          Public Citizen App
+          Citizen App
         </a>
-        <a href="/operations" class="btn btn-outline-sm" style="text-decoration: none;">CCTV Console</a>
-        <a href="/driver" class="btn btn-outline-sm" style="text-decoration: none;">Field EMS Navigator</a>
-        <button id="btnResetAll" class="btn btn-outline-sm">Reset Grid</button>
+        <a href="/driver" class="nav-link" target="_blank">EMS</a>
+        <button id="btnResetAll" class="btn-ghost" title="Reset network state">Reset</button>
       </div>
     </header>
 
-    <!-- Operational Transparency Banner -->
-    <div class="transparency-bar">
-      <span><strong>Operations Console:</strong> Dedicated tactical dashboard for Traffic Police & Control-Room Operators. Predict spatiotemporal queue spread (T+15m, T+30m, T+60m), prioritize saturated junctions, compare intervention scenarios, and deploy field units.</span>
-      <span class="badge-simulated">SECTOR: MANGALURU METROPOLITAN</span>
-    </div>
+    <!-- Main Workspace -->
+    <main class="dashboard-body">
 
-    <!-- Main Pure Dashboard Scrollable Container -->
-    <div class="dashboard-container">
-
-      <!-- Executive KPI Telemetry Row -->
-      <section class="kpi-row">
-        <div class="kpi-box">
-          <span class="kpi-label">Active Disruption</span>
-          <span class="kpi-value" id="kpiSeverity" style="color: var(--accent-red); font-size: 15px;">CRITICAL</span>
-          <span class="kpi-subtext" id="kpiLocation">Circuit House - Nanthoor</span>
+      <!-- Compact 5-Metric Telemetry Bar -->
+      <section class="telemetry-bar" aria-label="Key Indicators">
+        <div class="metric-card">
+          <span class="metric-label">Active Disruption</span>
+          <div class="metric-val text-red" id="kpiSeverity">CRITICAL</div>
+          <span class="metric-sub" id="kpiLocation">Circuit House - Nanthoor</span>
         </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Active Forecast Horizon</span>
-          <span class="kpi-value highlight-cyan" id="valActiveHorizon">T+30 min</span>
-          <span class="kpi-subtext">Multi-Step Model</span>
+        <div class="metric-card">
+          <span class="metric-label">Forecast Horizon</span>
+          <div class="metric-val text-cyan" id="valActiveHorizon">T+30 min</div>
+          <span class="metric-sub">Shockwave Model</span>
         </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Total Network Delay</span>
-          <span class="kpi-value highlight-red" id="valNetworkDelay">+0.0 min</span>
-          <span class="kpi-subtext">Delay Relative to Baseline</span>
+        <div class="metric-card">
+          <span class="metric-label">Network Delay</span>
+          <div class="metric-val text-amber" id="valNetworkDelay">+21.6 min</div>
+          <span class="metric-sub">vs. Normal Flow</span>
         </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Peak Queue Buildup</span>
-          <span class="kpi-value highlight-amber" id="kpiQueueMeters">0 m</span>
-          <span class="kpi-subtext" id="kpiExcessPcu">0 PCU Backlog</span>
+        <div class="metric-card">
+          <span class="metric-label">Peak Queue</span>
+          <div class="metric-val text-amber" id="kpiQueueMeters">1,300 m</div>
+          <span class="metric-sub" id="kpiExcessPcu">234 PCU Backlog</span>
         </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Critical Saturated Junctions</span>
-          <span class="kpi-value highlight-amber" id="valSaturatedJunctions">0</span>
-          <span class="kpi-subtext">&ge;70% Capacity Overload</span>
+        <div class="metric-card">
+          <span class="metric-label">Critical Junctions</span>
+          <div class="metric-val text-amber" id="valSaturatedJunctions">1</div>
+          <span class="metric-sub">&ge;70% Capacity</span>
         </div>
-        <div class="kpi-box">
-          <span class="kpi-label">Recommended Action Plan</span>
-          <span class="kpi-value highlight-green" id="valOptimalMitigation" style="font-size: 14px;">Scenario D (-74%)</span>
-          <span class="kpi-subtext">Coordinated Protocol</span>
+        <div class="metric-card">
+          <span class="metric-label">Recommended Plan</span>
+          <div class="metric-val text-green" id="valOptimalMitigation">Scenario D (-74%)</div>
+          <span class="metric-sub">Optimal Relief</span>
         </div>
       </section>
 
-      <!-- Main Operational 3-Column Grid -->
-      <div class="dashboard-main-grid">
+      <!-- 3-Column Primary Operational Grid -->
+      <div class="dashboard-grid">
 
-        <!-- ========================================================================= -->
-        <!-- COLUMN 1: LIVE INGESTION & TACTICAL POLICE DEPLOYMENT                    -->
-        <!-- ========================================================================= -->
-        <div class="dashboard-col">
+        <!-- =================================================================== -->
+        <!-- COLUMN 1: CONTROLS & CITIZEN REPORTS (Width: 320px)                 -->
+        <!-- =================================================================== -->
+        <div class="grid-col col-left">
 
-          <!-- 1. Citizen Reports Ingestion Queue (From Friend's Public Map App) -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Citizen Incident Reports Queue</h2>
-              <span class="badge badge-subtle" id="badgeCitizenCount">3 Inbound</span>
+          <!-- 1. Disruption Controller -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Disruption Event</span>
             </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Live reports ingested from public citizen mobile navigation apps. Verify to launch predictive spread forecast.
-            </p>
-            <div id="citizenReportsList" class="citizen-reports-list">
-              <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 10px;">
-                Loading incoming citizen reports...
+
+            <!-- Clean Presets -->
+            <div class="preset-row">
+              <button type="button" id="btnDemoNanthoor" class="preset-pill active" data-preset="nanthoor_freight_rollover">Nanthoor</button>
+              <button type="button" id="btnDemoBunts" class="preset-pill" data-preset="bunts_hostel_waterlogging">Bunts Flood</button>
+              <button type="button" id="btnDemoMgRoad" class="preset-pill" data-preset="mg_road_breakdown">MG Road</button>
+            </div>
+
+            <form id="incidentForm" class="clean-form">
+              <div class="form-row">
+                <label class="clean-label" for="incidentEdgeSelect">Corridor</label>
+                <select id="incidentEdgeSelect" class="clean-input"></select>
               </div>
-            </div>
-          </section>
 
-          <!-- 2. Active Disruption & Incident Parameters -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Disruption Event Controller</h2>
-              <span class="badge badge-accent">Input Parameters</span>
-            </div>
-
-            <div style="margin-bottom: 8px;">
-              <label class="form-label">Quick Scenario Presets (Live Tactical Demos)</label>
-              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <button type="button" id="btnDemoNanthoor" class="btn btn-sm btn-secondary" style="flex: 1;">
-                  Nanthoor Rollover
-                </button>
-                <button type="button" id="btnDemoBunts" class="btn btn-sm btn-secondary" style="flex: 1;">
-                  Bunts Flood
-                </button>
-                <button type="button" id="btnDemoMgRoad" class="btn btn-sm btn-secondary" style="flex: 1;">
-                  MG Road Bus
-                </button>
-              </div>
-            </div>
-
-            <form id="incidentForm" class="control-group">
-              <label class="form-label" for="incidentEdgeSelect">Disrupted Road Corridor</label>
-              <select id="incidentEdgeSelect" class="form-select">
-                <option value="corridor_cctv_07">Circuit House - Nanthoor Road (corridor_cctv_07)</option>
-                <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
-                <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
-                <option value="corridor_cctv_11">Bejai Green Bypass Expressway (corridor_cctv_11)</option>
-                <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial (corridor_cctv_13)</option>
-                <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
-              </select>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div class="form-row-2">
                 <div>
-                  <label class="form-label" for="incidentCategorySelect">Category</label>
-                  <select id="incidentCategorySelect" class="form-select">
+                  <label class="clean-label" for="incidentCategorySelect">Category</label>
+                  <select id="incidentCategorySelect" class="clean-input">
                     <option value="COLLISION">Collision</option>
-                    <option value="ROAD_BLOCKAGE">Road Blockage</option>
-                    <option value="VEHICLE_BREAKDOWN">Vehicle Breakdown</option>
+                    <option value="ROAD_BLOCKAGE">Blockage</option>
+                    <option value="VEHICLE_BREAKDOWN">Breakdown</option>
+                    <option value="WEATHER_WATERLOGGING">Flooding</option>
                     <option value="ROADWORKS">Roadworks</option>
-                    <option value="WEATHER_WATERLOGGING">Weather Waterlogging</option>
                   </select>
                 </div>
                 <div>
-                  <label class="form-label" for="incidentSeveritySelect">Severity</label>
-                  <select id="incidentSeveritySelect" class="form-select">
+                  <label class="clean-label" for="incidentSeveritySelect">Severity</label>
+                  <select id="incidentSeveritySelect" class="clean-input">
                     <option value="CRITICAL">Critical</option>
                     <option value="HIGH" selected>High</option>
                     <option value="MODERATE">Moderate</option>
@@ -166,246 +133,214 @@
                 </div>
               </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div class="form-row-2">
                 <div>
-                  <label class="form-label" for="capacityReductionInput">Capacity Cut (%)</label>
-                  <input type="number" id="capacityReductionInput" class="form-select" min="10" max="100" value="80" step="5">
+                  <label class="clean-label" for="capacityReductionInput">Cap Cut (%)</label>
+                  <input type="number" id="capacityReductionInput" class="clean-input" min="10" max="100" value="85" step="5">
                 </div>
                 <div>
-                  <label class="form-label" for="durationInput">Est Duration (min)</label>
-                  <input type="number" id="durationInput" class="form-select" min="10" max="180" value="60" step="5">
+                  <label class="clean-label" for="durationInput">Duration (m)</label>
+                  <input type="number" id="durationInput" class="clean-input" min="10" max="180" value="60" step="5">
                 </div>
               </div>
 
-              <button type="submit" id="btnRunForecast" class="btn btn-primary btn-block" style="margin-top: 6px;">
-                Run Spatiotemporal Impact Forecast
+              <button type="submit" id="btnRunForecast" class="btn-action">
+                Run Impact Forecast
               </button>
             </form>
 
-            <div id="activeIncidentBox" class="cv-results-box" style="margin-top: 8px;">
-              <div class="results-meta">
-                <span class="mono-label">INCIDENT ID:</span>
-                <span id="txtIncidentId" class="mono-val">-</span>
-                <span class="mono-label">STATUS:</span>
-                <span id="txtIncidentStatus" class="mono-val" style="color: var(--accent-red);">ACTIVE</span>
-              </div>
-              <div id="txtIncidentDesc" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
-                Loading scenario parameters...
-              </div>
+            <div class="mini-meta" id="activeIncidentBox">
+              <span class="meta-tag" id="txtIncidentStatus">CRITICAL</span>
+              <span class="meta-desc" id="txtIncidentDesc">Loading scenario...</span>
+              <span class="meta-id" id="txtIncidentId">-</span>
             </div>
-          </section>
+          </div>
 
-          <!-- 3. Traffic Police & Resource Deployment Console -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Police & Resource Deployment</h2>
-              <span class="badge badge-accent">Tactical Dispatch</span>
+          <!-- 2. Citizen Inbound Reports -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Citizen Reports</span>
+              <span class="count-pill" id="badgeCitizenCount">3</span>
             </div>
-
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Deploy traffic police officers, recovery cranes, or patrol cars to specific junctions and bottlenecks.
-            </p>
-
-            <form id="dispatchForm" style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
-              <div style="font-size: 11px; font-weight: 700; color: var(--accent-blue); margin-bottom: 6px;">
-                Create Tactical Field Dispatch Order
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px;">
-                <div>
-                  <label class="form-label" for="dispatchLocationSelect">Target Junction / Road</label>
-                  <select id="dispatchLocationSelect" class="form-select">
-                    <option value="INT_NANTHOOR">Nanthoor Junction (NH-66 / NH-73)</option>
-                    <option value="INT_BUNTS_HOSTEL">Bunts Hostel Circle</option>
-                    <option value="corridor_cctv_07">Circuit House - Nanthoor Highway</option>
-                    <option value="INT_KADRI_FIRE">Kadri Junction Feeder</option>
-                    <option value="INT_PUMPWELL">Pumpwell (Mahaveer) Circle</option>
-                    <option value="INT_LALBAGH">Lalbagh Circle (MG Road)</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" for="dispatchResourceSelect">Resource Unit Type</label>
-                  <select id="dispatchResourceSelect" class="form-select">
-                    <option value="TRAFFIC_POLICE_OFFICER">Traffic Police Officers (2 Units)</option>
-                    <option value="HEAVY_TOW_UNIT">Heavy Tow Recovery Crane</option>
-                    <option value="PATROL_INTERCEPTOR">Patrol Interceptor Car</option>
-                    <option value="RAPID_RESPONSE_TEAM">Rapid Response Team (QRT)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style="margin-bottom: 6px;">
-                <label class="form-label" for="dispatchDirectiveInput">Operational Directive</label>
-                <input type="text" id="dispatchDirectiveInput" class="form-select" value="Manual Signal Override & Queue Flushing">
-              </div>
-
-              <button type="submit" class="btn btn-primary btn-block" style="font-size: 11px; padding: 6px 12px;">
-                Dispatch Resource Unit to Field
-              </button>
-            </form>
-
-            <label class="form-label">Active Field Dispatches Ledger</label>
-            <div id="dispatchOrdersList" class="dispatch-list">
-              <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px;">
-                Loading active dispatches...
-              </div>
+            <div id="citizenReportsList" class="compact-feed">
+              <div class="feed-empty">Loading citizen reports...</div>
             </div>
-          </section>
+          </div>
 
         </div>
 
-        <!-- ========================================================================= -->
-        <!-- COLUMN 2: SPATIOTEMPORAL SPREAD FORECAST & SATURATED JUNCTIONS           -->
-        <!-- ========================================================================= -->
-        <div class="dashboard-col">
+        <!-- =================================================================== -->
+        <!-- COLUMN 2: CONGESTION SPREAD & NETWORK TABLES (1.35fr)                -->
+        <!-- =================================================================== -->
+        <div class="grid-col col-center">
 
-          <!-- 1. Congestion Spread Forecast (15m, 30m, 60m) -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Congestion Spread Forecast Engine</h2>
-              <span class="badge badge-subtle">Multi-Horizon</span>
-            </div>
-
-            <div class="horizon-btn-group">
-              <button type="button" class="horizon-pill" data-horizon="15">T+15m Forecast</button>
-              <button type="button" class="horizon-pill active" data-horizon="30">T+30m Forecast</button>
-              <button type="button" class="horizon-pill" data-horizon="60">T+60m Forecast</button>
-            </div>
-
-            <div id="forecastSummaryBox" style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-top: 8px;">
-              <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;" id="forecastHorizonTitle">
-                Forecast Horizon: T+30 Minutes
-              </div>
-              <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" id="forecastNarrative">
-                Simulating queue spillback, downstream bottlenecks, and diversion load...
+          <!-- Forecast Engine -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Congestion Spread</span>
+              <div class="horizon-switch">
+                <button type="button" class="h-btn" data-horizon="15">T+15m</button>
+                <button type="button" class="h-btn active" data-horizon="30">T+30m</button>
+                <button type="button" class="h-btn" data-horizon="60">T+60m</button>
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
-              <div class="stat-pill">
-                <div class="stat-num" id="statQueueMeters">0 m</div>
-                <div class="stat-name">Queue Length Accumulation</div>
-              </div>
-              <div class="stat-pill">
-                <div class="stat-num" id="statExcessPcu">0 PCU</div>
-                <div class="stat-name">Volume Backlog (Excess PCU)</div>
-              </div>
+            <div class="forecast-banner">
+              <div class="banner-title" id="forecastHorizonTitle">T+30 Minutes Projection</div>
+              <p class="banner-body" id="forecastNarrative">Simulating spatiotemporal queue propagation and feeder spillback...</p>
             </div>
-          </section>
 
-          <!-- 2. Impacted Corridors Spread Breakdown Table -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Network Corridors Impact Progression</h2>
-              <span class="badge badge-subtle">Arterial Load</span>
+            <div class="stats-duo">
+              <div class="duo-box">
+                <span class="duo-val text-cyan" id="statQueueMeters">1,300 m</span>
+                <span class="duo-lbl">Queue Length</span>
+              </div>
+              <div class="duo-box">
+                <span class="duo-val text-cyan" id="statExcessPcu">234 PCU</span>
+                <span class="duo-lbl">Volume Backlog</span>
+              </div>
             </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Macroscopic spread breakdown across direct disruption, upstream feeder spillback, and diversion-loaded bypasses.
-            </p>
-            <div class="data-table-wrapper">
-              <table class="data-table" id="corridorSpreadTable">
+
+            <!-- Impacted Corridors Table -->
+            <div class="table-wrap">
+              <div class="sub-head">Impacted Corridors</div>
+              <table class="clean-table" id="corridorSpreadTable">
                 <thead>
                   <tr>
-                    <th>Corridor / Segment</th>
-                    <th>Impact Classification</th>
-                    <th>Pred Travel Time</th>
-                    <th>Queue Length</th>
-                    <th>V/C Ratio</th>
+                    <th>Corridor</th>
+                    <th>Type</th>
+                    <th>Travel Time</th>
+                    <th>Queue</th>
+                    <th>V/C Load</th>
                   </tr>
                 </thead>
                 <tbody id="corridorSpreadTbody">
-                  <tr>
-                    <td colspan="5" style="text-align: center; color: var(--text-muted);">Calculating corridor spread...</td>
-                  </tr>
+                  <tr><td colspan="5" class="table-empty">Calculating spread...</td></tr>
                 </tbody>
               </table>
             </div>
-          </section>
 
-          <!-- 3. Critical Saturated Junctions Table -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Critical Junction Saturation Monitor</h2>
-              <span class="badge badge-accent">Intersection Load</span>
-            </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Intersections exceeding nominal capacity threshold with severe queue spillback risk.
-            </p>
-            <div class="data-table-wrapper">
-              <table class="data-table" id="saturatedJuncTable">
+            <!-- Saturated Intersections Table -->
+            <div class="table-wrap" style="margin-top: 10px;">
+              <div class="sub-head">Saturated Intersections (&ge;70%)</div>
+              <table class="clean-table" id="saturatedJuncTable">
                 <thead>
                   <tr>
-                    <th>Intersection</th>
-                    <th>Saturation Index</th>
+                    <th>Junction</th>
+                    <th>Saturation</th>
                     <th>Spillback Risk</th>
-                    <th>Incoming Delayed Feeders</th>
+                    <th>Inflow Feeders</th>
                   </tr>
                 </thead>
                 <tbody id="saturatedJuncTbody">
-                  <tr>
-                    <td colspan="4" style="text-align: center; color: var(--text-muted);">Analyzing junction saturation...</td>
-                  </tr>
+                  <tr><td colspan="4" class="table-empty">Analyzing intersections...</td></tr>
                 </tbody>
               </table>
             </div>
-          </section>
+          </div>
 
         </div>
 
-        <!-- ========================================================================= -->
-        <!-- COLUMN 3: RISK PRIORITIZATION & WHAT-IF INTERVENTION MATRIX              -->
-        <!-- ========================================================================= -->
-        <div class="dashboard-col">
+        <!-- =================================================================== -->
+        <!-- COLUMN 3: WHAT-IF INTERVENTIONS & RISK RANKING (1.15fr)             -->
+        <!-- =================================================================== -->
+        <div class="grid-col col-right">
 
-          <!-- 1. Prioritized Risk Ranking & Critical Junctions -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">Prioritized Chokepoint Risk Ranking</h2>
-              <span class="badge badge-accent">Composite Score 0-100</span>
+          <!-- What-If Interventions Matrix -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Intervention Planning</span>
             </div>
 
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Decomposed into Severity (25), V/C Load (25), Centrality & Dependency (25), and Diversion Deficit (25).
-            </p>
-
-            <div id="riskRankList" class="risk-rank-list" style="max-height: 380px;">
-              <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 12px;">
-                Generating risk assessment...
+            <!-- Recommended Plan Feature Card -->
+            <div class="recom-card" id="recomPlanBanner">
+              <div class="recom-top">
+                <span class="recom-badge">RECOMMENDED</span>
+                <button type="button" id="btnApplyRecomPlan" class="btn-apply">Pre-fill Dispatch</button>
               </div>
-            </div>
-          </section>
-
-          <!-- 2. What-If Intervention Planner -->
-          <section class="card panel-section">
-            <div class="card-header">
-              <h2 class="card-title">What-If Intervention Optimization Matrix</h2>
-              <span class="badge badge-accent">Scenario Comparison</span>
+              <div class="recom-text" id="recomRationaleTxt">Evaluating response scenarios...</div>
             </div>
 
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-              Evaluates candidate operational responses under identical initial conditions to select the optimal mitigation strategy.
-            </p>
+            <!-- Scenarios List -->
+            <div id="intervScenarioList" class="scenarios-feed"></div>
+          </div>
 
-            <!-- Recommendation Banner -->
-            <div id="recomPlanBanner" style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-green); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <strong style="color: var(--accent-green); font-size: 12px;">RECOMMENDED ACTION PLAN</strong>
-                <span class="badge-recom">OPTIMAL</span>
-              </div>
-              <div id="recomRationaleTxt" style="font-size: 11px; color: var(--text-primary); line-height: 1.4;">
-                Evaluating candidate response scenarios...
-              </div>
+          <!-- Risk Prioritization List -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Chokepoint Risk Ranking</span>
             </div>
-
-            <div id="intervScenarioList" class="interv-scenario-list" style="max-height: 480px;"></div>
-          </section>
+            <div id="riskRankList" class="risk-feed">
+              <div class="feed-empty">Assessing risk...</div>
+            </div>
+          </div>
 
         </div>
 
       </div>
 
-    </div>
+      <!-- =================================================================== -->
+      <!-- FULL-WIDTH BOTTOM: TACTICAL FIELD DISPATCH CONSOLE                 -->
+      <!-- =================================================================== -->
+      <section class="card dispatch-section">
+        <div class="card-head">
+          <span class="card-title">Tactical Field Dispatch</span>
+          <span class="count-pill" id="ledgerCountBadge">3 Units Active</span>
+        </div>
+
+        <div class="dispatch-layout">
+          <!-- Dispatch Form -->
+          <form id="dispatchForm" class="dispatch-form">
+            <div class="dispatch-inputs">
+              <div class="form-row">
+                <label class="clean-label" for="dispatchLocationSelect">Target Location</label>
+                <select id="dispatchLocationSelect" class="clean-input">
+                  <option value="INT_NANTHOOR">Nanthoor Junction</option>
+                  <option value="INT_BUNTS_HOSTEL">Bunts Hostel Circle</option>
+                  <option value="corridor_cctv_07">Circuit House - Nanthoor</option>
+                  <option value="INT_PUMPWELL">Pumpwell Circle</option>
+                  <option value="INT_LALBAGH">Lalbagh Circle</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <label class="clean-label" for="dispatchResourceSelect">Unit Type</label>
+                <select id="dispatchResourceSelect" class="clean-input">
+                  <option value="TRAFFIC_POLICE_OFFICER">Traffic Police Officers</option>
+                  <option value="HEAVY_TOW_UNIT">Heavy Tow Crane</option>
+                  <option value="PATROL_INTERCEPTOR">Patrol Interceptor</option>
+                  <option value="RAPID_RESPONSE_TEAM">Rapid Response (QRT)</option>
+                </select>
+              </div>
+
+              <div class="form-row" style="flex: 1.5;">
+                <label class="clean-label" for="dispatchDirectiveInput">Directive</label>
+                <input type="text" id="dispatchDirectiveInput" class="clean-input" value="Manual Signal Override & Queue Flushing">
+                <div class="chip-row">
+                  <button type="button" class="chip-btn" data-directive="Manual Signal Override & Queue Flushing">Signal Flush</button>
+                  <button type="button" class="chip-btn" data-directive="Enforce Upstream Freight Diversion at NH-66">NH-66 Divert</button>
+                  <button type="button" class="chip-btn" data-directive="Rapid Tow Crane Extraction of Disabled Vehicle">Tow Clear</button>
+                </div>
+              </div>
+
+              <div style="align-self: flex-end; padding-bottom: 2px;">
+                <button type="submit" class="btn-action" style="padding: 9px 18px; white-space: nowrap;">
+                  Dispatch Unit
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <!-- Active Dispatches List -->
+          <div id="dispatchOrdersList" class="dispatch-feed">
+            <div class="feed-empty">Loading dispatches...</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
   </div>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=4.0"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # Traffic-Diffusion
 
-**Predictive Traffic Intelligence & Intervention Planning Platform**
+**Predictive Traffic Intelligence, Incident Ingestion & Intervention Planning Platform**
 
 ---
 
@@ -8,167 +8,147 @@
 
 Urban traffic management centers traditionally operate reactively: operators detect congestion only after queues have formed, gridlock has cascaded across adjacent junctions, and transit corridors are paralyzed.
 
-**Traffic-Diffusion** transforms urban traffic operations from reactive monitoring to **predictive traffic intelligence and automated intervention planning**. Designed for municipal traffic operations analysts and control-room dispatchers, the platform models how a localized road incident propagates across an arterial network over multi-step temporal horizons (T+15m, T+30m, T+60m), quantifies network-wide risk through an explainable multi-factor index, simulates alternative mitigation strategies under what-if scenarios, and ranks actionable intervention plans by total vehicle-hours of delay saved.
+**Traffic-Diffusion** transforms urban traffic operations from reactive monitoring to **predictive traffic intelligence, citizen incident ingestion, and automated intervention planning**. Designed for municipal traffic operations analysts, control-room dispatchers, and city planners, the platform bridges the gap between public road observers and tactical traffic command.
 
-### The Dual Dashboard Architecture
+The platform coordinates two dedicated, role-specific products backed by an analytical graph and spatiotemporal modeling engine for the **Mangaluru Metropolitan Sector (NH-66 / NH-73)**:
 
-Traffic-Diffusion provides two complementary interfaces designed for distinct user roles:
-
-1. **Dashboard 1: Public Citizen Navigator & Incident Reporter (`/driver` & `/public`)**
-   - **Target User**: General driving public and daily commuters.
-   - **Purpose**: Google Maps-style mobile web app with street-level road-following geometry (OSRM), turn-by-turn maneuvers, speed limits, and a one-tap citizen incident reporting module.
-   - **Citizen Ingestion**: Commuters report road hazards, collisions, stalled vehicles, or waterlogging directly into the municipal control room queue.
-
-2. **Dashboard 2: Tactical Command & Urban Planning Center (`/`)**
-   - **Target Users**:
-     - **Traffic Police and Control-Room Operators**: Review incoming citizen reports, run multi-horizon congestion spread forecasts (15m, 30m, 60m), prioritize risky junctions, evaluate what-if intervention plans, and **dispatch traffic police officers, heavy tow units, and patrol interceptors** to critical bottlenecks.
-     - **City Traffic Planners and Road Authorities**: Mine historical incident records to identify recurring chokepoints, analyze macro traffic patterns (morning peak vs. evening peak), evaluate municipal infrastructure proposals (e.g., Nanthoor Flyover, Bunts Hostel slip lanes), and simulate what-if infrastructure upgrades (+1 lane capacity, grade separation).
+1. **Public Citizen Navigation & Incident Reporting App (`/public` & `/login`)**: A map-driven web application where commuters view live corridor statuses and submit geo-tagged incident reports with live camera evidence.
+2. **Traffic Police & Control Room Operators Command Center (`/`)**: A pure operational dashboard (no map view needed) designed for high data density, spatiotemporal queue spread forecasting (T+15m, T+30m, T+60m), 4-component risk prioritization, what-if intervention modeling, tactical unit dispatching, and strategic municipal planning.
 
 ---
 
-### The Core Operational Workflow
+## 2. Product Architecture & User Personas
 
-```
-[ Incident Ingestion / Detection ]
-               |
-               v
-[ Spatiotemporal Propagation Engine ]  -->  Forecasts Network Impact (T+15m, T+30m, T+60m)
-               |
-               v
-[ Multi-Factor Risk Assessment ]       -->  Prioritizes At-Risk Corridors & Saturated Junctions
-               |
-               v
-[ What-If Intervention Simulator ]     -->  Models Diversions, Tow Dispatch & Shoulder Clearing
-               |
-               v
-[ Side-by-Side Scenario Evaluator ]    -->  Compares Net Delay Saved & Spillback Reduction
-               |
-               v
-[ Recommended Action Plan ]            -->  Operator Dispatches Coordinated Strategy
-```
+### Product 1: Public Citizen Navigation & Road Incident Reporting App (`/public` & `/login`)
+
+- **Primary Persona**: Daily commuters, commercial drivers, and citizens navigating Mangaluru.
+- **Entry Points**:
+  - Citizen Access Portal: `http://127.0.0.1:8000/login`
+  - Citizen Live Map & Reporting: `http://127.0.0.1:8000/public`
+- **Capabilities**:
+  - **Live City Corridor Status Map**: Interactive Leaflet interface displaying Mangaluru arterials classified by real-time flow (`Blocked / Heavy`, `Moderate Flow`, `Nominal Traffic`, `Emergency Green Corridor`).
+  - **Citizen Profile Integration**: Personalized access tracking user identity and locality.
+  - **Prominent Emergency Floating Action Button (FAB `+`)**: One-tap access to report road emergencies, collisions, waterlogging, or stalled vehicles.
+  - **Incident Reporting Modal**:
+    - Automatic GPS geolocation detection.
+    - Incident category classification: `ACCIDENT`, `BREAKDOWN`, `WATERLOGGING`, `ROAD_HAZARD`, `EMERGENCY_VEHICLE_OBSTACLE`, `OTHER` (with custom subject input).
+    - Camera-only live photo capture for visual verification.
+    - Lane impact selector and descriptive notes.
+  - **Real-Time Control Room Pipeline**: Submits directly to the backend (`POST /api/v1/intelligence/citizen-reports`), instantly streaming into the Traffic Police Command Center queue for verification.
 
 ---
 
-## 2. Core Capabilities
+### Product 2: Traffic Police & Control Room Operators Command Center (`/`)
 
-### A. Predictive Incident Impact Engine
-- **Spatiotemporal Propagation**: Projects localized flow restrictions into multi-horizon queue accumulation, upstream feeder spillback, downstream starved bottlenecks, and diversion bypass loading across 15, 30, and 60-minute windows.
-- **BPR Delay Formulation**: Uses Bureau of Public Roads (BPR) volume-over-capacity functions to calculate realistic congestion delays as volume nears and exceeds capacity ($t = t_0 \cdot [1 + \alpha (V/C)^\beta]$).
-- **Multi-Horizon Network Snapshots**: Provides discrete network state forecasts (T+15m, T+30m, T+60m) with segment-by-segment speed degradation, queue length estimation, volume-over-capacity ratios, and upstream feeder flags.
-- **Critical Junction Saturation**: Computes junction-level volume load ratios and flags intersections entering critical saturation (saturation index $\ge 0.70$).
-
-### B. Explainable Multi-Factor Risk Prioritization
-Calculates a transparent 0-100 composite risk score for every road segment and junction, decomposed into four explainable components:
-1. **Disruption Severity (Max 25 pts)**: Incident classification and lane closure ratio.
-2. **Volume-to-Capacity Load (Max 25 pts)**: Congestion stress and queue density relative to baseline flow.
-3. **Network Centrality & Dependency (Max 25 pts)**: Graph betweenness centrality and arterial criticality.
-4. **Diversion Deficit (Max 25 pts)**: Lack of immediate high-capacity alternate bypass routes.
-
-### C. What-If Intervention Planning & Optimization
-Simulates and evaluates operational responses against an unmitigated Baseline:
-- **Baseline (No Action)**: Natural propagation of queue buildup and cascading congestion.
-- **Scenario A (Upstream VMS Diversion)**: Dynamic Variable Message Sign (VMS) advisory diverting 25% of incoming demand away from the affected corridor.
-- **Scenario B (Rapid Tow Clearance)**: Dispatch of heavy tow units with a modeled 7-minute response latency, clearing obstructions early.
-- **Scenario C (Emergency Shoulder Lane Opening)**: Dynamic shoulder utilization restoring 50% of lost lane capacity.
-- **Scenario D (Coordinated Action Plan)**: Integrated multi-agency protocol combining upstream diversion, rapid tow dispatch, and adaptive green signal priority.
-
-Outputs a side-by-side comparison matrix with net vehicle-hours saved, peak queue reduction, spillback suppression, implementation feasibility, and an automated optimal strategy recommendation.
-
-### D. Historical Pattern & Recurrence Analytics
-- Mines historical incident records to detect chronic congestion corridors and high-probability incident clusters.
-- Analyzes peak-hour distributions, day-of-week recurrence patterns, and Mean Time to Clear (MTTC) by incident type (rollover, breakdown, waterlogging, collision).
-- Correlates historical patterns against real-time forecasts to surface early warnings for known chronic bottlenecks.
-
-### E. Integrated Supporting Capabilities
-- **Field Ambulance Navigation (`/driver`)**: Turn-by-turn emergency navigation Progressive Web App (PWA) with live road-snapped OSRM geometry, preemption status, and hospital trauma bay readiness.
-- **CCTV Video Sensing (`/operations`)**: Computer vision pipeline powered by YOLOv8 and multi-frame centroid tracking for vehicle classification, queue duration measurement, and incident verification.
+- **Primary Personas**:
+  - **Traffic Police Dispatchers & Control Room Operators**: Active incident handling, verification, queue prediction, and tactical resource deployment.
+  - **City Traffic Planners & Municipal Road Authorities**: Long-term bottleneck mining, diurnal peak analysis, and infrastructure investment simulation.
+- **Entry Point**: `http://127.0.0.1:8000/`
+- **Key Modules**:
+  1. **Inbound Citizen Reports Queue**:
+     - Displays live incident submissions from the public app.
+     - Single-click **[Verify & Forecast]** action: Confirms the citizen report, registers an active incident, and immediately triggers the network-wide spread model.
+  2. **Disruption Event Controller**:
+     - Instant demo presets: `Nanthoor Rollover`, `Bunts Flood`, `MG Road Bus` with active pill indicators.
+     - Parameter customization: Affected corridor, incident category, severity, capacity reduction percentage, and estimated clearance duration.
+  3. **Congestion Spread Forecast Engine**:
+     - Multi-horizon temporal projections across **T+15 min**, **T+30 min**, and **T+60 min**.
+     - Calculates queue length accumulation (meters), excess volume backlog (PCU), upstream feeder spillback, and diversion-loaded bypass arterials.
+     - **In-Cell Load Meters**: Impacted Corridors Table features color-coded micro-meter bars for Volume-to-Capacity (V/C) ratios (`1.85 [████████░░]`).
+     - **Critical Saturated Junctions Monitor**: Real-time capacity overload meters highlighting intersections exceeding $\ge 70\%$ capacity.
+  4. **Prioritized Chokepoint Risk Ranking (0 - 100 Index)**:
+     - Decomposed horizontal component bars: Severity (25 pts), V/C Load (25 pts), Centrality & Dependency (25 pts), and Diversion Deficit (25 pts).
+     - Color-coded micro-legends and actionable tactical directives.
+  5. **What-If Intervention Optimization Matrix**:
+     - Simulates candidate operational responses under identical initial conditions:
+       - **Baseline**: Unmitigated queue propagation and cascading gridlock.
+       - **Scenario A**: Upstream Variable Message Sign (VMS) diversion.
+       - **Scenario B**: Rapid heavy recovery tow clearance.
+       - **Scenario C**: Emergency shoulder lane opening.
+       - **Scenario D (Optimal)**: Integrated multi-agency protocol (diversion + tow dispatch + adaptive green signal priority).
+     - Highlights the **Recommended Action Plan** with net travel time savings and delay reduction percentage.
+     - **1-Click "Apply & Pre-fill Deployment"**: Automatically populates the tactical dispatch console with the optimal mitigation strategy.
+  6. **Traffic Police & Tactical Resource Deployment Console**:
+     - Deploy Traffic Police Officers, Heavy Tow Recovery Cranes, Patrol Interceptors, or Rapid Response Teams (QRT).
+     - Quick-action directive chips (`Signal Override`, `NH-66 Diversion`, `Crane Extraction`, `Transit Clearing`).
+     - **Interactive Status Progression**: Advance active units through operational lifecycles (`DISPATCHED` &rarr; `EN_ROUTE` &rarr; `ON_SCENE` &rarr; `RESOLVED`) via live REST PATCH calls.
+  7. **City Traffic Planners & Authority Console (Header Tab)**:
+     - **Diurnal Traffic Variation Report**: Speed degradation and volume loading across Morning Peak (`24.5 km/h`, V/C `1.28`), Mid-Day Off-Peak (`41.2 km/h`, V/C `0.62`), and Evening Peak (`21.8 km/h`, V/C `1.42`).
+     - **Capital Infrastructure Proposals**: Data-driven structural proposals (Nanthoor 4-Lane Grade-Separated Flyover, Bunts Hostel Adaptive Signal Phase & Slip Lane, K.S. Rao Bus Bay Indentation, Pumpwell Flood Culvert Expansion).
+     - **What-If Infrastructure ROI Simulator**: Evaluates network delay reductions for structural additions (+1 lane capacity, flyover construction).
 
 ---
 
-## 3. System Architecture
+### Supporting Views
+
+- **Field Ambulance Turn-by-Turn Navigator (`/driver`)**: Mobile-first navigation PWA with road-following geometry (OSRM), hospital trauma bay readiness, and signal preemption status.
+- **Operations & CCTV Vision Ingestion (`/operations`)**: Computer vision pipeline powered by YOLOv8 and multi-frame centroid tracking for vehicle classification, queue duration measurement, and video verification.
+
+---
+
+## 3. End-to-End Operational Workflow
 
 ```
-                              Traffic-Diffusion Platform
-+---------------------------------------------------------------------------------------+
-|                                  Presentation Layer                                   |
-|   - Predictive Intelligence Workspace (/)       : Horizon Tabs, Risk Rankings,        |
-|                                                   Intervention Matrix, Analytics      |
-|   - Ambulance Field Navigator (/driver)         : Mobile Turn-by-Turn OSRM PWA        |
-|   - Operations Command Center (/operations)     : CCTV Ingestion & Verification       |
-+-------------------------------------------+-------------------------------------------+
-                                            |
-                                            v
-+---------------------------------------------------------------------------------------+
-|                               FastAPI Service Gateway                                 |
-|   - /api/v1/intelligence/*  : Incidents, Forecasts, Risk, Interventions, Historical   |
-|   - /api/v1/navigation/*    : Network Graph, Dynamic Corridors, OSRM Snap             |
-|   - /api/v1/cv/*            : CCTV Video Processing, Centroid Tracking, Telemetry     |
-+-------------------------------------------+-------------------------------------------+
-                                            |
-         +----------------------------------+----------------------------------+
-         |                                  |                                  |
-         v                                  v                                  v
-+-----------------------+      +-----------------------+      +-----------------------+
-| Prediction Engine     |      | Risk Analysis Service |      | Intervention Planner  |
-| - Spatiotemporal Queue|      | - Severity Index (25) |      | - Scenario Simulator  |
-| - Upstream Spillback  |      | - V/C Ratio Score (25)|      | - Delay Saved Metric  |
-| - Downstream Starve   |      | - Betweenness Central |      | - Spillback Avoidance |
-| - Diversion Loading   |      | - Diversion Deficit   |      | - Optimal Action Rank |
-+-----------------------+      +-----------------------+      +-----------------------+
-         |                                  |                                  |
-         +----------------------------------+----------------------------------+
-                                            |
-                                            v
-                               +-------------------------+
-                               | Historical & Graph Core |
-                               | - NetworkX Mangaluru    |
-                               | - 20+ Calibrated Events |
-                               | - Recurring Hotspot Miner|
-                               +-------------------------+
+[ Citizen Commuter on Road (/public) ]
+               |
+               v (Submits GPS hazard with photo evidence)
+[ Inbound Citizen Reports Queue ]
+               |
+               v (Operator clicks [Verify & Forecast])
+[ Spatiotemporal Congestion Engine ]  -->  Forecasts Network Spread (T+15m, T+30m, T+60m)
+               |
+               v
+[ 4-Component Risk Prioritization ]   -->  Ranks Chokepoints (Sev 25, V/C 25, Net 25, Div 25)
+               |
+               v
+[ What-If Intervention Evaluator ]    -->  Compares Scenarios A, B, C, D vs. Baseline
+               |
+               v (Operator clicks [Apply Recommended Action])
+[ Tactical Police Deployment Console ] -->  Dispatches Units (DISPATCHED -> EN_ROUTE -> ON_SCENE)
 ```
 
 ---
 
 ## 4. API Reference
 
-### Predictive Intelligence Endpoints (`/api/v1/intelligence`)
+### Predictive Intelligence & Operations Endpoints (`/api/v1/intelligence`)
 
 | Method | Endpoint | Description |
 |:---|:---|:---|
+| `GET` | `/citizen-reports` | List incoming citizen road incident reports submitted via `/public`. |
+| `POST` | `/citizen-reports` | Submit a citizen incident report (hazard, breakdown, collision, flood). |
+| `POST` | `/citizen-reports/{id}/verify` | Control room operator action to verify report and auto-spawn active incident. |
 | `POST` | `/incidents` | Register or update an active traffic incident with lane blockage details. |
 | `GET` | `/incidents` | Retrieve all registered incidents and their operational statuses. |
 | `GET` | `/incidents/{incident_id}` | Retrieve details for a specific incident. |
 | `POST` | `/forecast` | Generate multi-horizon impact forecast (15m, 30m, 60m) for an incident. |
 | `GET` | `/risk-assessment` | Retrieve prioritized risk ranking of road corridors and saturated junctions. |
 | `POST` | `/interventions/evaluate` | Simulate and evaluate What-If intervention scenarios (A, B, C, D vs. Baseline). |
-| `GET` | `/historical/analytics` | Retrieve historical hotspot analysis, peak hour distributions, and MTTC. |
-| `POST` | `/historical/import` | Ingest historical incident records into the analytical database. |
-| `POST` | `/demo-scenario` | Load pre-configured incident scenarios (Nanthoor Rollover, Bunts Waterlogging, etc.). |
-| `GET` | `/citizen-reports` | List incoming citizen road incident reports submitted via the public app. |
-| `POST` | `/citizen-reports` | Submit a citizen incident report (hazard, breakdown, collision, flood). |
-| `POST` | `/citizen-reports/{id}/verify` | Control room operator action to verify report and auto-spawn active incident. |
 | `GET` | `/dispatches` | List active resource dispatch orders (police officers, tow units, patrol cars). |
 | `POST` | `/dispatches` | Dispatch tactical traffic officers or equipment to specific junctions. |
-| `PATCH` | `/dispatches/{id}` | Update status of active dispatch order (DISPATCHED -> EN_ROUTE -> ON_SCENE). |
+| `PATCH` | `/dispatches/{id}` | Update status of active dispatch order (DISPATCHED &rarr; EN_ROUTE &rarr; ON_SCENE &rarr; RESOLVED). |
 | `GET` | `/planner/infrastructure-recommendations` | Get structural municipal road recommendations (flyovers, slip lanes). |
 | `GET` | `/planner/traffic-patterns` | Macro traffic pattern analysis (Morning Peak vs. Mid-Day vs. Evening Peak). |
 | `POST` | `/planner/simulate-infrastructure` | What-If Infrastructure simulator (+1 lane, grade-separated overpass). |
+| `POST` | `/demo-scenario` | Load pre-configured incident scenarios (Nanthoor Rollover, Bunts Flood, MG Road Bus). |
+| `GET` | `/historical/analytics` | Retrieve historical hotspot analysis, peak hour distributions, and MTTC. |
 
 ### Supporting Endpoints
 
 - `GET /api/v1/navigation/network`: Retrieves the complete Mangaluru road network topology, active incidents, and telemetry.
 - `POST /api/v1/navigation/route`: Calculates emergency green corridors with OSRM street-following geometry.
+- `POST /api/v1/navigation/reset`: Resets road network conditions to nominal baseline.
 - `POST /api/v1/cv/upload`: Processes uploaded CCTV footage using YOLOv8 and multi-frame centroid tracking.
 
 ---
 
-## 5. Quickstart & Verification
+## 5. Quickstart & Installation
 
 ### Prerequisites
 - Python 3.11+
 - Git
 
-### Installation & Execution
+### Installation
 
 ```bash
 # 1. Clone repository
@@ -180,43 +160,53 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# 3. Run automated test suite (26 tests)
+# 3. Run automated verification test suite (26 tests)
 pytest
 
-# 4. Start the application
+# 4. Start the application server
 uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### Accessing the Interfaces
-- **Predictive Traffic Intelligence Workspace**: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
-- **Field Ambulance Navigator PWA**: [http://127.0.0.1:8000/driver](http://127.0.0.1:8000/driver)
-- **Operations & CCTV Command Center**: [http://127.0.0.1:8000/operations](http://127.0.0.1:8000/operations)
-- **Interactive OpenAPI Documentation**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+### Accessing the Web Portals
+- **Traffic Police & Control Room Command Center**: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+- **Public Citizen Live Map & Incident Reporter**: [http://127.0.0.1:8000/public](http://127.0.0.1:8000/public)
+- **Citizen Access Portal (Login)**: [http://127.0.0.1:8000/login](http://127.0.0.1:8000/login)
+- **Field Ambulance Turn-by-Turn Navigator**: [http://127.0.0.1:8000/driver](http://127.0.0.1:8000/driver)
+- **CCTV Video Sensing & Operations Console**: [http://127.0.0.1:8000/operations](http://127.0.0.1:8000/operations)
+- **Interactive OpenAPI Specification**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ---
 
-## 6. End-to-End Demo Walkthrough
+## 6. Demonstration Script
 
-1. Open the **Predictive Traffic Intelligence Workspace** at `http://127.0.0.1:8000/`.
-2. Click **Nanthoor Freight Rollover** under **Quick Demo Scenarios**.
-   - Notice the incident automatically populates the form (Freight Vehicle Rollover on Nanthoor - Kadri Arterial, 2 lanes closed, critical severity).
-3. The platform executes the **Incident Impact Forecast**:
-   - The interactive Leaflet map renders the direct disruption corridor (red dashed), upstream spillback feeder corridors (amber/orange), and diversion-loaded bypass corridors (cyan).
-   - Toggle through the temporal horizon tabs: **T+15m**, **T+30m**, and **T+60m**. Observe how the estimated queue expands from 480 meters to 1,920 meters, and upstream spillback cascades through adjacent junctions.
-4. Review the **Prioritized Risk Assessment**:
-   - Inspect the ranked corridors. Examine the four-component breakdown bars: Severity, V/C Load, Network Centrality, and Diversion Deficit.
-   - Saturated junctions entering critical loads ($\ge 70\%$) are highlighted with pulsing badges on the map and listed with their saturation ratios.
-5. Review the **What-If Intervention Comparison**:
-   - Compare the **Baseline (No Action)** against **Scenario A (VMS Diversion)**, **Scenario B (Rapid Tow Clearance)**, **Scenario C (Shoulder Lane Opening)**, and **Scenario D (Coordinated Action Plan)**.
-   - Observe the highlighted **Recommended Action Plan** banner showing net vehicle-hours saved and spillback reduction percentage.
-6. Explore **Historical Recurring Hotspots**:
-   - Review chronic bottleneck clusters (e.g., Circuit House - Nanthoor Road, Kankanady Bypass) with average clearance times and historical recurrence frequencies.
+1. **Citizen Incident Reporting**:
+   - Navigate to [http://127.0.0.1:8000/public](http://127.0.0.1:8000/public).
+   - Click the red floating action button (`+`) in the bottom-right corner.
+   - Select incident category (e.g. `COLLISION`), enter description, capture/attach live photo, and click **Submit Incident Report**.
+2. **Control Room Ingestion & Verification**:
+   - Open the **Traffic Police Command Center** at [http://127.0.0.1:8000/](http://127.0.0.1:8000/).
+   - In the **Citizen Incident Reports Queue**, notice the new incoming report.
+   - Click **Verify & Forecast**. The system confirms the report, spawns an active disruption on the road corridor, and calculates the network impact.
+3. **Multi-Horizon Spread Analysis**:
+   - Switch between **T+15m**, **T+30m**, and **T+60m** horizons.
+   - Observe the expanding queue length accumulation, PCU backlog, and corridor V/C ratio bars in the **Network Corridors Impact Progression Table**.
+   - Review critical intersection saturation ratios ($\ge 70\%$) in the **Critical Junction Saturation Monitor**.
+4. **Intervention Comparison & Dispatch**:
+   - In the **What-If Intervention Optimization Matrix**, compare Baseline against Scenarios A, B, C, and D.
+   - Under the green **Recommended Action Plan** banner, click **Apply & Pre-fill Deployment Console**.
+   - Review the pre-populated target junction and operational directive in the **Field Resource Deployment Console**.
+   - Click **Dispatch Tactical Unit to Scene**.
+   - In the **Active Field Dispatches Ledger**, observe the new unit and use the interactive lifecycle button to advance status: `DISPATCHED` &rarr; `EN_ROUTE` &rarr; `ON_SCENE` &rarr; `RESOLVED`.
+5. **City Traffic Planning & Infrastructure**:
+   - In the top header navigation, click **City Traffic Planners & Authority**.
+   - Review diurnal peak speed variations and the four data-driven capital infrastructure proposals.
+   - Use the **What-If Infrastructure Modeling Simulator** to test adding a lane or constructing a flyover at Nanthoor Junction and inspect projected vehicle-hours saved.
 
 ---
 
-## 7. Data Transparency, Modeling Assumptions & Limitations
+## 7. Modeling Assumptions, Transparency & Limitations
 
-- **Simulated vs. Observed Data**: Traffic-Diffusion explicitly demarcates all analytical outputs. Real-time vision-derived inputs are labeled `[OBSERVED]`, while projected network states and what-if scenarios are clearly flagged `[SIMULATION_BASED_ESTIMATE]`.
-- **Road Network Representation**: The Mangaluru sector network is modeled as a strongly connected directed multigraph ($G = (V, E)$) comprising 17 key junctions and 38 arterial edges with calibrated baseline speeds and capacities.
-- **Traffic Propagation Model**: Queue accumulation and spillback calculations utilize empirical macroscopic flow models and BPR volume-delay relationships. They do not simulate microscopic car-following behavior (such as in SUMO or VISSIM).
-- **Physical Signal Integration**: Signal preemption and traffic light adapters use a simulated controller interface labeled `[SIMULATED_ADAPTER]` for demonstration purposes, ready for NTCIP 1202 or SCATS protocol integration in live deployments.
+- **Simulated vs. Observed Data**: Traffic-Diffusion strictly flags all analytical outputs. Vision-derived inputs and confirmed field reports are labeled `[OBSERVED]`, while projected network states and what-if scenarios are labeled `[SIMULATION_BASED_ESTIMATE]`.
+- **Road Network Topology**: The Mangaluru sector network is modeled as a strongly connected directed multigraph ($G = (V, E)$) comprising 17 key junctions and 38 arterial edges with calibrated baseline speeds and capacities.
+- **Traffic Propagation Model**: Queue accumulation and spillback calculations utilize empirical macroscopic flow models and Bureau of Public Roads (BPR) volume-delay relationships ($t = t_0 \cdot [1 + \alpha (V/C)^\beta]$).
+- **Zero Emojis Policy**: All user interfaces, consoles, badges, and documentation strictly utilize semantic SVG iconography and crisp typography in accordance with enterprise ITMS standards.
