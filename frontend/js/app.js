@@ -1,4 +1,4 @@
-// Traffic Diffusion - Command & Planning Platform Controller
+// Traffic Diffusion - Traffic Police & Control Room Command Center Controller
 document.addEventListener('DOMContentLoaded', () => {
   const trafficMap = new TrafficMap('map');
 
@@ -9,12 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const valSaturatedJunctions = document.getElementById('valSaturatedJunctions');
   const valOptimalMitigation = document.getElementById('valOptimalMitigation');
   const btnResetAll = document.getElementById('btnResetAll');
-
-  // Authority Persona Tabs
-  const tabPoliceOps = document.getElementById('tabPoliceOps');
-  const tabCityPlanners = document.getElementById('tabCityPlanners');
-  const viewPoliceControlRoom = document.getElementById('viewPoliceControlRoom');
-  const viewCityPlanners = document.getElementById('viewCityPlanners');
 
   // Citizen Reports Elements
   const citizenReportsList = document.getElementById('citizenReportsList');
@@ -59,24 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const recomRationaleTxt = document.getElementById('recomRationaleTxt');
   const intervScenarioList = document.getElementById('intervScenarioList');
 
-  // City Planners Elements
-  const plannerHistTotal = document.getElementById('plannerHistTotal');
-  const plannerTopHotspot = document.getElementById('plannerTopHotspot');
-  const plannerHotspotList = document.getElementById('plannerHotspotList');
-  const trafficPatternGrid = document.getElementById('trafficPatternGrid');
-  const patternSummaryText = document.getElementById('patternSummaryText');
-  const infraProposalsList = document.getElementById('infraProposalsList');
-
-  const infraSimForm = document.getElementById('infraSimForm');
-  const infraSimEdgeSelect = document.getElementById('infraSimEdgeSelect');
-  const infraSimTypeSelect = document.getElementById('infraSimTypeSelect');
-  const infraSimResultBox = document.getElementById('infraSimResultBox');
-  const infraResultTitle = document.getElementById('infraResultTitle');
-  const infraResultBadge = document.getElementById('infraResultBadge');
-  const infraResultDesc = document.getElementById('infraResultDesc');
-  const infraDelaySaved = document.getElementById('infraDelaySaved');
-  const infraQueueDrop = document.getElementById('infraQueueDrop');
-
   // State
   let networkNodes = [];
   let networkEdges = [];
@@ -85,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let forecastData = null;
   let riskData = null;
   let interventionData = null;
+  let activeDispatches = [];
 
   // =========================================================================
   // 1. Initial Startup & Network Loading
@@ -97,17 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
         networkNodes = netData.nodes;
         networkEdges = netData.edges;
         trafficMap.renderNetwork(networkNodes, networkEdges);
-        populateEdgeDropdowns(networkEdges);
+        populateEdgeDropdown(networkEdges);
       }
 
-      // Initialize Citizen Reports & Dispatches
+      // Load Citizen Reports & Tactical Dispatches
       await loadCitizenReports();
       await loadResourceDispatches();
-
-      // Initialize City Planners Data
-      await loadPlannerAnalytics();
-      await loadTrafficPatterns();
-      await loadInfrastructureProposals();
 
       // Trigger default demonstration scenario: Nanthoor Freight Rollover
       await triggerDemoScenario('nanthoor_freight_rollover');
@@ -116,41 +88,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function populateEdgeDropdowns(edges) {
+  function populateEdgeDropdown(edges) {
     incidentEdgeSelect.innerHTML = '';
-    infraSimEdgeSelect.innerHTML = '';
     edges.forEach(e => {
       const opt = document.createElement('option');
       opt.value = e.id;
       opt.textContent = `${e.name} (${e.id}) [${e.lanes} lanes]`;
       incidentEdgeSelect.appendChild(opt);
-
-      const opt2 = document.createElement('option');
-      opt2.value = e.id;
-      opt2.textContent = `${e.name} (${e.id})`;
-      infraSimEdgeSelect.appendChild(opt2);
     });
   }
 
   // =========================================================================
-  // 2. Persona Role Switcher
-  // =========================================================================
-  tabPoliceOps.addEventListener('click', () => {
-    tabPoliceOps.classList.add('active');
-    tabCityPlanners.classList.remove('active');
-    viewPoliceControlRoom.classList.add('active');
-    viewCityPlanners.classList.remove('active');
-  });
-
-  tabCityPlanners.addEventListener('click', () => {
-    tabCityPlanners.classList.add('active');
-    tabPoliceOps.classList.remove('active');
-    viewCityPlanners.classList.add('active');
-    viewPoliceControlRoom.classList.remove('active');
-  });
-
-  // =========================================================================
-  // 3. Citizen Incident Reports (Public Ingestion & Operator Verification)
+  // 2. Citizen Incident Reports (Public Ingestion & Operator Verification)
   // =========================================================================
   async function loadCitizenReports() {
     try {
@@ -158,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) return;
       const reports = await res.json();
 
-      badgeCitizenCount.textContent = `${reports.length} Reports`;
+      badgeCitizenCount.textContent = `${reports.length} Inbound`;
       citizenReportsList.innerHTML = '';
 
       if (reports.length === 0) {
@@ -184,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 Verify & Forecast
               </button>
             ` : `
-              <span style="font-size: 10px; color: var(--accent-green); font-weight: 700;">Active in Forecast</span>
+              <span style="font-size: 10px; color: var(--accent-green); font-weight: 700;">Verified Incident</span>
             `}
           </div>
         `;
@@ -212,14 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) throw new Error('Verification failed');
       const updated = await res.json();
 
-      // Set edge select
       incidentEdgeSelect.value = edgeId;
       capacityReductionInput.value = updated.lanes_affected > 1 ? 70 : 40;
 
-      // Reload reports
       await loadCitizenReports();
-
-      // Trigger forecast on this edge
       await triggerCustomForecast();
     } catch (err) {
       alert('Verification error: ' + err.message);
@@ -227,21 +172,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
-  // 4. Tactical Resource & Police Deployment Console
+  // 3. Tactical Resource & Police Deployment Console
   // =========================================================================
   async function loadResourceDispatches() {
     try {
       const res = await fetch('/api/v1/intelligence/dispatches');
       if (!res.ok) return;
-      const orders = await res.json();
+      activeDispatches = await res.json();
 
       dispatchOrdersList.innerHTML = '';
-      if (orders.length === 0) {
+      if (activeDispatches.length === 0) {
         dispatchOrdersList.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px;">No active dispatches</div>';
         return;
       }
 
-      orders.forEach(ord => {
+      activeDispatches.forEach(ord => {
         const item = document.createElement('div');
         item.className = 'dispatch-item';
         
@@ -260,6 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         dispatchOrdersList.appendChild(item);
       });
+
+      // Render tactical assets onto the Leaflet map!
+      trafficMap.renderDispatches(activeDispatches);
     } catch (err) {
       console.warn('Dispatch load error:', err);
     }
@@ -282,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         directive: directive,
         priority: 'HIGH',
         eta_minutes: 5.0,
-        notes: 'Dispatched via Police Tactical Operations Console'
+        notes: 'Dispatched via Traffic Police Command Center'
       };
 
       const res = await fetch('/api/v1/intelligence/dispatches', {
@@ -299,12 +247,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // =========================================================================
-  // 5. Demo Scenario Presets Loader
+  // 4. Quick Demo Scenario Presets Loader
   // =========================================================================
   async function triggerDemoScenario(scenarioKey) {
     try {
       btnRunForecast.disabled = true;
-      btnRunForecast.textContent = 'Loading Demo Scenario...';
+      btnRunForecast.textContent = 'Projecting Spread...';
 
       const res = await fetch(`/api/v1/intelligence/demo-scenario?scenario_key=${scenarioKey}`, {
         method: 'POST',
@@ -319,7 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
       capacityReductionInput.value = Math.round(activeIncident.capacity_reduction_pct * 100);
       durationInput.value = Math.round(activeIncident.estimated_duration_min);
 
-      // Fetch complete multi-horizon forecast
       await fetchAndDisplayForecast(activeIncident.incident_id);
     } catch (err) {
       console.error('Demo scenario error:', err);
@@ -335,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
   btnDemoMgRoad.addEventListener('click', () => triggerDemoScenario('mg_road_breakdown'));
 
   // =========================================================================
-  // 6. Custom Incident Forecast Form Handler
+  // 5. Custom Incident Forecast Form Handler
   // =========================================================================
   incidentForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -384,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
-  // 7. Multi-Horizon Impact Forecast Fetcher
+  // 6. Multi-Horizon Impact Forecast Fetcher
   // =========================================================================
   async function fetchAndDisplayForecast(incidentId) {
     try {
@@ -433,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
-  // 8. Horizon Toggling & Visualization Update
+  // 7. Horizon Toggling & Visualization Update
   // =========================================================================
   horizonPills.forEach(pill => {
     pill.addEventListener('click', async (e) => {
@@ -476,10 +423,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Leaflet map render
     trafficMap.renderPredictiveForecast(snap, networkNodes, networkEdges);
+    
+    // Re-render tactical field assets
+    trafficMap.renderDispatches(activeDispatches);
   }
 
   // =========================================================================
-  // 9. Risk Breakdown Ranking List
+  // 8. Risk Breakdown Ranking List
   // =========================================================================
   function renderRiskRankings(data) {
     if (!data.high_risk_roads) return;
@@ -510,14 +460,14 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         <div style="font-size: 10px; color: var(--text-muted);">${item.contributing_factors.join('; ')}</div>
-        <div class="risk-recom-box">Action: ${item.recommended_action}</div>
+        <div class="risk-recom-box">Directive: ${item.recommended_action}</div>
       `;
       riskRankList.appendChild(card);
     });
   }
 
   // =========================================================================
-  // 10. What-If Intervention Scenarios Matrix
+  // 9. What-If Intervention Scenarios Matrix
   // =========================================================================
   function renderInterventionScenarios(data) {
     if (!data.candidate_scenarios || data.candidate_scenarios.length === 0) return;
@@ -555,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
       card.innerHTML = `
         <div class="interv-card-header">
           <span class="interv-card-title">${scen.scenario_name}</span>
-          ${isRecom ? '<span class="badge-recom">RECOMMENDED</span>' : `<span class="status-tag tag-free">#${scen.rank}</span>`}
+          ${isRecom ? '<span class="badge-recom">RECOMMENDED ACTION</span>' : `<span class="status-tag tag-free">#${scen.rank}</span>`}
         </div>
         <div class="interv-metrics-row">
           <span>Net Travel Time: <strong>${scen.estimated_network_travel_time_min.toFixed(1)} min</strong></span>
@@ -572,136 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
-  // 11. City Planners: Historical Analytics & Macro Patterns
-  // =========================================================================
-  async function loadPlannerAnalytics() {
-    try {
-      const res = await fetch('/api/v1/intelligence/historical/analytics');
-      if (!res.ok) return;
-      const data = await res.json();
-
-      plannerHistTotal.textContent = data.total_records_analyzed;
-      if (data.top_recurring_hotspots && data.top_recurring_hotspots.length > 0) {
-        plannerTopHotspot.textContent = data.top_recurring_hotspots[0].location_name.split('-')[0].trim();
-      }
-
-      plannerHotspotList.innerHTML = '';
-      data.top_recurring_hotspots.slice(0, 4).forEach(spot => {
-        const item = document.createElement('div');
-        item.className = 'hotspot-mini-item';
-        item.innerHTML = `
-          <div style="display: flex; justify-content: space-between; font-weight: 700;">
-            <span>${spot.location_name}</span>
-            <span style="color: var(--accent-amber); font-family: var(--font-mono);">${spot.incident_count} events</span>
-          </div>
-          <div style="color: var(--text-muted); font-size: 10px; margin-top: 2px;">
-            Mean Duration: <strong>${spot.mean_duration_minutes.toFixed(0)} min</strong> | ${spot.recurring_pattern_summary}
-          </div>
-        `;
-        plannerHotspotList.appendChild(item);
-      });
-    } catch (err) {
-      console.warn('Planner analytics error:', err);
-    }
-  }
-
-  async function loadTrafficPatterns() {
-    try {
-      const res = await fetch('/api/v1/intelligence/planner/traffic-patterns');
-      if (!res.ok) return;
-      const data = await res.json();
-
-      trafficPatternGrid.innerHTML = '';
-      data.periods.forEach(p => {
-        const card = document.createElement('div');
-        card.className = 'pattern-card';
-        card.innerHTML = `
-          <div class="pattern-period-name">${p.period_name}</div>
-          <div class="pattern-hours">${p.hours}</div>
-          <div style="margin-top: 4px;">
-            <div class="pattern-metric">${p.average_network_speed_kmh} <span style="font-size: 9px;">km/h</span></div>
-            <div class="pattern-metric-lbl">Avg Speed</div>
-          </div>
-          <div style="margin-top: 2px;">
-            <div class="pattern-metric" style="color: ${p.average_vc_ratio > 1.2 ? 'var(--accent-red)' : 'var(--accent-green)'};">${p.average_vc_ratio}</div>
-            <div class="pattern-metric-lbl">V/C Load Index</div>
-          </div>
-        `;
-        trafficPatternGrid.appendChild(card);
-      });
-
-      patternSummaryText.textContent = data.summary_findings;
-    } catch (err) {
-      console.warn('Traffic patterns error:', err);
-    }
-  }
-
-  async function loadInfrastructureProposals() {
-    try {
-      const res = await fetch('/api/v1/intelligence/planner/infrastructure-recommendations');
-      if (!res.ok) return;
-      const recs = await res.json();
-
-      infraProposalsList.innerHTML = '';
-      recs.forEach(r => {
-        const card = document.createElement('div');
-        card.className = 'infra-card';
-        card.innerHTML = `
-          <div class="infra-card-header">
-            <span class="infra-title">${r.title}</span>
-            <span class="infra-metric-pill">-${r.projected_delay_reduction_pct.toFixed(0)}% Delay</span>
-          </div>
-          <div class="infra-desc">${r.description}</div>
-          <div class="infra-meta-row">
-            <span>Location: <strong>${r.location_name}</strong></span>
-            <span>Mitigates: <strong>${r.annual_bottlenecks_mitigated} / yr</strong></span>
-            <span>Timeline: <strong>${r.implementation_timeline}</strong></span>
-          </div>
-        `;
-        infraProposalsList.appendChild(card);
-      });
-    } catch (err) {
-      console.warn('Infrastructure proposals error:', err);
-    }
-  }
-
-  // =========================================================================
-  // 12. City Planners: What-If Infrastructure Upgrade Simulator
-  // =========================================================================
-  infraSimForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      const targetEdge = infraSimEdgeSelect.value;
-      const simType = infraSimTypeSelect.value;
-
-      const payload = {
-        target_edge_id: targetEdge,
-        intervention_type: simType,
-        capacity_increase_pct: simType === 'ADD_LANE' ? 0.50 : 0.80
-      };
-
-      const res = await fetch('/api/v1/intelligence/planner/simulate-infrastructure', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) throw new Error('Simulation failed');
-      const data = await res.json();
-
-      infraSimResultBox.style.display = 'block';
-      infraResultTitle.textContent = `${data.road_name} Projection`;
-      infraResultBadge.textContent = `-${data.delay_reduction_pct.toFixed(1)}% DELAY`;
-      infraResultDesc.textContent = data.projected_benefit_summary;
-      infraDelaySaved.textContent = `${data.delay_saved_min.toFixed(1)} min saved`;
-      infraQueueDrop.textContent = `-${data.queue_length_reduction_pct.toFixed(0)}%`;
-    } catch (err) {
-      alert('Infrastructure simulation error: ' + err.message);
-    }
-  });
-
-  // =========================================================================
-  // 13. Reset Grid
+  // 10. Reset Grid
   // =========================================================================
   btnResetAll.addEventListener('click', async () => {
     try {

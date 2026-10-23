@@ -135,19 +135,35 @@ body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
-/* Sidebar Controls */
+/* Left Sidebar Controls (Incident Ingestion & Dispatch) */
 .control-sidebar {
-  width: 420px;
+  width: 390px;
   background-color: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
-  padding: 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   overflow-y: auto;
   flex-shrink: 0;
+  z-index: 10;
+}
+
+/* Right Tactical Sidebar (Forecast, Risk & Interventions) */
+.tactical-sidebar {
+  width: 410px;
+  background-color: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  z-index: 10;
 }
 
 .card {
