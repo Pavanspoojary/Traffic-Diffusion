@@ -354,6 +354,10 @@ class MapLibre3DTrafficMap {
       if (!e.features || e.features.length === 0) return;
       const props = e.features[0].properties;
 
+      window.dispatchEvent(new CustomEvent('gmaps:junction-clicked', { 
+        detail: { ...props, lngLat: e.lngLat } 
+      }));
+
       this.popup
         .setLngLat(e.lngLat)
         .setHTML(`
@@ -487,6 +491,10 @@ class MapLibre3DTrafficMap {
       innerPin.className = 'maplibre-incident-pin-inner';
       innerPin.innerHTML = '⚠️';
       anchor.appendChild(innerPin);
+
+      anchor.addEventListener('click', (e) => {
+        window.dispatchEvent(new CustomEvent('gmaps:incident-clicked', { detail: inc }));
+      });
 
       const photoHtml = inc.photo
         ? `<div style="margin-top: 8px; border-radius: 6px; overflow: hidden; max-height: 120px; border: 1px solid #10b981;">

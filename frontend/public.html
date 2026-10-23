@@ -16,127 +16,388 @@
 </head>
 <body>
   <div class="public-map-layout">
-    <!-- Top Citizen Navigation Bar -->
-    <header class="public-top-nav">
-      <div class="public-brand">
-        <div class="public-brand-logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+    <!-- Sleek Google Maps Minimal Top Bar -->
+    <header class="gmaps-top-header">
+      <div class="gmaps-brand-pill">
+        <div class="gmaps-logo-dot">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
+            <circle cx="12" cy="9" r="2.5" fill="currentColor"></circle>
           </svg>
         </div>
-        <div>
-          <h1 class="public-brand-title">TRAFFIC DIFFUSION</h1>
-          <p class="public-brand-subtitle">Citizen Live Traffic Map & Incident Reporting</p>
+        <span class="gmaps-brand-name">Traffic Diffusion</span>
+        <span class="gmaps-city-badge">Mangaluru Live</span>
+      </div>
+
+      <!-- Right Profile & Quick Access Controls -->
+      <div class="gmaps-header-right">
+        <!-- Live Incident Counter Pill -->
+        <button type="button" id="btnOpenHistoryModal" class="gmaps-header-btn" title="View posted incident log">
+          <span class="gmaps-header-icon">⚠️</span>
+          <span class="gmaps-header-label">Incidents</span>
+          <span id="navIncidentCountBadge" class="gmaps-badge-count">3</span>
+        </button>
+
+        <!-- 3D Perspective Toggle Pill -->
+        <button type="button" id="btnToggle3DView" class="gmaps-header-btn active" title="Toggle 3D Buildings Perspective">
+          <span class="gmaps-header-icon">🏙️</span>
+          <span id="label3DView">3D</span>
+        </button>
+
+        <!-- User Profile Chip -->
+        <div class="gmaps-user-chip" id="userProfileChip" title="Logged in Citizen">
+          <div class="gmaps-user-avatar" id="citizenAvatarInitials">U</div>
+          <span class="gmaps-user-name" id="citizenDisplayName">Citizen User</span>
+        </div>
+
+        <a href="/login.html" class="gmaps-link-btn" title="Change citizen details">Switch</a>
+        <a href="/" class="gmaps-link-btn gmaps-link-console" title="Control Room Console">Console</a>
+      </div>
+    </header>
+
+    <!-- Main Map Wrapper -->
+    <main class="public-map-wrapper">
+      <!-- Underlying Preserved MapLibre 3D Vector Map -->
+      <div id="map"></div>
+
+      <!-- ====================================================================
+           Google Maps Floating Search & Destination / Directions Widget
+           ==================================================================== -->
+      <div class="gmaps-search-container" id="gmapsSearchContainer">
+        <!-- 1. Normal Search Bar State -->
+        <div class="gmaps-search-box" id="gmapsSearchBox">
+          <button type="button" class="gmaps-icon-btn" id="btnSearchMenu" aria-label="Menu" title="Options">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2.2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <input 
+            type="text" 
+            id="gmapsSearchInput" 
+            class="gmaps-search-input" 
+            placeholder="Search Mangaluru traffic & places..." 
+            autocomplete="off" 
+          />
+
+          <button type="button" class="gmaps-icon-btn" id="btnClearSearch" title="Clear search" style="display: none;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2.2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+
+          <div class="gmaps-search-divider"></div>
+
+          <!-- Google Maps Blue Diamond Directions Button -->
+          <button type="button" class="gmaps-directions-trigger-btn" id="btnGmapsDirections" title="Directions / Route Planner">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21.71 11.29l-9-9a.996.996 0 0 0-1.41 0l-9 9a.996.996 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 0 0 0-1.41zm-10.71 6.29l-6.59-6.59L11 4.41V8h4c1.1 0 2 .9 2 2v4h-2v-4h-4v3.59z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Search Suggestions Dropdown -->
+        <div class="gmaps-search-suggestions" id="gmapsSearchSuggestions" style="display: none;">
+          <!-- Dynamically populated with Mangaluru junctions and hospitals -->
+        </div>
+
+        <!-- 2. Google Maps Directions Card (Shown when Directions is triggered) -->
+        <div class="gmaps-directions-card" id="gmapsDirectionsCard" style="display: none;">
+          <!-- Mode Selector Tabs: Driving, Two-Wheeler, Transit, Walking -->
+          <div class="gmaps-mode-tabs">
+            <button type="button" class="gmaps-mode-tab active" data-mode="driving" title="Driving (Car / Ambulance)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+              </svg>
+            </button>
+            <button type="button" class="gmaps-mode-tab" data-mode="two_wheeler" title="Two-Wheeler / Motorcycle">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.44 9.03L15.41 5H11v2h3.59l2 2H5c-2.8 0-5 2.2-5 5s2.2 5 5 5c2.46 0 4.45-1.69 4.9-4h4.2c.45 2.31 2.44 4 4.9 4 2.8 0 5-2.2 5-5 0-2.55-1.92-4.63-4.56-4.97zM7.82 15C7.4 16.15 6.28 17 5 17c-1.63 0-3-1.37-3-3s1.37-3 3-3c1.28 0 2.4.85 2.82 2H5v2h2.82zm11.18 2c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/>
+              </svg>
+            </button>
+            <button type="button" class="gmaps-mode-tab" data-mode="transit" title="Public Transit / City Bus">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2c-4.42 0-8 .5-8 4v10c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4zm5.5 12h-11V6h11v8zM6.5 17c-.83 0-1.5-.67-1.5-1.5S5.67 14 6.5 14s1.5.67 1.5 1.5S7.33 17 6.5 17zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+              </svg>
+            </button>
+            <button type="button" class="gmaps-mode-tab" data-mode="walking" title="Walking">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+              </svg>
+            </button>
+            <button type="button" class="gmaps-close-directions-btn" id="btnCloseDirections" title="Close directions">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2.2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Origins & Destinations Input Box -->
+          <div class="gmaps-inputs-container">
+            <!-- Starting Point Row -->
+            <div class="gmaps-input-row">
+              <div class="gmaps-point-bullet gmaps-point-origin"></div>
+              <select id="gmapsOriginSelect" class="gmaps-route-select" aria-label="Starting location">
+                <option value="CURRENT_GPS" selected>📍 Your Current Location (GPS)</option>
+                <option value="INT_HAMPANKATTA">Hampankatta Signal Junction</option>
+                <option value="INT_JYOTHI_CIRCLE">Jyothi (Dr. B.R. Ambedkar) Circle</option>
+                <option value="INT_BUNTS_HOSTEL">Bunts Hostel Circle</option>
+                <option value="INT_PVS_CIRCLE">PVS Circle (Kodialbail)</option>
+                <option value="INT_LALBAGH">Lalbagh Junction (MG Road)</option>
+                <option value="INT_MALLIKATTE">Mallikatte Circle (Kadri Road)</option>
+                <option value="INT_NANTHOOR">Nanthoor Circle (NH-66 / NH-73)</option>
+                <option value="INT_KANKANADY">Kankanady Bypass Junction</option>
+                <option value="EMS_STATE_BANK">State Bank Transit Hub</option>
+              </select>
+            </div>
+
+            <!-- Swap Points Button -->
+            <button type="button" class="gmaps-swap-btn" id="btnSwapRoutePoints" title="Reverse starting point and destination">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2.2">
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <polyline points="17 14 12 9 7 14"></polyline>
+              </svg>
+            </button>
+
+            <!-- Destination Row -->
+            <div class="gmaps-input-row">
+              <div class="gmaps-point-bullet gmaps-point-destination"></div>
+              <select id="gmapsDestinationSelect" class="gmaps-route-select" aria-label="Destination location">
+                <option value="INT_NANTHOOR" selected>Nanthoor Circle (NH-66 / NH-73)</option>
+                <option value="HOSPITAL_KMC_JYOTHI">KMC Hospital (Ambedkar Circle)</option>
+                <option value="HOSPITAL_AJ_KUNTIKAN">A.J. Hospital & Research Centre</option>
+                <option value="HOSPITAL_WENLOCK">Wenlock District Hospital</option>
+                <option value="HOSPITAL_FATHER_MULLER">Father Muller Medical College</option>
+                <option value="INT_BUNTS_HOSTEL">Bunts Hostel Circle</option>
+                <option value="INT_LALBAGH">Lalbagh Junction (MG Road)</option>
+                <option value="INT_KANKANADY">Kankanady Bypass Junction</option>
+                <option value="INT_HAMPANKATTA">Hampankatta Signal Junction</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Options & Route Trigger Row -->
+          <div class="gmaps-route-options">
+            <label class="gmaps-checkbox-label">
+              <input type="checkbox" id="chkAvoidIncidents" checked />
+              <span>Avoid live incident blockages</span>
+            </label>
+            <button type="button" id="btnCalculateRoute" class="gmaps-btn-primary">
+              <span>Directions</span>
+            </button>
+          </div>
+
+          <!-- Route Calculation Results Card -->
+          <div class="gmaps-route-results" id="gmapsRouteResults" style="display: none;">
+            <div class="gmaps-eta-row">
+              <div class="gmaps-eta-left">
+                <span class="gmaps-eta-number" id="routeEtaNumber">12 min</span>
+                <span class="gmaps-distance-text" id="routeDistanceText">(4.2 km)</span>
+              </div>
+              <span class="gmaps-traffic-badge" id="routeTrafficBadge">Fastest route</span>
+            </div>
+            <div class="gmaps-route-via" id="routeViaRoad">via K.S. Rao Rd and Bunts Hostel Ave</div>
+            
+            <div class="gmaps-incident-alert-row" id="routeIncidentAlertRow" style="display: none;">
+              <span class="gmaps-alert-icon">⚠️</span>
+              <span id="routeIncidentAlertText">Bypassing heavy rollover near Circuit House</span>
+            </div>
+
+            <div class="gmaps-action-row">
+              <button type="button" id="btnStartNavigation" class="gmaps-btn-nav-start">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                </svg>
+                <span>Start</span>
+              </button>
+              <button type="button" id="btnToggleTurnSteps" class="gmaps-btn-secondary">
+                <span>Details & Steps</span>
+              </button>
+              <button type="button" id="btnClearRouteDisplay" class="gmaps-btn-text" title="Clear route from map">
+                <span>Clear</span>
+              </button>
+            </div>
+
+            <!-- Turn-by-Turn Steps List (Accordion) -->
+            <div class="gmaps-steps-list" id="gmapsStepsList" style="display: none;">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Right Profile & Navigation Controls -->
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <!-- Live Incident History Button with Counter Badge -->
-        <button type="button" id="btnOpenHistoryModal" class="btn-history-pill" title="View posted incident history">
-          <span class="history-pill-icon">🚨</span>
-          <span class="history-pill-text">Incidents Log</span>
-          <span id="navIncidentCountBadge" class="incident-counter-badge">3</span>
+      <!-- ====================================================================
+           Google Maps Quick Category Chips Bar (Horizontally under Search)
+           ==================================================================== -->
+      <div class="gmaps-chips-bar" id="gmapsChipsBar">
+        <button type="button" class="gmaps-chip" id="chipDirections" title="Calculate Route">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#1a73e8">
+            <path d="M21.71 11.29l-9-9a.996.996 0 0 0-1.41 0l-9 9a.996.996 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 0 0 0-1.41zm-10.71 6.29l-6.59-6.59L11 4.41V8h4c1.1 0 2 .9 2 2v4h-2v-4h-4v3.59z"/>
+          </svg>
+          <span>Directions</span>
         </button>
 
-        <!-- 3D Perspective Tilt View Toggle -->
-        <button type="button" id="btnToggle3DView" class="btn-3d-toggle active" title="Toggle 3D Building Extrusions Perspective">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+        <button type="button" class="gmaps-chip active" id="chipTraffic" title="Toggle Real-time Traffic Corridors">
+          <span class="gmaps-chip-dot" style="background: #10b981;"></span>
+          <span>Traffic Flow</span>
+        </button>
+
+        <button type="button" class="gmaps-chip" id="chipIncidents" title="Filter Live Incident Hazards">
+          <span style="font-size: 13px;">⚠️</span>
+          <span>Incidents (3)</span>
+        </button>
+
+        <button type="button" class="gmaps-chip" id="chipHospitals" title="Show Emergency Hospital Hubs">
+          <span style="font-size: 13px;">🏥</span>
+          <span>Hospitals</span>
+        </button>
+
+        <button type="button" class="gmaps-chip" id="chipGreenCorridor" title="Show Emergency Green Corridors">
+          <span style="font-size: 13px;">🚨</span>
+          <span>EMS Corridor</span>
+        </button>
+
+        <button type="button" class="gmaps-chip" id="chip3DBuildings" title="Toggle 3D Vector Extrusions">
+          <span style="font-size: 13px;">🏙️</span>
+          <span>3D Buildings</span>
+        </button>
+      </div>
+
+      <!-- ====================================================================
+           Google Maps Floating Map Controls Column (Right Side)
+           ==================================================================== -->
+      <div class="gmaps-controls-col" id="gmapsControlsCol">
+        <!-- Compass (Resets Bearing / Pitch to North) -->
+        <button type="button" class="gmaps-fab-btn" id="btnCompassReset" title="Reset North orientation">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2.2">
+            <polygon points="12 2 19 21 12 17 5 21 12 2" fill="#ea4335" stroke="#ea4335"></polygon>
+            <polygon points="12 2 5 21 12 17 12 2" fill="#f8fafc" stroke="#5f6368"></polygon>
+          </svg>
+        </button>
+
+        <!-- "My Location" GPS Center Target -->
+        <button type="button" class="gmaps-fab-btn" id="btnGmapsMyLocation" title="Center to My GPS Location">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2.2">
+            <circle cx="12" cy="12" r="8"></circle>
+            <line x1="12" y1="2" x2="12" y2="6"></line>
+            <line x1="12" y1="18" x2="12" y2="22"></line>
+            <line x1="2" y1="12" x2="6" y2="12"></line>
+            <line x1="18" y1="12" x2="22" y2="12"></line>
+            <circle cx="12" cy="12" r="3" fill="#1a73e8"></circle>
+          </svg>
+        </button>
+
+        <!-- Layer Mode Switcher -->
+        <button type="button" class="gmaps-fab-btn" id="btnGmapsLayers" title="Map Layers & Traffic Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2.2">
             <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
             <polyline points="2 17 12 22 22 17"></polyline>
             <polyline points="2 12 12 17 22 12"></polyline>
           </svg>
-          <span id="label3DView">3D Buildings</span>
         </button>
 
-        <!-- Logged-in User Profile Chip -->
-        <div class="public-user-chip" id="userProfileChip">
-          <div class="user-avatar-circle" id="citizenAvatarInitials">U</div>
-          <div>
-            <div class="user-info-text" id="citizenDisplayName">Citizen User</div>
-            <div class="user-info-meta" id="citizenDisplayAddress">Loading profile...</div>
-          </div>
-        </div>
-
-        <a href="/login.html" class="btn-switch-user" title="Change citizen details">Switch User</a>
-        <a href="/" class="btn-switch-user" style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.4);">Console</a>
-      </div>
-    </header>
-
-    <!-- Main Map Display Area -->
-    <main class="public-map-wrapper">
-      <div id="map"></div>
-
-      <!-- Floating Map Legend Overlay -->
-      <div class="map-legend-overlay" style="top: 16px; left: 16px; z-index: 400;">
-        <div style="font-weight: 800; font-size: 11px; color: #fff; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-          <span>CITY CORRIDORS</span>
-          <span style="font-size: 9px; color: #38bdf8; font-weight: 700;">MAPLIBRE 3D</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color-box" style="background-color: #ef4444;"></div>
-          <span>Blocked / Heavy Congestion</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color-box" style="background-color: #f59e0b;"></div>
-          <span>Moderate Flow</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color-box" style="background-color: #3b82f6;"></div>
-          <span>Nominal Traffic</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color-box" style="background-color: #10b981;"></div>
-          <span>Emergency Green Corridor</span>
+        <!-- Zoom In & Zoom Out Stacked Pill -->
+        <div class="gmaps-zoom-stack">
+          <button type="button" class="gmaps-zoom-btn" id="btnGmapsZoomIn" title="Zoom in">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <div class="gmaps-zoom-divider"></div>
+          <button type="button" class="gmaps-zoom-btn" id="btnGmapsZoomOut" title="Zoom out">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2.5">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
         </div>
       </div>
 
-      <!-- Floating Incident Metrics & History Overview Card -->
-      <div class="map-stats-overlay" id="mapStatsOverlay">
-        <div class="stats-header">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="font-size: 13px;">🚨</span>
-            <span style="font-weight: 800; font-size: 11px; color: #f8fafc; letter-spacing: 0.02em;">LIVE INCIDENT COUNTER</span>
-          </div>
-          <button type="button" id="btnQuickViewHistory" class="btn-stats-link">View Log →</button>
+      <!-- ====================================================================
+           Google Maps Bottom Place / Incident Card (Slide-up on Marker Click)
+           ==================================================================== -->
+      <div class="gmaps-bottom-card" id="gmapsPlaceCard" style="display: none;">
+        <button type="button" class="gmaps-card-close-btn" id="btnClosePlaceCard" title="Dismiss card">✕</button>
+        <div class="gmaps-card-header">
+          <div class="gmaps-card-badge" id="placeCardSeverityBadge">⚠️ CRITICAL HAZARD</div>
+          <h2 class="gmaps-card-title" id="placeCardTitle">Heavy Commercial Freight Rollover</h2>
+          <div class="gmaps-card-subtitle" id="placeCardSubtitle">Circuit House - Nanthoor Road · Mangaluru</div>
         </div>
-        <div class="stats-grid">
-          <div class="stat-box">
-            <span class="stat-number" id="statTotalIncidents">3</span>
-            <span class="stat-label">Total Posted</span>
+
+        <div class="gmaps-card-body">
+          <div class="gmaps-card-meta-row">
+            <div class="gmaps-card-meta-item">
+              <span class="meta-label">Delay:</span>
+              <span class="meta-value" id="placeCardDelay" style="color: #d93025; font-weight: 700;">+18 mins</span>
+            </div>
+            <div class="gmaps-card-meta-item">
+              <span class="meta-label">Blockage:</span>
+              <span class="meta-value" id="placeCardLanes">Both Lanes Blocked</span>
+            </div>
+            <div class="gmaps-card-meta-item">
+              <span class="meta-label">Reported:</span>
+              <span class="meta-value" id="placeCardReported">15 mins ago</span>
+            </div>
           </div>
-          <div class="stat-box">
-            <span class="stat-number" id="statCriticalIncidents" style="color: #f87171;">1</span>
-            <span class="stat-label">Critical</span>
+          <div class="gmaps-card-desc" id="placeCardDesc">
+            Overturned multi-axle freight truck blocking arterial lanes towards Nanthoor circle approach.
           </div>
-          <div class="stat-box">
-            <span class="stat-number" id="statMyIncidents" style="color: #60a5fa;">0</span>
-            <span class="stat-label">My Reports</span>
+          <div id="placeCardPhotoWrapper" style="display: none; margin-top: 8px;">
+            <img id="placeCardPhoto" class="gmaps-card-photo" alt="Incident view" />
           </div>
         </div>
-        <div class="stat-footer-text">
-          <span style="color: #64748b;">Latest:</span>
-          <span id="statLatestTitle" style="color: #cbd5e1; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 150px; display: inline-block; vertical-align: middle;">Freight Rollover</span>
+
+        <div class="gmaps-card-actions">
+          <button type="button" class="gmaps-btn-primary" id="btnPlaceDirections">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21.71 11.29l-9-9a.996.996 0 0 0-1.41 0l-9 9a.996.996 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 0 0 0-1.41zm-10.71 6.29l-6.59-6.59L11 4.41V8h4c1.1 0 2 .9 2 2v4h-2v-4h-4v3.59z"/>
+            </svg>
+            <span>Directions</span>
+          </button>
+          <button type="button" class="gmaps-btn-secondary" id="btnPlaceReportUpdate">
+            <span>Update / Report</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Google Maps Traffic Legend Bar (Bottom Left) -->
+      <div class="gmaps-traffic-legend" id="gmapsTrafficLegend">
+        <span class="legend-title">Live Traffic</span>
+        <div class="legend-scale">
+          <span class="scale-label">Fast</span>
+          <div class="scale-bar">
+            <span style="background: #10b981;"></span>
+            <span style="background: #3b82f6;"></span>
+            <span style="background: #f59e0b;"></span>
+            <span style="background: #ef4444;"></span>
+          </div>
+          <span class="scale-label">Slow</span>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- Prominent Red "+" Floating Action Button (FAB) on Bottom Right Corner -->
+  <!-- Google Maps Style Floating "Report Incident / Contribute" FAB Button -->
   <button 
     type="button" 
     id="btnEmergencyFab" 
-    class="fab-emergency-add" 
+    class="gmaps-report-fab" 
     aria-label="Report Incident or Emergency"
     onclick="window.openCitizenReportModal && window.openCitizenReportModal()"
+    title="Report road incident or hazard"
   >
-    <span class="fab-tooltip">Report Incident / SOS</span>
-    <!-- Bold White "+" Icon -->
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"></line>
-      <line x1="5" y1="12" x2="19" y2="12"></line>
-    </svg>
+    <div class="gmaps-fab-icon-wrap">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6">
+        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <span class="gmaps-fab-label">+ Report Incident</span>
   </button>
+
 
   <!-- Emergency Incident Report Modal (Triggered by the Red "+" button) -->
   <div id="incidentReportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -415,6 +676,6 @@
 
   <!-- MapLibre 3D Vector Map & Citizen Controller Scripts -->
   <script src="/js/maplibre_3d_traffic_map.js"></script>
-  <script src="/js/public.js?v=5.1"></script>
+  <script src="/js/public.js?v=6.0"></script>
 </body>
 </html>

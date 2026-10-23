@@ -661,6 +661,736 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial count update
   updateIncidentCounters();
 
+  // ========================================================================
+  // Google Maps Authentic Navigation & Interactive Controls Controller
+  // ========================================================================
+  function initGoogleMapsInterface() {
+    let currentMode = 'driving';
+    let currentCalculatedRoute = null;
+    let isTrafficLayerVisible = true;
+
+    // Mode Speed Multipliers for realistic ETAs
+    const MODE_FACTORS = {
+      driving: 1.0,
+      two_wheeler: 0.8,
+      transit: 1.35,
+      walking: 4.2
+    };
+
+    // DOM Elements
+    const searchInput = document.getElementById('gmapsSearchInput');
+    const clearSearchBtn = document.getElementById('btnClearSearch');
+    const suggestionsBox = document.getElementById('gmapsSearchSuggestions');
+    const directionsCard = document.getElementById('gmapsDirectionsCard');
+    const directionsBtn = document.getElementById('btnGmapsDirections');
+    const closeDirectionsBtn = document.getElementById('btnCloseDirections');
+    const modeTabs = document.querySelectorAll('.gmaps-mode-tab');
+    const originSelect = document.getElementById('gmapsOriginSelect');
+    const destinationSelect = document.getElementById('gmapsDestinationSelect');
+    const swapPointsBtn = document.getElementById('btnSwapRoutePoints');
+    const calculateRouteBtn = document.getElementById('btnCalculateRoute');
+    const avoidIncidentsChk = document.getElementById('chkAvoidIncidents');
+    const routeResults = document.getElementById('gmapsRouteResults');
+    const routeEtaNumber = document.getElementById('routeEtaNumber');
+    const routeDistanceText = document.getElementById('routeDistanceText');
+    const routeTrafficBadge = document.getElementById('routeTrafficBadge');
+    const routeViaRoad = document.getElementById('routeViaRoad');
+    const routeIncidentAlertRow = document.getElementById('routeIncidentAlertRow');
+    const routeIncidentAlertText = document.getElementById('routeIncidentAlertText');
+    const startNavBtn = document.getElementById('btnStartNavigation');
+    const toggleStepsBtn = document.getElementById('btnToggleTurnSteps');
+    const clearRouteBtn = document.getElementById('btnClearRouteDisplay');
+    const stepsList = document.getElementById('gmapsStepsList');
+
+    // Place Card Elements
+    const placeCard = document.getElementById('gmapsPlaceCard');
+    const closePlaceCardBtn = document.getElementById('btnClosePlaceCard');
+    const placeCardBadge = document.getElementById('placeCardSeverityBadge');
+    const placeCardTitle = document.getElementById('placeCardTitle');
+    const placeCardSubtitle = document.getElementById('placeCardSubtitle');
+    const placeCardDelay = document.getElementById('placeCardDelay');
+    const placeCardLanes = document.getElementById('placeCardLanes');
+    const placeCardReported = document.getElementById('placeCardReported');
+    const placeCardDesc = document.getElementById('placeCardDesc');
+    const placeCardPhotoWrapper = document.getElementById('placeCardPhotoWrapper');
+    const placeCardPhoto = document.getElementById('placeCardPhoto');
+    const btnPlaceDirections = document.getElementById('btnPlaceDirections');
+    const btnPlaceReportUpdate = document.getElementById('btnPlaceReportUpdate');
+
+    // Floating Map Controls
+    const btnCompassReset = document.getElementById('btnCompassReset');
+    const btnMyLocation = document.getElementById('btnGmapsMyLocation');
+    const btnMapLayers = document.getElementById('btnGmapsLayers');
+    const btnZoomIn = document.getElementById('btnGmapsZoomIn');
+    const btnZoomOut = document.getElementById('btnGmapsZoomOut');
+
+    // Filter Chips
+    const chipDirections = document.getElementById('chipDirections');
+    const chipTraffic = document.getElementById('chipTraffic');
+    const chipIncidents = document.getElementById('chipIncidents');
+    const chipHospitals = document.getElementById('chipHospitals');
+    const chipGreenCorridor = document.getElementById('chipGreenCorridor');
+    const chip3DBuildings = document.getElementById('chip3DBuildings');
+
+    // 1. Search Bar Input & Autocomplete
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim().toLowerCase();
+        if (query.length > 0) {
+          if (clearSearchBtn) clearSearchBtn.style.display = 'flex';
+          renderSearchSuggestions(query);
+        } else {
+          if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+          if (suggestionsBox) suggestionsBox.style.display = 'none';
+        }
+      });
+
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const firstSug = suggestionsBox?.querySelector('.gmaps-suggestion-item');
+          if (firstSug) firstSug.click();
+        }
+      });
+    }
+
+    if (clearSearchBtn) {
+      clearSearchBtn.addEventListener('click', () => {
+        if (searchInput) searchInput.value = '';
+        clearSearchBtn.style.display = 'none';
+        if (suggestionsBox) suggestionsBox.style.display = 'none';
+        clearGoogleRouteFromMap();
+        if (placeCard) placeCard.style.display = 'none';
+      });
+    }
+
+    function renderSearchSuggestions(query) {
+      if (!suggestionsBox) return;
+
+      const matches = [];
+
+      // Search junctions / nodes
+      networkNodes.forEach(node => {
+        if (node.name.toLowerCase().includes(query) || (node.type && node.type.toLowerCase().includes(query))) {
+          matches.push({
+            type: 'node',
+            title: node.name,
+            subtitle: node.type || 'Key Intersection',
+            icon: '📍',
+            data: node
+          });
+        }
+      });
+
+      // Search active incidents
+      incidentHistory.forEach(inc => {
+        if (
+          inc.subject.toLowerCase().includes(query) ||
+          inc.location.toLowerCase().includes(query) ||
+          inc.category.toLowerCase().includes(query)
+        ) {
+          matches.push({
+            type: 'incident',
+            title: inc.subject,
+            subtitle: `⚠️ ${inc.category} · ${inc.location}`,
+            icon: '🚨',
+            data: inc
+          });
+        }
+      });
+
+      if (matches.length === 0) {
+        suggestionsBox.innerHTML = `
+          <div class="gmaps-suggestion-item" style="cursor: default; color: #70757a;">
+            <span>No places or incidents match "${query}"</span>
+          </div>
+        `;
+        suggestionsBox.style.display = 'block';
+        return;
+      }
+
+      suggestionsBox.innerHTML = matches.slice(0, 6).map(m => `
+        <div class="gmaps-suggestion-item" data-type="${m.type}">
+          <span class="gmaps-suggestion-icon">${m.icon}</span>
+          <div>
+            <div class="gmaps-suggestion-main">${m.title}</div>
+            <div class="gmaps-suggestion-sub">${m.subtitle}</div>
+          </div>
+        </div>
+      `).join('');
+
+      suggestionsBox.style.display = 'block';
+
+      // Item selection handlers
+      const items = suggestionsBox.querySelectorAll('.gmaps-suggestion-item');
+      items.forEach((item, index) => {
+        item.addEventListener('click', () => {
+          const m = matches[index];
+          if (!m) return;
+
+          if (searchInput) searchInput.value = m.title;
+          suggestionsBox.style.display = 'none';
+
+          if (m.type === 'node') {
+            const node = m.data;
+            if (activeMap && typeof activeMap.focusLocation === 'function') {
+              activeMap.focusLocation(node.lat, node.lng, node.name, 16);
+            }
+            showJunctionPlaceCard(node);
+          } else if (m.type === 'incident') {
+            const inc = m.data;
+            if (activeMap && typeof activeMap.focusLocation === 'function') {
+              activeMap.focusLocation(inc.lat, inc.lng, inc.subject, 16);
+            }
+            showIncidentPlaceCard(inc);
+          }
+        });
+      });
+    }
+
+    // 2. Directions Panel & Trigger
+    function openDirectionsPanel() {
+      if (directionsCard) {
+        directionsCard.style.display = 'block';
+        if (destinationSelect) destinationSelect.focus();
+      }
+      if (suggestionsBox) suggestionsBox.style.display = 'none';
+      if (chipDirections) chipDirections.classList.add('active');
+    }
+
+    function closeDirectionsPanel() {
+      if (directionsCard) directionsCard.style.display = 'none';
+      if (chipDirections) chipDirections.classList.remove('active');
+      clearGoogleRouteFromMap();
+      currentCalculatedRoute = null;
+    }
+
+    if (directionsBtn) directionsBtn.addEventListener('click', () => {
+      if (directionsCard.style.display === 'block') {
+        closeDirectionsPanel();
+      } else {
+        openDirectionsPanel();
+      }
+    });
+
+    if (closeDirectionsBtn) closeDirectionsBtn.addEventListener('click', closeDirectionsPanel);
+    if (chipDirections) chipDirections.addEventListener('click', openDirectionsPanel);
+
+    // Mode Selector Tabs (Driving, Two-Wheeler, Transit, Walking)
+    modeTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        modeTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentMode = tab.getAttribute('data-mode') || 'driving';
+
+        // Re-display route with updated mode factor if already computed
+        if (currentCalculatedRoute) {
+          updateRouteMetricsDisplay(currentCalculatedRoute);
+        }
+      });
+    });
+
+    // Swap Origin & Destination
+    if (swapPointsBtn) {
+      swapPointsBtn.addEventListener('click', () => {
+        if (!originSelect || !destinationSelect) return;
+        const temp = originSelect.value;
+        // If origin was GPS, set destination to default Hampankatta
+        originSelect.value = destinationSelect.value;
+        destinationSelect.value = temp === 'CURRENT_GPS' ? 'INT_HAMPANKATTA' : temp;
+
+        if (currentCalculatedRoute) {
+          calculateRouteAction();
+        }
+      });
+    }
+
+    // 3. Route Calculation Action
+    async function calculateRouteAction() {
+      if (!originSelect || !destinationSelect) return;
+
+      let originId = originSelect.value;
+      const destId = destinationSelect.value;
+      const avoidBlockages = avoidIncidentsChk ? avoidIncidentsChk.checked : true;
+
+      // Handle GPS starting point by defaulting to closest primary central junction
+      if (originId === 'CURRENT_GPS') {
+        originId = 'INT_HAMPANKATTA';
+      }
+
+      if (originId === destId) {
+        showToast('Origin and Destination cannot be the same junction.');
+        return;
+      }
+
+      showToast('Calculating fastest street route avoiding incidents...');
+
+      try {
+        const payload = {
+          origin_node_id: originId,
+          destination_node_id: destId,
+          is_emergency: false,
+          avoid_congestion: avoidBlockages
+        };
+
+        const res = await fetch('/api/v1/navigation/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          throw new Error(`Route computation failed with status ${res.status}`);
+        }
+
+        const data = await res.json();
+        const primary = data.primary_route;
+
+        if (!primary) {
+          showToast('No viable street route found between selected points.');
+          return;
+        }
+
+        currentCalculatedRoute = primary;
+        updateRouteMetricsDisplay(primary);
+
+        // Draw Google blue route line on MapLibre map
+        if (primary.path_coordinates && primary.path_coordinates.length > 0) {
+          drawGoogleRouteOnMap(primary.path_coordinates);
+        }
+
+        showToast(`Route found: ${primary.total_distance_km} km via ${primary.primary_road_name || 'Mangaluru Arterial'}`);
+
+      } catch (err) {
+        console.error('Route calculation error:', err);
+        showToast('Error calculating route. Falling back to direct corridor.');
+      }
+    }
+
+    function updateRouteMetricsDisplay(route) {
+      if (!routeResults) return;
+
+      const factor = MODE_FACTORS[currentMode] || 1.0;
+      const baseTime = route.estimated_travel_time_min || 8;
+      const computedMin = Math.max(2, Math.round(baseTime * factor));
+
+      if (routeEtaNumber) {
+        routeEtaNumber.textContent = `${computedMin} min`;
+        // Color coding based on congestion
+        if (computedMin > baseTime * 1.3) {
+          routeEtaNumber.style.color = '#ea8600'; // Amber/Orange
+        } else {
+          routeEtaNumber.style.color = '#1e8e3e'; // Google Green
+        }
+      }
+
+      if (routeDistanceText) {
+        routeDistanceText.textContent = `(${route.total_distance_km} km)`;
+      }
+
+      if (routeViaRoad) {
+        routeViaRoad.textContent = `via ${route.primary_road_name || 'K.S. Rao Road / Bunts Hostel Ave'}`;
+      }
+
+      if (routeTrafficBadge) {
+        if (route.closures_encountered > 0) {
+          routeTrafficBadge.textContent = 'Incident detour active';
+          routeTrafficBadge.style.background = '#fef7e0';
+          routeTrafficBadge.style.color = '#b06000';
+        } else {
+          routeTrafficBadge.textContent = 'Fastest route now';
+          routeTrafficBadge.style.background = '#e6f4ea';
+          routeTrafficBadge.style.color = '#137333';
+        }
+      }
+
+      // Incident warning alert row
+      if (routeIncidentAlertRow && routeIncidentAlertText) {
+        if (route.closures_encountered > 0 || (route.congestion_points && route.congestion_points.length > 0)) {
+          routeIncidentAlertRow.style.display = 'flex';
+          routeIncidentAlertText.textContent = route.closures_encountered > 0
+            ? 'Detour active: Successfully bypassing blocked commercial freight zone'
+            : 'Caution: Moderate congestion detected along secondary arterial';
+        } else {
+          routeIncidentAlertRow.style.display = 'none';
+        }
+      }
+
+      // Populate Turn-by-Turn Steps List
+      if (stepsList) {
+        const instructions = route.turn_instructions && route.turn_instructions.length > 0
+          ? route.turn_instructions
+          : [
+              `Depart towards ${route.primary_road_name || 'City Arterial'}`,
+              'Follow green traffic flow corridor',
+              'Approaching destination junction'
+            ];
+
+        stepsList.innerHTML = instructions.map((step, idx) => `
+          <div class="gmaps-step-item">
+            <span class="gmaps-step-num">${idx + 1}</span>
+            <span>${step}</span>
+          </div>
+        `).join('');
+      }
+
+      routeResults.style.display = 'block';
+    }
+
+    if (calculateRouteBtn) calculateRouteBtn.addEventListener('click', calculateRouteAction);
+
+    // Start Navigation Button
+    if (startNavBtn) {
+      startNavBtn.addEventListener('click', () => {
+        if (!activeMap || !activeMap.map || !currentCalculatedRoute) return;
+        const coords = currentCalculatedRoute.path_coordinates;
+        if (coords && coords.length > 0) {
+          const startPt = coords[0];
+          activeMap.map.flyTo({
+            center: [startPt[1], startPt[0]],
+            zoom: 17,
+            pitch: 62,
+            bearing: -22,
+            speed: 1.5,
+            curve: 1.2
+          });
+          showToast('Turn-by-turn navigation started! Follow blue route line.');
+        }
+      });
+    }
+
+    // Toggle Turn Steps Accordion
+    if (toggleStepsBtn && stepsList) {
+      toggleStepsBtn.addEventListener('click', () => {
+        const isHidden = stepsList.style.display === 'none';
+        stepsList.style.display = isHidden ? 'block' : 'none';
+        toggleStepsBtn.textContent = isHidden ? 'Hide Steps' : 'Details & Steps';
+      });
+    }
+
+    // Clear Route Display
+    if (clearRouteBtn) {
+      clearRouteBtn.addEventListener('click', () => {
+        clearGoogleRouteFromMap();
+        if (routeResults) routeResults.style.display = 'none';
+        currentCalculatedRoute = null;
+        showToast('Route cleared from map.');
+      });
+    }
+
+    // 4. Map Drawing: Draw Google Route on MapLibre Map
+    function drawGoogleRouteOnMap(coordinates) {
+      if (!activeMap || !activeMap.map) return;
+      const map = activeMap.map;
+
+      // MapLibre requires [lng, lat]
+      const lineCoords = coordinates.map(pt => [pt[1], pt[0]]);
+
+      const geojsonData = {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: lineCoords
+        }
+      };
+
+      if (map.getSource('gmaps-route-source')) {
+        map.getSource('gmaps-route-source').setData(geojsonData);
+      } else {
+        map.addSource('gmaps-route-source', {
+          type: 'geojson',
+          data: geojsonData
+        });
+
+        // Crisp white casing
+        map.addLayer({
+          id: 'gmaps-route-casing',
+          type: 'line',
+          source: 'gmaps-route-source',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 9.5,
+            'line-opacity': 0.98
+          }
+        });
+
+        // Google Maps Blue Polyline
+        map.addLayer({
+          id: 'gmaps-route-line',
+          type: 'line',
+          source: 'gmaps-route-source',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#1a73e8',
+            'line-width': 6.0,
+            'line-opacity': 1.0
+          }
+        });
+      }
+
+      // Smoothly fit bounds
+      if (lineCoords.length > 1 && typeof maplibregl !== 'undefined') {
+        const bounds = new maplibregl.LngLatBounds();
+        lineCoords.forEach(pt => bounds.extend(pt));
+        map.fitBounds(bounds, {
+          padding: { top: 90, bottom: 90, left: 420, right: 80 },
+          duration: 1100,
+          pitch: 44
+        });
+      }
+    }
+
+    function clearGoogleRouteFromMap() {
+      if (!activeMap || !activeMap.map) return;
+      const map = activeMap.map;
+      if (map.getSource('gmaps-route-source')) {
+        map.getSource('gmaps-route-source').setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+    }
+
+    // 5. Place Card (Slide-up Bottom Sheet) Handlers
+    function showIncidentPlaceCard(inc) {
+      if (!placeCard) return;
+
+      if (placeCardBadge) {
+        placeCardBadge.textContent = `⚠️ ${(inc.severity || 'HIGH')} · ${inc.category || 'HAZARD'}`;
+        placeCardBadge.style.background = inc.severity === 'CRITICAL' ? '#fce8e6' : '#fef7e0';
+        placeCardBadge.style.color = inc.severity === 'CRITICAL' ? '#d93025' : '#b06000';
+      }
+
+      if (placeCardTitle) placeCardTitle.textContent = inc.subject || 'Active Incident';
+      if (placeCardSubtitle) placeCardSubtitle.textContent = inc.location || 'Mangaluru Sector';
+      if (placeCardDelay) placeCardDelay.textContent = inc.severity === 'CRITICAL' ? '+18 mins' : '+8 mins';
+      if (placeCardLanes) placeCardLanes.textContent = `${inc.severity === 'CRITICAL' ? '2 Lanes' : '1 Lane'} Blocked`;
+      if (placeCardReported) placeCardReported.textContent = inc.timeAgo || 'Recently';
+      if (placeCardDesc) placeCardDesc.textContent = inc.description || 'Road disruption reported by citizen.';
+
+      if (placeCardPhotoWrapper && placeCardPhoto) {
+        if (inc.photo) {
+          placeCardPhoto.src = inc.photo;
+          placeCardPhotoWrapper.style.display = 'block';
+        } else {
+          placeCardPhotoWrapper.style.display = 'none';
+        }
+      }
+
+      // Directions button sets destination and opens directions card
+      if (btnPlaceDirections) {
+        btnPlaceDirections.onclick = () => {
+          placeCard.style.display = 'none';
+          openDirectionsPanel();
+          if (destinationSelect) {
+            destinationSelect.value = 'INT_NANTHOOR'; // Default or matching junction
+          }
+          calculateRouteAction();
+        };
+      }
+
+      if (btnPlaceReportUpdate) {
+        btnPlaceReportUpdate.onclick = () => {
+          placeCard.style.display = 'none';
+          openReportModal();
+        };
+      }
+
+      placeCard.style.display = 'block';
+    }
+
+    function showJunctionPlaceCard(node) {
+      if (!placeCard) return;
+
+      if (placeCardBadge) {
+        placeCardBadge.textContent = '📍 KEY INTERSECTION';
+        placeCardBadge.style.background = '#e8f0fe';
+        placeCardBadge.style.color = '#1a73e8';
+      }
+
+      if (placeCardTitle) placeCardTitle.textContent = node.name || 'Junction';
+      if (placeCardSubtitle) placeCardSubtitle.textContent = `Mangaluru Road Network · ID: ${node.id}`;
+      if (placeCardDelay) placeCardDelay.textContent = 'Nominal Traffic';
+      if (placeCardLanes) placeCardLanes.textContent = 'All Lanes Open';
+      if (placeCardReported) placeCardReported.textContent = 'Live Sensor Feed';
+      if (placeCardDesc) placeCardDesc.textContent = `Connected arterial junction. Latitude: ${node.lat.toFixed(5)}, Longitude: ${node.lng.toFixed(5)}.`;
+      if (placeCardPhotoWrapper) placeCardPhotoWrapper.style.display = 'none';
+
+      if (btnPlaceDirections) {
+        btnPlaceDirections.onclick = () => {
+          placeCard.style.display = 'none';
+          openDirectionsPanel();
+          if (destinationSelect) {
+            destinationSelect.value = node.id;
+          }
+          calculateRouteAction();
+        };
+      }
+
+      if (btnPlaceReportUpdate) {
+        btnPlaceReportUpdate.onclick = () => {
+          placeCard.style.display = 'none';
+          openReportModal();
+        };
+      }
+
+      placeCard.style.display = 'block';
+    }
+
+    if (closePlaceCardBtn) {
+      closePlaceCardBtn.addEventListener('click', () => {
+        if (placeCard) placeCard.style.display = 'none';
+      });
+    }
+
+    // Listen to custom map events dispatched by MapLibre3DTrafficMap
+    window.addEventListener('gmaps:incident-clicked', (e) => {
+      if (e.detail) showIncidentPlaceCard(e.detail);
+    });
+
+    window.addEventListener('gmaps:junction-clicked', (e) => {
+      if (e.detail) showJunctionPlaceCard(e.detail);
+    });
+
+    // 6. Floating Category Filter Chips Listeners
+    if (chipTraffic) {
+      chipTraffic.addEventListener('click', () => {
+        if (!activeMap || !activeMap.map) return;
+        isTrafficLayerVisible = !isTrafficLayerVisible;
+        const visibility = isTrafficLayerVisible ? 'visible' : 'none';
+
+        if (activeMap.map.getLayer('traffic-corridors-core')) {
+          activeMap.map.setLayoutProperty('traffic-corridors-core', 'visibility', visibility);
+        }
+        if (activeMap.map.getLayer('traffic-corridors-glow')) {
+          activeMap.map.setLayoutProperty('traffic-corridors-glow', 'visibility', visibility);
+        }
+
+        chipTraffic.classList.toggle('active', isTrafficLayerVisible);
+        showToast(isTrafficLayerVisible ? 'Traffic density layer enabled' : 'Traffic density layer hidden');
+      });
+    }
+
+    if (chipIncidents) {
+      chipIncidents.addEventListener('click', () => {
+        if (incidentHistory.length > 0) {
+          const first = incidentHistory[0];
+          if (activeMap && typeof activeMap.focusLocation === 'function') {
+            activeMap.focusLocation(first.lat, first.lng, first.subject, 16);
+          }
+          showIncidentPlaceCard(first);
+          showToast(`Zoomed to latest critical incident: "${first.subject}"`);
+        } else {
+          openHistoryModal();
+        }
+      });
+    }
+
+    if (chipHospitals) {
+      chipHospitals.addEventListener('click', () => {
+        const hospitalNode = networkNodes.find(n => n.id.includes('HOSPITAL')) || {
+          lat: 12.8710,
+          lng: 74.8510,
+          name: 'KMC Hospital (Ambedkar Circle)'
+        };
+
+        if (activeMap && typeof activeMap.focusLocation === 'function') {
+          activeMap.focusLocation(hospitalNode.lat, hospitalNode.lng, hospitalNode.name, 16.5);
+        }
+        showJunctionPlaceCard(hospitalNode);
+        showToast(`Located hospital hub: "${hospitalNode.name}"`);
+      });
+    }
+
+    if (chipGreenCorridor) {
+      chipGreenCorridor.addEventListener('click', () => {
+        openDirectionsPanel();
+        if (originSelect) originSelect.value = 'EMS_STATE_BANK';
+        if (destinationSelect) destinationSelect.value = 'HOSPITAL_KMC_JYOTHI';
+        calculateRouteAction();
+        showToast('Calculated Emergency Green Corridor to KMC Hospital!');
+      });
+    }
+
+    if (chip3DBuildings) {
+      chip3DBuildings.addEventListener('click', () => {
+        const toggleBtn = document.getElementById('btnToggle3DView');
+        if (toggleBtn) toggleBtn.click();
+      });
+    }
+
+    // 7. Right-Hand Floating Map Controls
+    if (btnCompassReset) {
+      btnCompassReset.addEventListener('click', () => {
+        if (!activeMap || !activeMap.map) return;
+        activeMap.map.easeTo({
+          bearing: 0,
+          pitch: 0,
+          duration: 600
+        });
+        showToast('Reset map orientation to North (2D).');
+      });
+    }
+
+    if (btnMyLocation) {
+      btnMyLocation.addEventListener('click', () => {
+        if (!activeMap) return;
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              activeMap.focusLocation(pos.coords.latitude, pos.coords.longitude, 'My Current GPS Location', 16);
+              showToast('Centered on verified GPS coordinates.');
+            },
+            () => {
+              // Fallback to Mangaluru city center
+              activeMap.focusLocation(12.8750, 74.8550, 'Current Location · Mangaluru', 16);
+              showToast('Centered on Mangaluru Sector.');
+            }
+          );
+        } else {
+          activeMap.focusLocation(12.8750, 74.8550, 'Current Location · Mangaluru', 16);
+        }
+      });
+    }
+
+    if (btnMapLayers) {
+      let layerCycle = 0;
+      btnMapLayers.addEventListener('click', () => {
+        if (!activeMap || !activeMap.map) return;
+        layerCycle = (layerCycle + 1) % 3;
+        if (layerCycle === 0) {
+          activeMap.map.easeTo({ pitch: 52, bearing: -17.6, duration: 600 });
+          showToast('Layer: 3D Isometric Urban Buildings');
+        } else if (layerCycle === 1) {
+          activeMap.map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+          showToast('Layer: Clean 2D Cartographic View');
+        } else {
+          activeMap.map.easeTo({ pitch: 60, bearing: 30, duration: 600 });
+          showToast('Layer: Perspective Traffic Corridor View');
+        }
+      });
+    }
+
+    if (btnZoomIn) {
+      btnZoomIn.addEventListener('click', () => {
+        if (activeMap && activeMap.map) activeMap.map.zoomIn();
+      });
+    }
+
+    if (btnZoomOut) {
+      btnZoomOut.addEventListener('click', () => {
+        if (activeMap && activeMap.map) activeMap.map.zoomOut();
+      });
+    }
+  }
+
   // 4. Background Initialization of MapLibre 3D Map & Network (Non-blocking)
   let activeMap = null;
   let networkEdges = [];
@@ -722,17 +1452,25 @@ document.addEventListener('DOMContentLoaded', () => {
       activeMap = new MapLibre3DTrafficMap('map');
       activeMap.init().then(() => {
         console.info('MapLibre GL JS 3D Traffic Map ready.');
-        loadPublicNetwork();
+        loadPublicNetwork().then(() => {
+          initGoogleMapsInterface();
+        });
       }).catch(err => {
         console.warn('MapLibre 3D map initialization warning:', err);
-        loadPublicNetwork();
+        loadPublicNetwork().then(() => {
+          initGoogleMapsInterface();
+        });
       });
     } catch (err) {
       console.warn('MapLibre GL initialization error:', err);
-      loadPublicNetwork();
+      loadPublicNetwork().then(() => {
+        initGoogleMapsInterface();
+      });
     }
   } else {
-    loadPublicNetwork();
+    loadPublicNetwork().then(() => {
+      initGoogleMapsInterface();
+    });
   }
 
   // Periodic network refresh
