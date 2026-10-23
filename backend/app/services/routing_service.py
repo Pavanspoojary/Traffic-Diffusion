@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Tuple, Any
 import networkx as nx
 
 from backend.app.config import settings
+from backend.app.services.osrm_service import osrm_service
 from backend.app.models.schemas import (
     RoadNode,
     RoadEdge,
@@ -221,9 +222,11 @@ class RoutingService:
 
         # Assemble coordinates and route segments
         path_coords: List[List[float]] = []
+        waypoints: List[Tuple[float, float]] = []
         for nid in path_nodes:
             n = self.nodes[nid]
             path_coords.append([n.lat, n.lng])
+            waypoints.append((n.lat, n.lng))
 
         segments: List[RouteSegment] = []
         total_distance = 0.0
@@ -268,11 +271,29 @@ class RoutingService:
         # If green corridor routed around an incident, calculate time saved
         time_saved = max(0.0, round(standard_time_min - total_time_min, 2))
 
+        # Query real street-snapped, road-following geometry (Google Maps style)
+        snapped_result = osrm_service.get_road_snapped_route(waypoints)
+        if snapped_result and snapped_result.get("coordinates") and len(snapped_result["coordinates"]) > 5:
+            final_coords = snapped_result["coordinates"]
+            turn_instructions = snapped_result.get("maneuvers")
+            if snapped_result.get("distance_meters"):
+                total_distance = round(snapped_result["distance_meters"] / 1000.0, 2)
+        else:
+            final_coords = path_coords
+            turn_instructions = None
+
+        # Determine prominent road descriptor (e.g., 'via MG Rd' as seen in Google Maps)
+        primary_road = "via MG Road"
+        if segments:
+            longest_seg = max(segments, key=lambda s: s.distance_km)
+            clean_name = longest_seg.road_name.split("(")[0].strip()
+            primary_road = f"via {clean_name}"
+
         return RouteCalculationResponse(
             origin=self.nodes[origin_node_id],
             destination=self.nodes[destination_node_id],
             path_node_ids=path_nodes,
-            path_coordinates=path_coords,
+            path_coordinates=final_coords,
             segments=segments,
             total_distance_km=round(total_distance, 2),
             estimated_travel_time_min=round(total_time_min, 2),
@@ -280,6 +301,8 @@ class RoutingService:
             time_saved_min=time_saved,
             signals_preempted=total_signals if is_emergency else 0,
             is_green_corridor_active=is_emergency,
+            primary_road_name=primary_road,
+            turn_instructions=turn_instructions,
         )
 
 # Global routing service singleton

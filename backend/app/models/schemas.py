@@ -89,6 +89,8 @@ class RouteCalculationResponse(BaseModel):
     time_saved_min: float
     signals_preempted: int
     is_green_corridor_active: bool
+    primary_road_name: Optional[str] = "via MG Road"
+    turn_instructions: Optional[List[Dict[str, Any]]] = None
 
 class IncidentSimulateRequest(BaseModel):
     edge_id: str

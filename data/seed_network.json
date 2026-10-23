@@ -51,6 +51,14 @@
       "address": "Hampankatta, Mangaluru"
     },
     {
+      "id": "COLLEGE_SHREE_DEVI",
+      "name": "Shree Devi College (Emergency Medical Unit)",
+      "type": "hospital",
+      "lat": 12.8805,
+      "lng": 74.8432,
+      "address": "Shri Devi College Rd, Ballalbagh, Lalbagh, Mangaluru"
+    },
+    {
       "id": "INT_HAMPANKATTA",
       "name": "Hampankatta Signal Junction",
       "type": "intersection",
@@ -357,6 +365,34 @@
       "base_speed_kmh": 45,
       "lanes": 2,
       "density_score": 0.15,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 1
+    },
+    {
+      "id": "corridor_cctv_18",
+      "source": "INT_LALBAGH",
+      "target": "COLLEGE_SHREE_DEVI",
+      "name": "MG Road - Shri Devi College Road",
+      "corridor_id": "corridor_cctv_18",
+      "length_km": 0.9,
+      "base_speed_kmh": 40,
+      "lanes": 2,
+      "density_score": 0.20,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 1
+    },
+    {
+      "id": "corridor_cctv_19",
+      "source": "INT_PVS_CIRCLE",
+      "target": "COLLEGE_SHREE_DEVI",
+      "name": "Ballalbagh Link Road",
+      "corridor_id": "corridor_cctv_19",
+      "length_km": 0.6,
+      "base_speed_kmh": 35,
+      "lanes": 2,
+      "density_score": 0.25,
       "congestion_level": "FREE_FLOW",
       "has_incident": false,
       "traffic_signals": 1

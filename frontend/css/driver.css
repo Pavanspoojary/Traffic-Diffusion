@@ -373,6 +373,61 @@ body {
   flex-direction: column;
 }
 
+.route-via-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 2px;
+}
+
+/* Google Maps Midpoint Duration Callout Badge */
+.gmaps-route-pill-wrap {
+  pointer-events: none;
+}
+
+.gmaps-route-pill {
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  padding: 3px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.gmaps-route-pill .pill-time {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gmaps-green);
+  line-height: 1.1;
+}
+
+.gmaps-route-pill .pill-dist {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.gmaps-start-pin {
+  width: 16px;
+  height: 16px;
+  background-color: #1a73e8;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.gmaps-end-pin {
+  width: 24px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
 .eta-time-large {
   font-size: 28px;
   font-weight: 800;
