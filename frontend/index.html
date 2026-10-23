@@ -3,96 +3,111 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Traffic-Diffusion — Traffic Incident Intelligence</title>
+  <title>Traffic-Diffusion — Predictive Traffic Intelligence &amp; Intervention Planning</title>
   <link rel="stylesheet" href="/css/maplibre-gl.css">
-  <link rel="stylesheet" href="/css/style.css?v=7.1">
+  <link rel="stylesheet" href="/css/style.css?v=9.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="theme-control-room">
   <div class="app-layout">
 
-    <!-- Minimal Header -->
+    <!-- Top Navigation & Operations Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="logo-box">
-          <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
+        <div class="brand-box">
+          <svg width="26" height="26" viewBox="0 0 36 36" fill="none">
             <path d="M3 31H33M5 31V19H10V31M10 19V11H15V31M15 11V5H21V31M21 13H26V31M26 17H30V31M30 22H33V31" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="rgba(56, 189, 248, 0.12)"/>
             <circle cx="18" cy="5" r="1.5" fill="#38bdf8"/>
           </svg>
-        </div>
-        <div class="brand-headings">
-          <h1 class="brand-title">Traffic-Diffusion</h1>
-          <span class="brand-subtitle">Traffic Incident Intelligence</span>
+          <div class="brand-text">
+            <h1 class="brand-title">Traffic-Diffusion</h1>
+            <span class="brand-subtitle">Predictive Traffic Incident Intelligence &amp; Diversion Planning</span>
+          </div>
         </div>
       </div>
 
+      <!-- Center: 4-Step Operational Workflow Stepper -->
+      <nav class="workflow-stepper" aria-label="Incident Analysis Workflow">
+        <div class="stepper-item active" id="stepDetect">
+          <span class="stepper-num">01</span>
+          <span class="stepper-label">Detect</span>
+        </div>
+        <span class="stepper-arrow">&rarr;</span>
+        <div class="stepper-item" id="stepPredict">
+          <span class="stepper-num">02</span>
+          <span class="stepper-label">Predict</span>
+        </div>
+        <span class="stepper-arrow">&rarr;</span>
+        <div class="stepper-item" id="stepCompare">
+          <span class="stepper-num">03</span>
+          <span class="stepper-label">Compare</span>
+        </div>
+        <span class="stepper-arrow">&rarr;</span>
+        <div class="stepper-item" id="stepRecommend">
+          <span class="stepper-num">04</span>
+          <span class="stepper-label">Recommend</span>
+        </div>
+      </nav>
+
+      <!-- Right: Sector, Status, Clock & Controller Badge -->
       <div class="header-right">
         <div class="header-tag">
-          <span class="tag-label">Sector:</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+          </svg>
           <span class="tag-value" id="currentCityName">Mangaluru Metro</span>
         </div>
+
         <div class="status-indicator">
           <span class="status-dot"></span>
-          <span class="status-text">Simulation Mode</span>
+          <span class="status-text">Operational Control</span>
         </div>
+
         <div class="header-clock" id="headerLiveClock"></div>
+
+        <div class="user-avatar" title="Operations Controller">
+          <span>OP</span>
+        </div>
       </div>
     </header>
 
-    <!-- Compact Workflow Progress Indicator (01 Detect -> 02 Predict -> 03 Compare -> 04 Recommend) -->
-    <nav class="workflow-stepper" aria-label="Incident Analysis Workflow">
-      <div class="stepper-item active" id="stepDetect">
-        <span class="stepper-num">01</span>
-        <span class="stepper-label">Detect</span>
-      </div>
-      <span class="stepper-arrow">&rarr;</span>
-      <div class="stepper-item" id="stepPredict">
-        <span class="stepper-num">02</span>
-        <span class="stepper-label">Predict</span>
-      </div>
-      <span class="stepper-arrow">&rarr;</span>
-      <div class="stepper-item" id="stepCompare">
-        <span class="stepper-num">03</span>
-        <span class="stepper-label">Compare</span>
-      </div>
-      <span class="stepper-arrow">&rarr;</span>
-      <div class="stepper-item" id="stepRecommend">
-        <span class="stepper-num">04</span>
-        <span class="stepper-label">Recommend</span>
-      </div>
-    </nav>
-
-    <!-- Main Content Container -->
+    <!-- Main Dashboard Container -->
     <main class="dashboard-main">
 
-      <!-- STAGE 1 & 2: Main Workspace (Incident Setup Left + Network Map Right) -->
+      <!-- STAGE 1: Incident Setup (Detect) & Live Network Map -->
       <section class="workspace-grid">
 
-        <!-- Left Column: Incident Setup -->
+        <!-- Left Column: Incident Setup (Detect) -->
         <div class="panel incident-panel">
           <div class="panel-header">
-            <h2 class="panel-title">Incident Setup</h2>
-            <span class="panel-meta">Detect &amp; Configure</span>
+            <div class="header-with-icon">
+              <span class="icon-header icon-red">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              </span>
+              <h2 class="panel-title">Incident Setup</h2>
+            </div>
+            <span class="panel-meta">Stage 01 &bull; Detect</span>
           </div>
 
           <div class="panel-body">
-            <!-- Presets -->
+            <!-- Quick Presets -->
             <div class="control-group">
-              <label class="control-label">Incident Presets</label>
+              <label class="control-label">Quick Incident Presets</label>
               <div class="preset-chips">
                 <button type="button" class="preset-chip active" id="presetNanthoor" data-corridor="corridor_cctv_07" data-block="80">
-                  Nanthoor Rollover (80%)
+                  Nanthoor (80%)
                 </button>
                 <button type="button" class="preset-chip" id="presetBunts" data-corridor="corridor_cctv_05" data-block="50">
-                  Bunts Waterlogging (50%)
+                  Bunts (50%)
                 </button>
                 <button type="button" class="preset-chip" id="presetMgRoad" data-corridor="corridor_cctv_10" data-block="60">
-                  MG Road Bus Stall (60%)
+                  MG Road (60%)
                 </button>
                 <button type="button" class="preset-chip" id="presetHampankatta" data-corridor="corridor_cctv_01" data-block="100">
-                  K.S. Rao Closure (100%)
+                  K.S. Rao (100%)
                 </button>
               </div>
             </div>
@@ -113,7 +128,7 @@
               </select>
             </div>
 
-            <!-- Severity Controls & Blockage Slider -->
+            <!-- Incident Severity Chips & Blockage Slider -->
             <div class="control-group">
               <div class="label-with-tip">
                 <label class="control-label">Incident Severity</label>
@@ -128,7 +143,7 @@
               <input type="range" id="sliderBlockage" min="0" max="100" step="5" value="80" class="control-range">
             </div>
 
-            <!-- Demand & Capacity Summary -->
+            <!-- Real-Time Demand & Capacity Telemetry -->
             <div class="demand-summary-strip">
               <div class="demand-stat">
                 <span class="d-label">Baseline Demand</span>
@@ -155,18 +170,18 @@
           </div>
         </div>
 
-        <!-- Right Column: Network Map -->
+        <!-- Right Column: Live Network Map with Real Physical Route Overlays -->
         <div class="panel map-panel">
           <div class="panel-header">
             <div class="map-title-row">
               <h2 class="panel-title" id="mapCardTitle">Mangaluru Arterial Network</h2>
-              <span class="panel-meta">3D Urban View</span>
+              <span class="panel-meta">Geo-Physical Corridor Simulation</span>
             </div>
             <div class="map-legend">
-              <span class="legend-item"><span class="legend-dot dot-blocked"></span>Incident Road</span>
-              <span class="legend-item"><span class="legend-dot dot-detour-a"></span>Route A</span>
-              <span class="legend-item"><span class="legend-dot dot-detour-b"></span>Route B</span>
-              <span class="legend-item"><span class="legend-dot dot-bottleneck"></span>Bottleneck</span>
+              <span class="legend-item"><span class="legend-dot dot-heavy"></span>Incident Segment</span>
+              <span class="legend-item"><span class="legend-dot dot-detour-a"></span>Alternative A</span>
+              <span class="legend-item"><span class="legend-dot dot-detour-b"></span>Alternative B</span>
+              <span class="legend-item"><span class="legend-dot dot-moderate"></span>Bottleneck Warning</span>
             </div>
           </div>
 
@@ -177,137 +192,163 @@
 
       </section>
 
-      <!-- STAGE 2: Compact Impact Summary (3 Key Metrics) -->
+      <!-- STAGE 2: Real Predictive Impact Telemetry (Predict) -->
       <section class="summary-strip" id="impactSummaryContainer">
         <div class="summary-metric">
-          <span class="metric-label">Displaced Traffic</span>
+          <div class="metric-top-row">
+            <span class="metric-label">Displaced Traffic</span>
+            <span class="provenance-pill" id="provenanceBadge">ESTIMATED</span>
+          </div>
           <div class="metric-value-row">
             <span class="metric-value text-red" id="kpiDisplacedDemand">895 PCU/hr</span>
-            <span class="metric-tag">[ESTIMATED]</span>
           </div>
           <span class="metric-sub">Demand displaced from blocked corridor</span>
         </div>
 
         <div class="summary-metric">
-          <span class="metric-label">Network Delay Impact</span>
-          <div class="metric-value-row">
-            <span class="metric-value text-green" id="kpiDelaySaved">242.8 veh-hrs</span>
+          <div class="metric-top-row">
+            <span class="metric-label">Network Delay Relief</span>
             <span class="metric-pill pill-green" id="kpiDelayPctTag">-94.8%</span>
           </div>
-          <span class="metric-sub">Projected relief vs baseline (1-hr horizon)</span>
+          <div class="metric-value-row">
+            <span class="metric-value text-green" id="kpiDelaySaved">242.8 veh-hrs</span>
+          </div>
+          <span class="metric-sub">Projected relief vs unmitigated baseline (1-hr horizon)</span>
         </div>
 
         <div class="summary-metric">
-          <span class="metric-label">Remaining Downstream Bottlenecks</span>
+          <div class="metric-top-row">
+            <span class="metric-label">Downstream Bottlenecks</span>
+            <span class="metric-pill pill-cyan" id="kpiCapacityLostTag">BPR MODEL</span>
+          </div>
           <div class="metric-value-row">
             <span class="metric-value text-cyan" id="kpiSaturatedCount">0 New Bottlenecks</span>
-            <span class="metric-tag" id="kpiCapacityLostTag">[BPR MODEL]</span>
           </div>
-          <span class="metric-sub">Subsystem: <span id="rippleCorridorsCount">6</span> links analyzed &bull; <span id="rippleQueueBacklog">447 PCU</span> backlog</span>
+          <span class="metric-sub">Subsystem: <strong id="rippleCorridorsCount">6</strong> links analyzed &bull; <strong id="rippleQueueBacklog">447 PCU</strong> backlog</span>
         </div>
       </section>
 
-      <!-- STAGE 3: Scenario Comparison Table -->
-      <section class="panel comparison-panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Diversion Scenario Comparison</h2>
-            <span class="panel-meta">Macroscopic traffic redistribution across candidate detours &bull; Click row to inspect</span>
+      <!-- STAGE 3 & 4: Decision Engine (Compare & Recommend) -->
+      <section class="bottom-decision-grid">
+
+        <!-- Left Column: Scenario Comparison & Segment Inspector (Compare) -->
+        <div class="panel comparison-panel">
+          <div class="panel-header">
+            <div class="header-with-icon">
+              <span class="icon-header icon-cyan">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h16"></path><path d="M4 5h16"></path><path d="M12 5v14"></path></svg>
+              </span>
+              <div>
+                <h2 class="panel-title">Diversion Scenario Comparison</h2>
+                <span class="panel-meta">Macroscopic traffic redistribution &bull; Click any row to inspect &amp; map</span>
+              </div>
+            </div>
+            <span class="badge-rec">STAGE 03 &bull; COMPARE</span>
           </div>
-          <span class="provenance-pill" id="provenanceBadge">ESTIMATED</span>
-        </div>
 
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Scenario</th>
-                <th>Assigned Flow</th>
-                <th>Travel Time</th>
-                <th>Peak V/C</th>
-                <th>Downstream Bottlenecks</th>
-                <th>Network Delay Saved</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="matrixTableBody">
-              <!-- Populated dynamically by app.js -->
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Collapsible Detailed Road-Segment Breakdown Inspector -->
-        <details class="segment-breakdown-details" id="scenarioSegmentInspector">
-          <summary class="segment-summary-bar">
-            <span class="summary-title">Segment-by-Segment Capacity &amp; Flow Inspector: <strong id="inspectorScenarioName">Optimal Split</strong></span>
-            <span class="summary-badge">Toggle Link Breakdown</span>
-          </summary>
-          <div class="table-responsive inspector-scroll-area">
-            <table class="data-table table-dense">
+          <div class="table-responsive">
+            <table class="data-table">
               <thead>
                 <tr>
-                  <th>Road Segment</th>
-                  <th>Role</th>
-                  <th>Nominal Flow</th>
+                  <th>Scenario</th>
                   <th>Assigned Flow</th>
-                  <th>Capacity</th>
-                  <th>Reserve</th>
-                  <th>V/C Ratio</th>
-                  <th>Status</th>
+                  <th>Travel Time</th>
+                  <th>Peak V/C</th>
+                  <th>Downstream Bottlenecks</th>
+                  <th>Network Delay Saved</th>
+                  <th>Action</th>
                 </tr>
               </thead>
-              <tbody id="inspectorTableBody">
-                <!-- Populated dynamically on scenario click -->
+              <tbody id="matrixTableBody">
+                <!-- Populated dynamically by app.js -->
               </tbody>
             </table>
           </div>
-        </details>
-      </section>
 
-      <!-- STAGE 4: Operational Recommendation Panel -->
-      <section class="panel recommendation-panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">Operational Recommendation</h2>
-            <span class="panel-meta">Decision-Support Guidance</span>
-          </div>
-          <span class="badge-rec">RECOMMENDED INTERVENTION</span>
-        </div>
-
-        <div class="rec-card">
-          <div class="rec-headline" id="recTitle">Optimal: Capacity-Aware Multi-Corridor Split</div>
-          <p class="rec-explanation" id="recDesc">
-            Recommended Strategy: 'Capacity-Aware Multi-Corridor Split (Balanced Detour)' achieves optimal network relief, saving 242.8 vehicle-hours (-94.8% vs baseline) with peak arterial V/C at 1.00.
-          </p>
-          <div class="rec-tradeoffs" id="recTradeoff">
-            Trade-off Analysis: Creates zero new saturated bottlenecks. Requires 2 units (Multi-Junction VMS Signage &amp; Dynamic Guidance).
-          </div>
-          <div class="rec-allocations" id="recRouteAllocations">
-            <!-- Populated dynamically with volume and route details -->
-          </div>
-        </div>
-
-        <!-- Hidden container for detours list to preserve app.js binding -->
-        <div id="detoursContainer" style="display: none;"></div>
-
-        <!-- Concise Advisory and Assumptions -->
-        <div class="rec-footer">
-          <div class="advisory-text">
-            <strong>Decision-Support Advisory:</strong> Model estimates assist operator situational judgment; field implementation requires human command authorization.
-          </div>
-          <details class="assumptions-toggle">
-            <summary class="assumptions-summary">Model Assumptions &amp; Standards</summary>
-            <ul id="recAssumptionsList" class="assumptions-items">
-              <li>Capacities derived from IRC standards (900 PCU/lane/hr).</li>
-              <li>Travel times follow Bureau of Public Roads (BPR) volume-delay curves: t = t0 * [1 + 0.15*(V/C)^4], bounded at 8.0x crawl speed.</li>
-              <li>Delays and delay savings measured over a 1-hour operational analysis horizon.</li>
-              <li>Strictly isolated network initial conditions across all candidate scenarios.</li>
-            </ul>
+          <!-- Segment-by-Segment Capacity & Flow Inspector -->
+          <details class="segment-breakdown-details" id="scenarioSegmentInspector" open>
+            <summary class="segment-summary-bar">
+              <span class="summary-title">Segment Capacity &amp; Flow Inspector: <strong id="inspectorScenarioName">Optimal Split</strong></span>
+              <span class="summary-badge">Toggle Link Breakdown</span>
+            </summary>
+            <div class="table-responsive inspector-scroll-area">
+              <table class="data-table table-dense">
+                <thead>
+                  <tr>
+                    <th>Road Segment</th>
+                    <th>Role</th>
+                    <th>Assigned Flow</th>
+                    <th>Capacity</th>
+                    <th>Reserve</th>
+                    <th>V/C Ratio</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="inspectorTableBody">
+                  <!-- Populated dynamically by app.js -->
+                </tbody>
+              </table>
+            </div>
           </details>
         </div>
+
+        <!-- Right Column: Operational Recommendation (Recommend) -->
+        <div class="panel recommendation-panel">
+          <div class="panel-header">
+            <div class="header-with-icon">
+              <span class="icon-header icon-green">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              </span>
+              <h2 class="panel-title">Operational Recommendation</h2>
+            </div>
+            <span class="badge-rec">STAGE 04 &bull; RECOMMEND</span>
+          </div>
+
+          <div class="panel-body recommendation-body">
+            <div class="rec-headline-box">
+              <div class="rec-badge-tag">OPTIMAL STRATEGY</div>
+              <h3 class="rec-headline" id="recTitle">Optimal: Capacity-Aware Multi-Corridor Split</h3>
+            </div>
+
+            <p class="rec-explanation" id="recDesc">
+              Recommended Strategy: 'Capacity-Aware Multi-Corridor Split (Balanced Detour)' achieves optimal network relief, saving 242.8 vehicle-hours (-94.8% vs baseline) with peak arterial V/C at 1.00.
+            </p>
+
+            <!-- Volume Allocation Split Breakdown -->
+            <div class="rec-allocations-box" id="recRouteAllocations">
+              <!-- Populated dynamically with volume and percentage split -->
+            </div>
+
+            <!-- Field Resource Requirements & Trade-offs -->
+            <div class="rec-tradeoffs" id="recTradeoff">
+              Trade-off Analysis: Creates zero new saturated bottlenecks. Requires 2 field units (Multi-Junction VMS Signage &amp; Dynamic Guidance).
+            </div>
+
+            <!-- Decision-Support Advisory -->
+            <div class="rec-advisory">
+              <strong>Control Room Advisory:</strong> Model estimates assist situational decision-making. Field deployment requires traffic controller authorization.
+            </div>
+
+            <!-- Model Assumptions & Standards -->
+            <details class="assumptions-toggle">
+              <summary class="assumptions-summary">Model Assumptions &amp; Standards</summary>
+              <ul id="recAssumptionsList" class="assumptions-items">
+                <li>Capacities derived from IRC standards (900 PCU/lane/hr).</li>
+                <li>Travel times follow Bureau of Public Roads (BPR) volume-delay curves: t = t0 * [1 + 0.15*(V/C)^4], bounded at 8.0x crawl speed.</li>
+                <li>Delays and delay savings measured over a 1-hour operational analysis horizon.</li>
+                <li>Strictly isolated network initial conditions across all candidate scenarios.</li>
+              </ul>
+            </details>
+          </div>
+        </div>
+
       </section>
 
     </main>
+
+    <!-- Hidden containers for backwards compatibility -->
+    <div id="detoursContainer" style="display:none;"></div>
+    <div id="kpiCapacityLost" style="display:none;"></div>
 
     <!-- Global Toast Notification -->
     <div id="actionToast" class="action-toast hidden"></div>
@@ -315,6 +356,6 @@
   </div>
 
   <script src="/js/maplibre-gl.js"></script>
-  <script src="/js/app.js?v=7.4"></script>
+  <script src="/js/app.js?v=9.0"></script>
 </body>
 </html>
