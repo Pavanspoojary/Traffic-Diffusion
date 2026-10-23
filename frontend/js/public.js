@@ -239,11 +239,70 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnRemovePhoto.addEventListener('click', clearPhotoPreview);
   }
 
+  // Location Elements
+  const modalIncidentLocation = document.getElementById('modalIncidentLocation');
+  const btnUseCurrentLocation = document.getElementById('btnUseCurrentLocation');
+  const gpsActivePill = document.getElementById('gpsActivePill');
+
+  if (btnUseCurrentLocation) {
+    btnUseCurrentLocation.addEventListener('click', () => {
+      if (modalIncidentLocation) {
+        modalIncidentLocation.placeholder = 'Acquiring GPS fix...';
+      }
+
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = Math.round(position.coords.accuracy || 15);
+            
+            if (modalIncidentLocation) {
+              modalIncidentLocation.value = `GPS: ${lat.toFixed(5)}° N, ${lng.toFixed(5)}° E (±${accuracy}m)`;
+            }
+            if (gpsActivePill) gpsActivePill.style.display = 'inline-block';
+
+            // Pan map to current GPS location and drop marker
+            if (trafficMap && trafficMap.map) {
+              trafficMap.map.setView([lat, lng], 15);
+              L.circleMarker([lat, lng], {
+                radius: 8,
+                fillColor: '#3b82f6',
+                color: '#ffffff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.9
+              }).addTo(trafficMap.map).bindPopup('<strong>Your Current GPS Location</strong>').openPopup();
+            }
+          },
+          (error) => {
+            console.warn('Geolocation error:', error);
+            if (modalIncidentLocation) {
+              modalIncidentLocation.value = currentCitizen.address || 'Mangaluru Sector';
+            }
+            if (gpsActivePill) {
+              gpsActivePill.textContent = 'Approx Location';
+              gpsActivePill.style.display = 'inline-block';
+            }
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      } else {
+        if (modalIncidentLocation) {
+          modalIncidentLocation.value = currentCitizen.address || 'Mangaluru Sector';
+        }
+      }
+    });
+  }
+
   function openModal() {
     if (incidentModal) {
       incidentModal.classList.add('active');
       const subjectInput = document.getElementById('modalIncidentSubject');
       if (subjectInput) subjectInput.focus();
+      if (modalIncidentLocation && !modalIncidentLocation.value) {
+        modalIncidentLocation.value = currentCitizen.address || '';
+      }
     }
   }
 
@@ -282,21 +341,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const category = modalCategorySelect?.value || 'ROAD_BLOCKAGE';
       const subject = modalIncidentSubject?.value.trim() || 'Citizen Incident';
-      const corridorId = document.getElementById('modalCorridorSelect')?.value || 'corridor_cctv_01';
+      const location = modalIncidentLocation?.value.trim() || currentCitizen.address || 'Mangaluru';
       const description = document.getElementById('modalIncidentDesc')?.value || '';
       const severity = document.getElementById('modalSeveritySelect')?.value || 'HIGH';
 
-      const fullDetails = `${subject} | ${description}`.trim();
+      const fullDetails = `${subject} at ${location} | ${description}`.trim();
 
       // Submit to backend intelligence API if available
       try {
         const payload = {
-          edge_id: corridorId,
+          edge_id: 'corridor_cctv_01',
           category: category === 'OTHER' ? 'ROAD_BLOCKAGE' : category,
           severity: severity,
           capacity_reduction: 0.85,
           estimated_duration_min: 45,
           custom_subject: subject,
+          location: location,
           reporter: currentCitizen.name,
           reporter_address: currentCitizen.address,
           has_photo: !!capturedPhotoBase64
@@ -309,13 +369,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         if (res.ok) {
-          showToast(`Alert dispatched: "${subject}" with photo verification! Responders notified.`);
+          showToast(`Alert dispatched: "${subject}" at ${location} with photo verification!`);
         } else {
-          showToast(`Alert dispatched: "${subject}" recorded near ${corridorId}.`);
+          showToast(`Alert dispatched: "${subject}" recorded at ${location}.`);
         }
       } catch (err) {
         // Fallback demo toast if offline
-        showToast(`Alert logged: "${subject}" verified via camera. Responders alerted!`);
+        showToast(`Alert logged: "${subject}" at ${location} verified via camera!`);
       }
 
       // Close modal and clean up

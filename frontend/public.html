@@ -141,12 +141,32 @@
               />
             </div>
 
-            <!-- Road Corridor -->
+            <!-- Incident Location (Current GPS / Address) -->
             <div class="login-form-group">
-              <label class="login-label" for="modalCorridorSelect">Affected Road Corridor</label>
-              <select id="modalCorridorSelect" class="login-input" required>
-                <option value="">Loading corridors...</option>
-              </select>
+              <div class="login-label">
+                <span>Incident Location</span>
+                <button type="button" id="btnUseCurrentLocation" class="btn-location-gps" title="Fetch live GPS coordinates">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <line x1="12" y1="1" x2="12" y2="4"></line>
+                    <line x1="12" y1="20" x2="12" y2="23"></line>
+                    <line x1="1" y1="12" x2="4" y2="12"></line>
+                    <line x1="20" y1="12" x2="23" y2="12"></line>
+                  </svg>
+                  <span>Use Current GPS Location</span>
+                </button>
+              </div>
+              <div style="position: relative;">
+                <input 
+                  type="text" 
+                  id="modalIncidentLocation" 
+                  class="login-input" 
+                  placeholder="e.g. Current Location / landmark..." 
+                  required 
+                />
+                <span id="gpsActivePill" class="gps-active-badge" style="display: none;">GPS Verified</span>
+              </div>
             </div>
 
             <!-- Severity -->
