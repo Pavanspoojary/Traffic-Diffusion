@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     mapInstance = new maplibregl.Map({
       container: 'liveTrafficMap',
-      style: 'https://tiles.openfreemap.org/styles/dark',
+      style: 'https://tiles.openfreemap.org/styles/bright',
       center: MANGALURU_CENTER,
       zoom: 14.3,
       pitch: 45,
@@ -116,10 +116,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 'interpolate',
                 ['linear'],
                 ['get', 'render_height'],
-                0, '#151d30',
-                40, '#1c2944',
-                120, '#2563eb',
-                250, '#38bdf8'
+                0, '#d1d5db',
+                40, '#94a3b8',
+                120, '#60a5fa',
+                250, '#2563eb'
               ],
               'fill-extrusion-height': [
                 'interpolate',
@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 13, 0,
                 15.5, ['get', 'render_min_height']
               ],
-              'fill-extrusion-opacity': 0.85
+              'fill-extrusion-opacity': 0.72
             }
           },
           labelLayerId
@@ -227,17 +227,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         data: geojson
       });
 
-      // Background glow for corridors
+      // Background casing for corridors on light map
       mapInstance.addLayer({
         id: 'corridors-glow',
         type: 'line',
         source: 'mng-corridors',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'isTarget'], 10, 5],
-          'line-opacity': 0.35,
-          'line-blur': 3
+          'line-color': ['case', ['get', 'isTarget'], '#fee2e2', '#ffffff'],
+          'line-width': ['case', ['get', 'isTarget'], 10, 6],
+          'line-opacity': 0.85
         }
       });
 
@@ -249,7 +248,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'isTarget'], 5, 2.5]
+          'line-width': ['case', ['get', 'isTarget'], 5, 3]
         }
       });
 
@@ -382,12 +381,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (lblNom) lblNom.textContent = `${data.baseline_flow_veh_hr.toFixed(0)} PCU/hr`;
     if (lblEff) lblEff.textContent = `${data.effective_capacity_veh_hr.toFixed(0)} PCU/hr`;
     if (lblDisp) lblDisp.textContent = `${data.displaced_demand_veh_hr.toFixed(0)} PCU/hr`;
-
-    // Map Floating Callout
-    const overlayRoad = document.getElementById('overlayRoadName');
-    const overlayMeta = document.getElementById('overlayMetaText');
-    if (overlayRoad) overlayRoad.textContent = data.affected_corridor || activeCorridorId;
-    if (overlayMeta) overlayMeta.textContent = `${activeBlockagePct}% Blockage &bull; ${data.displaced_demand_veh_hr.toFixed(0)} PCU/hr Displaced`;
 
     // 1. STEP 2: Render Discovered Viable Detours List
     const detoursContainer = document.getElementById('detoursContainer');
@@ -738,14 +731,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       mapInstance.addLayer({
+        id: 'detours-casing-layer',
+        type: 'line',
+        source: 'active-detours',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 8.5,
+          'line-opacity': 0.95
+        }
+      });
+
+      mapInstance.addLayer({
         id: 'detours-pulse-layer',
         type: 'line',
         source: 'active-detours',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': 6,
-          'line-opacity': 0.88
+          'line-width': 5.5,
+          'line-opacity': 0.95
         }
       });
     }

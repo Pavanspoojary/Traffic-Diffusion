@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Traffic-Diffusion — Traffic Diversion Intelligence for Control Rooms</title>
   <link rel="stylesheet" href="/css/maplibre-gl.css">
-  <link rel="stylesheet" href="/css/style.css?v=6.0">
+  <link rel="stylesheet" href="/css/style.css?v=6.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -210,22 +210,6 @@
 
             <div class="map-canvas-wrapper">
               <div id="liveTrafficMap" class="maplibre-3d-map"></div>
-
-              <!-- Floating Incident Detection Callout Banner -->
-              <div class="map-incident-overlay" id="incidentOverlayCallout">
-                <div class="overlay-icon-box">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.3">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                  </svg>
-                </div>
-                <div class="overlay-info">
-                  <div class="overlay-status" id="overlayStatusText">Active Arterial Disruption</div>
-                  <div class="overlay-road" id="overlayRoadName">Circuit House - Nanthoor Road</div>
-                  <div class="overlay-meta" id="overlayMetaText">80% Blockage &bull; 895 PCU/hr Displaced Demand</div>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -538,6 +522,6 @@
   </div>
 
   <script src="/js/maplibre-gl.js"></script>
-  <script src="/js/app.js?v=6.0"></script>
+  <script src="/js/app.js?v=6.1"></script>
 </body>
 </html>
