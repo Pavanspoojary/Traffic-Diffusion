@@ -442,6 +442,21 @@ class ComputerVisionService:
             record.verified_by = operator_id
             if notes:
                 record.description += f" [Verified: {notes}]"
+            try:
+                from backend.app.services.prediction_service import prediction_service
+                from backend.app.models.schemas import IncidentCategory, IncidentSeverity, EventProvenance
+                edge_id = record.corridor_id
+                prediction_service.create_incident(
+                    affected_edge_id=edge_id,
+                    category=IncidentCategory.COLLISION if "collision" in record.description.lower() else IncidentCategory.ROAD_BLOCKAGE,
+                    severity=IncidentSeverity.HIGH,
+                    blocked_lanes=1,
+                    capacity_reduction_pct=0.60,
+                    description=f"Confirmed CCTV Incident: {record.description}",
+                    provenance=EventProvenance.OBSERVED,
+                )
+            except Exception:
+                pass
         elif action_upper in ["DISMISS", "CLEAR"]:
             record.status = IncidentStatus.CLEARED
             record.verified_at = now_iso

@@ -192,6 +192,8 @@ async def evaluate_intervention_scenarios(request: InterventionEvaluationRequest
         horizon_minutes=30,
         custom_scenarios=request.custom_scenarios,
         optimization_objective=request.optimization_objective,
+        override_displaced_demand=request.override_displaced_demand,
+        override_blockage_pct=request.override_blockage_pct,
     )
     return evaluation
 
@@ -242,6 +244,13 @@ async def load_demo_scenario(scenario_key: str = Query("nanthoor_freight_rollove
         desc = "Disabled articulated transit bus blocking central lane on M.G. Road near Lalbagh"
         reduc = 0.40
         dur = 35.0
+    elif scenario_key == "hampankatta_closure":
+        edge_id = "corridor_cctv_01"
+        category = IncidentCategory.ROADWORKS
+        sev = IncidentSeverity.CRITICAL
+        desc = "Emergency utility sinkhole repair causing complete closure of K.S. Rao Arterial Road"
+        reduc = 1.0
+        dur = 120.0
     else:
         # Default: nanthoor_freight_rollover
         edge_id = "corridor_cctv_07"

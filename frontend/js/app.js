@@ -1,10 +1,11 @@
-// Traffic-Diffusion — Predictive Traffic Intelligence & Intervention Planning
+// Traffic-Diffusion — Traffic Diversion Intelligence for Control Rooms
 // MapLibre GL JS with 3D Buildings Extrusion & Vector Tiles
+// Unified Demonstration Geography: Mangaluru Metropolitan Arterials (NH-66 / NH-73)
 
 document.addEventListener('DOMContentLoaded', async () => {
 
   // =========================================================================
-  // 1. Live Digital Clock (Mon, Apr 28, 2025 • 14:32:05)
+  // 1. Live Digital Clock
   // =========================================================================
   const headerLiveClock = document.getElementById('headerLiveClock');
 
@@ -30,143 +31,60 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateClock();
 
   // =========================================================================
-  // 2. State & Sector Data
+  // 2. State & Sector Data (Mangaluru Metropolitan Sector)
   // =========================================================================
-  let currentCity = 'Bengaluru';
-  let activeIncident = {
-    road: 'Hosur Road',
-    category: 'Accident',
-    severity: 'Severe',
-    time: '14:20',
-    duration: '~ 45 min',
-    lanes: '2 lanes blocked',
-    trafficLoad: 68,
-    activeIncidentsCount: 3,
-    avgDelayMin: 12,
-    networkRisk: 'Medium',
-    peakRiskPct: 92,
-    atRiskPct: 72
-  };
-
-  // High-fidelity Bengaluru Arterials ([longitude, latitude] GeoJSON format)
-  const BENGALURU_NETWORK = {
-    center: [77.6255, 12.9110], // Silk Board / Hosur Road / Koramangala
-    zoom: 15.2,
-    pitch: 45,
-    bearing: -17.6,
-    corridors: [
-      {
-        id: 'blr_hosur_01',
-        name: 'Hosur Road Arterial (Silk Board - Bommanahalli)',
-        coords: [[77.6228, 12.9172], [77.6288, 12.9065], [77.6360, 12.8980]],
-        congestion: 'HEAVY',
-        hasIncident: true,
-        incidentDesc: 'Accident: Overturned truck blocking 2 central lanes'
-      },
-      {
-        id: 'blr_hosur_02',
-        name: 'Hosur Road Expressway (Electronic City Phase 1)',
-        coords: [[77.6360, 12.8980], [77.6530, 12.8750], [77.6680, 12.8450]],
-        congestion: 'MODERATE',
-        hasIncident: false
-      },
-      {
-        id: 'blr_sarjapur_01',
-        name: 'Sarjapur Main Road (Koramangala to Iblur Junction)',
-        coords: [[77.6280, 12.9280], [77.6480, 12.9230], [77.6710, 12.9210]],
-        congestion: 'HEAVY',
-        hasIncident: false
-      },
-      {
-        id: 'blr_orr_bellandur',
-        name: 'Outer Ring Road (Iblur to Bellandur Tech Park)',
-        coords: [[77.6710, 12.9210], [77.6840, 12.9310], [77.6960, 12.9410]],
-        congestion: 'HEAVY',
-        hasIncident: false
-      },
-      {
-        id: 'blr_orr_silkboard',
-        name: 'Outer Ring Road (BTM Layout to Silk Board Junction)',
-        coords: [[77.6080, 12.9150], [77.6228, 12.9172]],
-        congestion: 'HEAVY',
-        hasIncident: false
-      },
-      {
-        id: 'blr_koramangala_80ft',
-        name: 'Koramangala 80 Feet Road Bypass',
-        coords: [[77.6180, 12.9350], [77.6280, 12.9340], [77.6420, 12.9300]],
-        congestion: 'MODERATE',
-        hasIncident: false
-      },
-      {
-        id: 'blr_inner_ring',
-        name: 'Inner Ring Road (Domlur to Koramangala)',
-        coords: [[77.6380, 12.9550], [77.6340, 12.9420], [77.6280, 12.9340]],
-        congestion: 'SMOOTH',
-        hasIncident: false
-      },
-      {
-        id: 'blr_bannerghatta',
-        name: 'Bannerghatta Road Link',
-        coords: [[77.5980, 12.9250], [77.5960, 12.9050]],
-        congestion: 'SMOOTH',
-        hasIncident: false
-      },
-      {
-        id: 'blr_old_airport',
-        name: 'Old Airport Road',
-        coords: [[77.6450, 12.9600], [77.6680, 12.9570], [77.6950, 12.9550]],
-        congestion: 'SMOOTH',
-        hasIncident: false
-      }
-    ],
-    incidents: [
-      { lat: 12.9110, lng: 77.6255, road: 'Hosur Road', type: 'Accident', severity: 'Severe', time: '14:20' },
-      { lat: 12.9215, lng: 77.6710, road: 'Outer Ring Road (Iblur)', type: 'Congestion', severity: 'High', time: '14:25' },
-      { lat: 12.9240, lng: 77.6420, road: 'Sarjapur Road', type: 'Slowdown', severity: 'Moderate', time: '14:15' }
-    ]
-  };
-
-  // =========================================================================
-  // 3. MapLibre GL JS Map Initialization with 3D Buildings
-  // =========================================================================
+  const MANGALURU_CENTER = [74.8550, 12.8750]; // Center around Bunts Hostel / Kadri / Nanthoor
   let mapInstance = null;
   let activeMarkers = [];
+  let currentCorridorsData = [];
+  let currentNodesMap = new Map();
 
+  let activeCorridorId = 'corridor_cctv_07';
+  let activeBlockagePct = 80;
+  let activeDisplacedDemand = 895.0;
+  let latestEvaluation = null;
+
+  // Presets mapping
+  const PRESETS = {
+    nanthoor: { corridor: 'corridor_cctv_07', blockage: 80, desc: 'Nanthoor Rollover (80%)' },
+    bunts: { corridor: 'corridor_cctv_05', blockage: 50, desc: 'Bunts Waterlogging (50%)' },
+    mgRoad: { corridor: 'corridor_cctv_10', blockage: 60, desc: 'MG Road Bus Stall (60%)' },
+    hampankatta: { corridor: 'corridor_cctv_01', blockage: 100, desc: 'K.S. Rao Closure (100%)' }
+  };
+
+  // =========================================================================
+  // 3. MapLibre GL JS Map Initialization with 3D Buildings Extrusion
+  // =========================================================================
   function initMapLibre() {
     const mapContainer = document.getElementById('liveTrafficMap');
     if (!mapContainer || typeof maplibregl === 'undefined') return;
 
     mapInstance = new maplibregl.Map({
       container: 'liveTrafficMap',
-      // OpenFreeMap dark style (100% free, no API key required, global CDN)
       style: 'https://tiles.openfreemap.org/styles/dark',
-      center: BENGALURU_NETWORK.center,
-      zoom: BENGALURU_NETWORK.zoom,
-      pitch: BENGALURU_NETWORK.pitch,
-      bearing: BENGALURU_NETWORK.bearing,
+      center: MANGALURU_CENTER,
+      zoom: 14.3,
+      pitch: 45,
+      bearing: -15,
       canvasContextAttributes: { antialias: true }
     });
 
-    // Navigation Controls
     mapInstance.addControl(
       new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),
       'top-left'
     );
 
-    mapInstance.on('load', () => {
+    mapInstance.on('load', async () => {
       setup3DBuildings();
-      loadCorridorsLayer(BENGALURU_NETWORK.corridors);
-      setupIncidentMarkers(BENGALURU_NETWORK.incidents);
+      await loadMangaluruNetwork();
+      await triggerDiversionEvaluation();
     });
   }
 
-  // 3D Buildings Extrusion (Official MapLibre GL JS Pattern)
+  // 3D Buildings Extrusion
   function setup3DBuildings() {
     try {
       const layers = mapInstance.getStyle().layers || [];
-
-      // Find top label layer to insert buildings beneath text labels
       let labelLayerId;
       for (let i = 0; i < layers.length; i++) {
         if (layers[i].type === 'symbol' && layers[i].layout && layers[i].layout['text-field']) {
@@ -175,7 +93,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
 
-      // OpenFreeMap vector tile source
       const existingSource = mapInstance.getSource('openmaptiles') ? 'openmaptiles' : (mapInstance.getSource('openfreemap') ? 'openfreemap' : null);
       if (!existingSource) {
         mapInstance.addSource('openfreemap', {
@@ -225,317 +142,501 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
       }
     } catch (e) {
-      console.warn('3D buildings initialization:', e);
+      console.warn('3D buildings init notice:', e);
     }
   }
 
-  // Corridors GeoJSON Source & Layers
-  function loadCorridorsLayer(corridorsList) {
-    const geojsonData = {
-      type: 'FeatureCollection',
-      features: corridorsList.map(c => ({
+  // =========================================================================
+  // 4. Load Mangaluru Network from Backend (/api/v1/navigation/network)
+  // =========================================================================
+  async function loadMangaluruNetwork() {
+    try {
+      const res = await fetch('/api/v1/navigation/network');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      currentNodesMap.clear();
+      data.nodes.forEach(n => currentNodesMap.set(n.id, n));
+      currentCorridorsData = data.edges;
+
+      // Populate Corridor Select dropdown
+      const selectCorridor = document.getElementById('selectCorridor');
+      if (selectCorridor && selectCorridor.options.length <= 1) {
+        selectCorridor.innerHTML = '';
+        data.edges.forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = `${e.name} (${e.id})`;
+          if (e.id === activeCorridorId) opt.selected = true;
+          selectCorridor.appendChild(opt);
+        });
+      }
+
+      renderNetworkOnMap();
+      setupJunctionMarkers();
+
+    } catch (err) {
+      console.error('Failed to load Mangaluru network:', err);
+    }
+  }
+
+  function renderNetworkOnMap() {
+    if (!mapInstance || !currentCorridorsData.length) return;
+
+    const features = [];
+    currentCorridorsData.forEach(edge => {
+      const s = currentNodesMap.get(edge.source);
+      const t = currentNodesMap.get(edge.target);
+      if (!s || !t) return;
+
+      const isTarget = (edge.id === activeCorridorId);
+      let color = '#22c55e'; // Normal
+      if (isTarget) {
+        color = '#ef4444'; // Blocked
+      } else if (edge.congestion_level === 'HEAVY') {
+        color = '#fbbf24';
+      } else if (edge.congestion_level === 'MODERATE') {
+        color = '#38bdf8';
+      }
+
+      features.push({
         type: 'Feature',
         properties: {
-          id: c.id,
-          name: c.name,
-          congestion: c.congestion,
-          color: c.congestion === 'HEAVY' ? '#ef4444' : (c.congestion === 'MODERATE' ? '#fbbf24' : '#22c55e')
+          id: edge.id,
+          name: edge.name,
+          color: color,
+          isTarget: isTarget,
+          lanes: edge.lanes
         },
         geometry: {
           type: 'LineString',
-          coordinates: c.coords
+          coordinates: [[s.lng, s.lat], [t.lng, t.lat]]
         }
-      }))
-    };
+      });
+    });
 
-    if (mapInstance.getSource('traffic-corridors')) {
-      mapInstance.getSource('traffic-corridors').setData(geojsonData);
+    const geojson = { type: 'FeatureCollection', features };
+
+    if (mapInstance.getSource('mng-corridors')) {
+      mapInstance.getSource('mng-corridors').setData(geojson);
     } else {
-      mapInstance.addSource('traffic-corridors', {
+      mapInstance.addSource('mng-corridors', {
         type: 'geojson',
-        data: geojsonData
+        data: geojson
       });
 
-      // Outer glow line layer
+      // Background glow for corridors
       mapInstance.addLayer({
         id: 'corridors-glow',
         type: 'line',
-        source: 'traffic-corridors',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
+        source: 'mng-corridors',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': 8,
-          'line-opacity': 0.35
+          'line-width': ['case', ['get', 'isTarget'], 10, 5],
+          'line-opacity': 0.35,
+          'line-blur': 3
         }
       });
 
-      // Core crisp line layer
+      // Foreground sharp corridor line
       mapInstance.addLayer({
         id: 'corridors-core',
         type: 'line',
-        source: 'traffic-corridors',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
+        source: 'mng-corridors',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': 4.5,
-          'line-opacity': 0.95
+          'line-width': ['case', ['get', 'isTarget'], 5, 2.5]
         }
       });
 
-      // Interactivity
       mapInstance.on('click', 'corridors-core', (e) => {
-        if (e.features && e.features[0]) {
-          const props = e.features[0].properties;
-          selectCorridor(props.name, props.congestion);
-        }
-      });
-
-      mapInstance.on('mouseenter', 'corridors-core', () => {
-        mapInstance.getCanvas().style.cursor = 'pointer';
-      });
-      mapInstance.on('mouseleave', 'corridors-core', () => {
-        mapInstance.getCanvas().style.cursor = '';
+        if (!e.features || !e.features.length) return;
+        const prop = e.features[0].properties;
+        setTargetCorridor(prop.id, prop.name);
       });
     }
   }
 
-  // HTML Markers on 3D Map
-  function setupIncidentMarkers(incidentsList) {
+  function setupJunctionMarkers() {
     activeMarkers.forEach(m => m.remove());
     activeMarkers = [];
 
-    incidentsList.forEach((inc, idx) => {
-      const el = document.createElement('div');
-      
-      if (idx === 1) {
-        // Purple Incident Car Marker
-        el.innerHTML = `
-          <div style="
-            width: 28px; height: 28px; border-radius: 50%;
-            background: #8b5cf6; border: 2.5px solid #ffffff;
-            box-shadow: 0 0 16px rgba(139,92,246,0.95);
-            display: flex; align-items: center; justify-content: center;
-            color: #ffffff; cursor: pointer;
-          ">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
-              <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H7.5a1 1 0 0 0-.8.4L4 11l-5.16.86a1 1 0 0 0-.84.99V16h3m14 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-10 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"></path>
-            </svg>
-          </div>
-        `;
-      } else {
-        // Red Alert Circle with Exclamation
-        el.innerHTML = `
-          <div style="
-            width: 28px; height: 28px; border-radius: 50%;
-            background: #ef4444; border: 2.5px solid #ffffff;
-            box-shadow: 0 0 16px rgba(239,68,68,0.95);
-            display: flex; align-items: center; justify-content: center;
-            color: #ffffff; font-weight: 800; font-size: 14px; font-family: sans-serif;
-            cursor: pointer;
-          ">!</div>
-        `;
-      }
+    const keyJunctions = ['INT_NANTHOOR', 'INT_BUNTS_HOSTEL', 'INT_MALLIKATTE', 'INT_JYOTHI_CIRCLE', 'INT_KUNTIKAN', 'INT_PUMPWELL'];
+    keyJunctions.forEach(jid => {
+      const node = currentNodesMap.get(jid);
+      if (!node) return;
 
-      el.addEventListener('click', () => {
-        selectCorridor(inc.road, inc.severity || 'Critical');
-      });
+      const el = document.createElement('div');
+      el.className = 'junction-map-dot';
+      el.title = node.name;
 
       const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([inc.lng, inc.lat])
+        .setLngLat([node.lng, node.lat])
+        .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(`<strong style="color:#0f172a;">${node.name}</strong>`))
         .addTo(mapInstance);
 
       activeMarkers.push(marker);
     });
   }
 
-  function selectCorridor(roadName, status) {
-    const overlayRoad = document.getElementById('overlayRoadName');
-    const incRoad = document.getElementById('incRoadPrimary');
-    if (overlayRoad) overlayRoad.textContent = roadName;
-    if (incRoad) incRoad.textContent = roadName;
-    showToast(`Inspecting corridor: ${roadName}`);
-  }
-
-  initMapLibre();
-
   // =========================================================================
-  // 4. City Sector Toggle (Bengaluru <-> Mangaluru)
+  // 5. Calculate & Compare Diversions (/api/v1/intelligence/interventions/evaluate)
   // =========================================================================
-  const btnCityToggle = document.getElementById('btnCityToggle');
-  const currentCityName = document.getElementById('currentCityName');
-  const mapCardTitle = document.getElementById('mapCardTitle');
+  async function triggerDiversionEvaluation() {
+    const btnSim = document.getElementById('btnSimulateDiversion');
+    if (btnSim) {
+      btnSim.disabled = true;
+      btnSim.innerHTML = `<span>Computing Graph Redistribution...</span>`;
+    }
 
-  if (btnCityToggle) {
-    btnCityToggle.addEventListener('click', async () => {
-      if (currentCity === 'Bengaluru') {
-        currentCity = 'Mangaluru';
-        if (currentCityName) currentCityName.textContent = 'Mangaluru';
-        if (mapCardTitle) mapCardTitle.textContent = 'Live Traffic Map – Mangaluru Metro';
-        showToast('Switched sector to Mangaluru Metropolitan Arterials (3D)');
-        await loadMangaluruNetwork3D();
-      } else {
-        currentCity = 'Bengaluru';
-        if (currentCityName) currentCityName.textContent = 'Bengaluru';
-        if (mapCardTitle) mapCardTitle.textContent = 'Live Traffic Map – Bengaluru';
-        showToast('Switched sector to Bengaluru Highway Corridors (3D)');
-        if (mapInstance) {
-          mapInstance.flyTo({
-            center: BENGALURU_NETWORK.center,
-            zoom: BENGALURU_NETWORK.zoom,
-            pitch: BENGALURU_NETWORK.pitch,
-            bearing: BENGALURU_NETWORK.bearing,
-            essential: true
-          });
-          loadCorridorsLayer(BENGALURU_NETWORK.corridors);
-          setupIncidentMarkers(BENGALURU_NETWORK.incidents);
-        }
-      }
-    });
-  }
-
-  async function loadMangaluruNetwork3D() {
     try {
-      const res = await fetch('/api/v1/navigation/network');
-      if (!res.ok) return;
-      const data = await res.json();
+      const payload = {
+        incident: {
+          incident_id: `INC-MNG-${activeCorridorId.toUpperCase()}`,
+          affected_edge_id: activeCorridorId,
+          capacity_reduction_pct: activeBlockagePct / 100.0,
+          severity: activeBlockagePct >= 80 ? 'CRITICAL' : (activeBlockagePct >= 50 ? 'HIGH' : 'MODERATE'),
+          estimated_duration_min: 45.0,
+          provenance: 'ESTIMATED',
+          description: `Disruption on ${activeCorridorId} with ${activeBlockagePct}% blockage`
+        },
+        override_blockage_pct: activeBlockagePct / 100.0
+      };
 
-      const nodesMap = new Map();
-      data.nodes.forEach(n => nodesMap.set(n.id, n));
-
-      const mngCorridors = [];
-      const mngIncidents = [];
-
-      data.edges.forEach(edge => {
-        const s = nodesMap.get(edge.source);
-        const t = nodesMap.get(edge.target);
-        if (!s || !t) return;
-
-        let cong = 'SMOOTH';
-        if (edge.congestion_level === 'BLOCKED' || edge.has_incident) {
-          cong = 'HEAVY';
-          mngIncidents.push({
-            lat: (s.lat + t.lat) / 2,
-            lng: (s.lng + t.lng) / 2,
-            road: edge.name,
-            severity: 'Critical'
-          });
-        } else if (edge.congestion_level === 'HEAVY') {
-          cong = 'HEAVY';
-        } else if (edge.congestion_level === 'MODERATE') {
-          cong = 'MODERATE';
-        }
-
-        mngCorridors.push({
-          id: edge.id,
-          name: edge.name,
-          coords: [[s.lng, s.lat], [t.lng, t.lat]],
-          congestion: cong
-        });
+      const res = await fetch('/api/v1/intelligence/interventions/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      if (mapInstance) {
-        mapInstance.flyTo({
-          center: [74.8550, 12.8750],
-          zoom: 14.6,
-          pitch: 45,
-          bearing: -15,
-          essential: true
-        });
-        loadCorridorsLayer(mngCorridors);
-        setupIncidentMarkers(mngIncidents.slice(0, 3));
+      if (!res.ok) {
+        showToast('Diversion calculation request failed');
+        return;
       }
+
+      latestEvaluation = await res.json();
+      renderEvaluationResults(latestEvaluation);
+      renderDetoursOnMap(latestEvaluation);
+      showToast('Graph Diversion Scenarios calculated');
+
     } catch (err) {
-      console.warn('Failed to load Mangaluru 3D network:', err);
+      console.error('Diversion evaluation error:', err);
+      showToast('Error connecting to diversion calculation engine');
+    } finally {
+      if (btnSim) {
+        btnSim.disabled = false;
+        btnSim.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+          </svg>
+          <span>Calculate &amp; Compare Diversions</span>
+        `;
+      }
     }
   }
 
   // =========================================================================
-  // 5. Intervention Options Selection
+  // 6. Render Calculated Diversion Results into UI
   // =========================================================================
-  const btnSelect0 = document.getElementById('btnSelect0');
-  const btnSelect1 = document.getElementById('btnSelect1');
-  const btnSelect2 = document.getElementById('btnSelect2');
+  function renderEvaluationResults(data) {
+    if (!data) return;
 
-  const interventions = [
-    { title: 'Divert via Bellandur', delay: '+2 min', directive: 'Enforce upstream VMS diversion via Bellandur bypass' },
-    { title: 'Increase Police Patrol', delay: '+4 min', directive: 'Deploy quick-response patrol interceptor for manual lane clearance' },
-    { title: 'Signal Adjustment (ORR)', delay: '+1 min', directive: 'Grant adaptive green-wave priority phase on Outer Ring Road' }
-  ];
+    // Update Top KPIs with genuine data
+    const kpiDisplaced = document.getElementById('kpiDisplacedDemand');
+    const kpiSaturated = document.getElementById('kpiSaturatedCount');
+    const kpiDelaySaved = document.getElementById('kpiDelaySaved');
+    const kpiActive = document.getElementById('kpiActiveIncidents');
 
-  function activateIntervention(index, btnEl) {
-    const item = interventions[index];
-    btnEl.textContent = 'Active';
-    btnEl.style.backgroundColor = '#1d4ed8';
+    if (kpiDisplaced) kpiDisplaced.textContent = `${data.displaced_demand_veh_hr.toFixed(0)} PCU/hr`;
+    if (kpiActive) kpiActive.textContent = `1 Corridor Active`;
 
-    fetch('/api/v1/intelligence/dispatches', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        incident_id: 'INC-HOSUR-ACCIDENT-01',
-        target_location_id: 'LOC_BELLANDUR',
-        target_location_name: item.title,
-        resource_type: 'TRAFFIC_POLICE_OFFICER',
-        units_assigned: 2,
-        directive: item.directive,
-        priority: 'CRITICAL',
-        eta_minutes: 3.5,
-        notes: `Selected from operator console: ${item.delay}`
-      })
-    }).catch(e => console.warn('Dispatch save error:', e));
+    // Displaced demand strip in parameters box
+    const lblNom = document.getElementById('lblNominalFlow');
+    const lblEff = document.getElementById('lblEffectiveCap');
+    const lblDisp = document.getElementById('lblDisplacedFlow');
 
-    showToast(`Intervention activated: "${item.title}" (${item.delay} delay saved)`);
+    if (lblNom) lblNom.textContent = `${data.baseline_flow_veh_hr.toFixed(0)} PCU/hr`;
+    if (lblEff) lblEff.textContent = `${data.effective_capacity_veh_hr.toFixed(0)} PCU/hr`;
+    if (lblDisp) lblDisp.textContent = `${data.displaced_demand_veh_hr.toFixed(0)} PCU/hr`;
+
+    // Map Floating Callout
+    const overlayRoad = document.getElementById('overlayRoadName');
+    const overlayMeta = document.getElementById('overlayMetaText');
+    if (overlayRoad) overlayRoad.textContent = data.affected_corridor || activeCorridorId;
+    if (overlayMeta) overlayMeta.textContent = `${activeBlockagePct}% Blockage • ${data.displaced_demand_veh_hr.toFixed(0)} PCU/hr Displaced`;
+
+    // 1. Render Discovered Viable Detours List
+    const detoursContainer = document.getElementById('detoursContainer');
+    if (detoursContainer) {
+      detoursContainer.innerHTML = '';
+      if (!data.candidate_detours || !data.candidate_detours.length) {
+        detoursContainer.innerHTML = `
+          <div class="empty-detour-notice">
+            No alternative graph detour exists without traversing closed segments.
+          </div>
+        `;
+      } else {
+        data.candidate_detours.forEach((d, idx) => {
+          const badgeClass = idx === 0 ? 'badge-route-a' : 'badge-route-b';
+          const badgeLabel = idx === 0 ? 'Route A' : (idx === 1 ? 'Route B' : `Route ${idx+1}`);
+          const div = document.createElement('div');
+          div.className = `detour-item ${idx === 0 ? 'active-detour' : ''}`;
+          div.innerHTML = `
+            <div class="detour-header">
+              <span class="detour-badge ${badgeClass}">${badgeLabel}</span>
+              <span class="detour-name">${d.title}</span>
+            </div>
+            <div class="detour-metrics">
+              <span><strong>${d.total_length_km.toFixed(1)} km</strong> length</span>
+              <span><strong>${d.baseline_travel_time_min.toFixed(1)} min</strong> travel time</span>
+              <span><strong>${d.bottleneck_capacity_pcu.toFixed(0)} PCU/hr</strong> bottleneck cap</span>
+            </div>
+          `;
+          detoursContainer.appendChild(div);
+        });
+      }
+    }
+
+    // 2. Render Side-by-Side Comparison Table
+    const tbody = document.getElementById('matrixTableBody');
+    if (tbody) {
+      tbody.innerHTML = '';
+
+      // Baseline Row
+      const base = data.baseline_scenario;
+      const baseRow = document.createElement('tr');
+      baseRow.className = 'table-row-baseline';
+      baseRow.innerHTML = `
+        <td><strong class="text-red">Baseline</strong> (Unmitigated)</td>
+        <td>0 PCU/hr</td>
+        <td>${base.route_travel_time_min.toFixed(1)} min</td>
+        <td><span class="vc-pill vc-severe">${base.max_vc_ratio.toFixed(2)}</span></td>
+        <td><span class="badge-chokepoints">${base.saturated_segments.length} segment(s)</span></td>
+        <td><span class="text-dim">0 veh-hrs</span></td>
+        <td><span class="status-passive">Unmitigated</span></td>
+      `;
+      tbody.appendChild(baseRow);
+
+      // Candidate Scenarios Rows
+      data.candidate_scenarios.forEach(sc => {
+        const isRec = (sc.scenario_id === data.recommended_scenario_id);
+        const vcClass = sc.max_vc_ratio >= 1.0 ? 'vc-warning' : 'vc-normal';
+        const tr = document.createElement('tr');
+        if (isRec) tr.className = 'table-row-recommended';
+
+        tr.innerHTML = `
+          <td>
+            <strong>${sc.scenario_name.split(':')[0]}</strong>
+            <div class="scenario-subname">${sc.scenario_name.split(':')[1] || ''}</div>
+          </td>
+          <td>${sc.assigned_demand_pcu.toFixed(0)} PCU/hr</td>
+          <td>${sc.route_travel_time_min.toFixed(1)} min</td>
+          <td><span class="vc-pill ${vcClass}">${sc.max_vc_ratio.toFixed(2)}</span></td>
+          <td>${sc.downstream_bottlenecks.length > 0 ? `<span class="badge-bottleneck">${sc.downstream_bottlenecks.length} new</span>` : `<span class="badge-clean">0 new</span>`}</td>
+          <td><strong class="text-green">${sc.delay_saved_veh_hours.toFixed(1)} veh-hrs</strong> (-${sc.delay_reduction_pct.toFixed(0)}%)</td>
+          <td>
+            <button type="button" class="btn-table-apply ${isRec ? 'btn-apply-rec' : ''}" data-id="${sc.scenario_id}">
+              ${isRec ? 'Recommended' : 'Test'}
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 3. Render Recommendation Banner
+    const recTitle = document.getElementById('recTitle');
+    const recDesc = document.getElementById('recDesc');
+    const recTradeoff = document.getElementById('recTradeoff');
+
+    const recScenario = data.candidate_scenarios.find(s => s.scenario_id === data.recommended_scenario_id) || data.candidate_scenarios[0];
+    if (recScenario) {
+      if (kpiDelaySaved) kpiDelaySaved.textContent = `${recScenario.delay_saved_veh_hours.toFixed(1)} veh-hrs`;
+      if (kpiSaturated) kpiSaturated.textContent = `${recScenario.elevated_risk_edges_count} Segments`;
+
+      if (recTitle) recTitle.textContent = `Optimal: ${recScenario.scenario_name}`;
+      if (recDesc) recDesc.textContent = data.recommendation_rationale;
+      if (recTradeoff) recTradeoff.textContent = data.tradeoff_summary;
+    }
   }
 
-  if (btnSelect0) btnSelect0.addEventListener('click', () => activateIntervention(0, btnSelect0));
-  if (btnSelect1) btnSelect1.addEventListener('click', () => activateIntervention(1, btnSelect1));
-  if (btnSelect2) btnSelect2.addEventListener('click', () => activateIntervention(2, btnSelect2));
+  // =========================================================================
+  // 7. Render Calculated Detours & Saturated Bottlenecks on 3D Map
+  // =========================================================================
+  function renderDetoursOnMap(data) {
+    if (!mapInstance || !data || !data.candidate_detours) return;
+
+    // Refresh base corridors
+    renderNetworkOnMap();
+
+    const detourFeatures = [];
+
+    // Detour 1 (Route A) - Vivid Cyan / Blue
+    if (data.candidate_detours.length >= 1) {
+      const d1 = data.candidate_detours[0];
+      for (let i = 0; i < d1.node_path.length - 1; i++) {
+        const u = currentNodesMap.get(d1.node_path[i]);
+        const v = currentNodesMap.get(d1.node_path[i+1]);
+        if (u && v) {
+          detourFeatures.push({
+            type: 'Feature',
+            properties: { route: 'ROUTE_A', color: '#38bdf8' },
+            geometry: { type: 'LineString', coordinates: [[u.lng, u.lat], [v.lng, v.lat]] }
+          });
+        }
+      }
+    }
+
+    // Detour 2 (Route B) - Vivid Violet / Purple
+    if (data.candidate_detours.length >= 2) {
+      const d2 = data.candidate_detours[1];
+      for (let i = 0; i < d2.node_path.length - 1; i++) {
+        const u = currentNodesMap.get(d2.node_path[i]);
+        const v = currentNodesMap.get(d2.node_path[i+1]);
+        if (u && v) {
+          detourFeatures.push({
+            type: 'Feature',
+            properties: { route: 'ROUTE_B', color: '#a855f7' },
+            geometry: { type: 'LineString', coordinates: [[u.lng, u.lat], [v.lng, v.lat]] }
+          });
+        }
+      }
+    }
+
+    const detourGeoJSON = { type: 'FeatureCollection', features: detourFeatures };
+
+    if (mapInstance.getSource('active-detours')) {
+      mapInstance.getSource('active-detours').setData(detourGeoJSON);
+    } else {
+      mapInstance.addSource('active-detours', {
+        type: 'geojson',
+        data: detourGeoJSON
+      });
+
+      mapInstance.addLayer({
+        id: 'detours-pulse-layer',
+        type: 'line',
+        source: 'active-detours',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': 6,
+          'line-opacity': 0.85
+        }
+      });
+    }
+
+    // Smoothly pan and frame the affected corridor
+    const targetEdge = currentCorridorsData.find(e => e.id === activeCorridorId);
+    if (targetEdge) {
+      const s = currentNodesMap.get(targetEdge.source);
+      const t = currentNodesMap.get(targetEdge.target);
+      if (s && t) {
+        mapInstance.flyTo({
+          center: [(s.lng + t.lng) / 2.0, (s.lat + t.lat) / 2.0],
+          zoom: 14.5,
+          pitch: 45,
+          bearing: -15,
+          essential: true
+        });
+      }
+    }
+  }
 
   // =========================================================================
-  // 6. Citizen Reports Feed Modal
+  // 8. Event Handlers & Preset Interactivity
+  // =========================================================================
+  function setTargetCorridor(corridorId, roadName) {
+    activeCorridorId = corridorId;
+    const select = document.getElementById('selectCorridor');
+    if (select) select.value = corridorId;
+    triggerDiversionEvaluation();
+  }
+
+  // Corridor Select dropdown change
+  const selectCorridor = document.getElementById('selectCorridor');
+  if (selectCorridor) {
+    selectCorridor.addEventListener('change', (e) => {
+      activeCorridorId = e.target.value;
+      triggerDiversionEvaluation();
+    });
+  }
+
+  // Blockage Slider change
+  const sliderBlockage = document.getElementById('sliderBlockage');
+  const lblBlockagePct = document.getElementById('lblBlockagePct');
+  if (sliderBlockage) {
+    sliderBlockage.addEventListener('input', (e) => {
+      activeBlockagePct = parseInt(e.target.value, 10);
+      if (lblBlockagePct) lblBlockagePct.textContent = `${activeBlockagePct}% Blocked`;
+    });
+    sliderBlockage.addEventListener('change', () => {
+      triggerDiversionEvaluation();
+    });
+  }
+
+  // Presets
+  const presetButtons = document.querySelectorAll('.preset-chip');
+  presetButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      presetButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      activeCorridorId = btn.dataset.corridor;
+      activeBlockagePct = parseInt(btn.dataset.block, 10);
+
+      if (sliderBlockage) sliderBlockage.value = activeBlockagePct;
+      if (lblBlockagePct) lblBlockagePct.textContent = `${activeBlockagePct}% Blocked`;
+      if (selectCorridor) selectCorridor.value = activeCorridorId;
+
+      triggerDiversionEvaluation();
+    });
+  });
+
+  // Calculate Button
+  const btnSimulate = document.getElementById('btnSimulateDiversion');
+  if (btnSimulate) {
+    btnSimulate.addEventListener('click', () => {
+      triggerDiversionEvaluation();
+    });
+  }
+
+  // =========================================================================
+  // 9. Citizen Reports Ingestion Modal
   // =========================================================================
   const incidentModal = document.getElementById('incidentModal');
-  const btnViewAllIncidents = document.getElementById('btnViewAllIncidents');
-  const btnCompareInterventions = document.getElementById('btnCompareInterventions');
+  const btnOpenCitizenFeed = document.getElementById('btnOpenCitizenFeed');
   const btnCloseIncidentModal = document.getElementById('btnCloseIncidentModal');
   const citizenFeedList = document.getElementById('citizenFeedList');
   const tabIncidentAnalysis = document.getElementById('tabIncidentAnalysis');
-  const tabDashboard = document.getElementById('tabDashboard');
 
   function openIncidentModal() {
     if (incidentModal) incidentModal.classList.remove('hidden');
-    loadCitizenReportsModal();
+    loadCitizenReports();
   }
 
   function closeIncidentModal() {
     if (incidentModal) incidentModal.classList.add('hidden');
   }
 
-  if (btnViewAllIncidents) btnViewAllIncidents.addEventListener('click', openIncidentModal);
-  if (btnCompareInterventions) btnCompareInterventions.addEventListener('click', openIncidentModal);
+  if (btnOpenCitizenFeed) btnOpenCitizenFeed.addEventListener('click', openIncidentModal);
   if (tabIncidentAnalysis) tabIncidentAnalysis.addEventListener('click', openIncidentModal);
   if (btnCloseIncidentModal) btnCloseIncidentModal.addEventListener('click', closeIncidentModal);
 
-  if (tabDashboard) {
-    tabDashboard.addEventListener('click', () => {
-      closeIncidentModal();
-      showToast('Dashboard overview active');
-    });
-  }
-
-  async function loadCitizenReportsModal() {
+  async function loadCitizenReports() {
     try {
       const res = await fetch('/api/v1/intelligence/citizen-reports');
       if (!res.ok) return;
       const reports = await res.json();
 
+      const feedBadge = document.getElementById('citizenFeedCount');
+      if (feedBadge) feedBadge.textContent = reports.length;
+
       citizenFeedList.innerHTML = '';
-      if (reports.length === 0) {
+      if (!reports.length) {
         citizenFeedList.innerHTML = '<div style="color: var(--text-dim); text-align: center; padding: 20px;">No pending citizen reports</div>';
         return;
       }
@@ -547,18 +648,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         card.innerHTML = `
           <div class="feed-card-header">
             <span class="feed-road-title">${rep.road_name}</span>
-            <span class="feed-badge ${isVerified ? 'badge-verified' : 'badge-pending'}">${isVerified ? 'VERIFIED' : 'PENDING'}</span>
+            <span class="feed-badge ${isVerified ? 'badge-verified' : 'badge-pending'}">${rep.verification_status}</span>
           </div>
-          <div class="feed-card-desc">${rep.description} &bull; ${rep.category.replace(/_/g, ' ')} (${rep.lanes_affected}L)</div>
+          <div class="feed-card-desc">${rep.description} &bull; ${rep.category.replace(/_/g, ' ')} (${rep.lanes_affected} lane affected)</div>
           <div class="feed-card-actions">
-            <span style="font-size: 10px; color: var(--text-dim);">${rep.report_id}</span>
+            <span style="font-size: 11px; color: var(--text-dim);">${rep.report_id}</span>
             ${!isVerified ? `
-              <button type="button" class="btn-action-small btn-modal-verify" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}" data-road="${rep.road_name}">
-                Verify &amp; Forecast
+              <button type="button" class="btn-action-small btn-modal-verify" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}">
+                Verify &amp; Simulate Diversion
               </button>
             ` : `
-              <button type="button" class="btn-action-small btn-modal-load" data-id="${rep.report_id}" data-edge="${rep.road_segment_id}" data-road="${rep.road_name}">
-                Inspect On Map
+              <button type="button" class="btn-action-small btn-modal-load" data-edge="${rep.road_segment_id}">
+                Inspect on Map
               </button>
             `}
           </div>
@@ -569,19 +670,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.btn-modal-verify').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const id = e.currentTarget.dataset.id;
-          const road = e.currentTarget.dataset.road;
+          const edge = e.currentTarget.dataset.edge;
           await fetch(`/api/v1/intelligence/citizen-reports/${id}/verify?verified=true`, { method: 'POST' });
-          showToast(`Report ${id} on ${road} verified!`);
+          showToast(`Report ${id} verified. Corridor loaded into Diversion Studio.`);
           closeIncidentModal();
-          selectCorridor(road, 'Critical');
+          activeCorridorId = edge;
+          if (selectCorridor) selectCorridor.value = edge;
+          triggerDiversionEvaluation();
         });
       });
 
       document.querySelectorAll('.btn-modal-load').forEach(btn => {
         btn.addEventListener('click', (e) => {
-          const road = e.currentTarget.dataset.road;
+          const edge = e.currentTarget.dataset.edge;
           closeIncidentModal();
-          selectCorridor(road, 'Critical');
+          activeCorridorId = edge;
+          if (selectCorridor) selectCorridor.value = edge;
+          triggerDiversionEvaluation();
         });
       });
 
@@ -591,24 +696,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // =========================================================================
-  // 7. Background Data Polling for Live Citizen Ingestion (3s interval)
-  // =========================================================================
-  async function pollLiveIncidents() {
-    try {
-      const res = await fetch('/api/v1/intelligence/citizen-reports');
-      if (!res.ok) return;
-      const reports = await res.json();
-      
-      const activeCountEl = document.getElementById('kpiActiveIncidents');
-      if (activeCountEl) {
-        activeCountEl.textContent = Math.max(3, reports.length);
-      }
-    } catch (e) {}
-  }
-  setInterval(pollLiveIncidents, 3500);
-
-  // =========================================================================
-  // 8. Global Action Toast Notification
+  // 10. Global Toast Notification
   // =========================================================================
   const actionToast = document.getElementById('actionToast');
   let toastTimer = null;
@@ -623,5 +711,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       actionToast.classList.add('hidden');
     }, 3200);
   }
+
+  // Initialize Map
+  initMapLibre();
 
 });

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Traffic-Diffusion — Predictive Traffic Intelligence &amp; Intervention Planning</title>
+  <title>Traffic-Diffusion — Traffic Diversion Intelligence for Control Rooms</title>
   <link rel="stylesheet" href="/css/maplibre-gl.css">
-  <link rel="stylesheet" href="/css/style.css?v=5.1">
+  <link rel="stylesheet" href="/css/style.css?v=6.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -17,14 +17,14 @@
     <header class="app-header">
       <div class="header-left">
         <div class="logo-box">
-          <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
-            <path d="M3 31H33M5 31V19H10V31M10 19V11H15V31M15 11V5H21V31M21 13H26V31M26 17H30V31M30 22H33V31" stroke="#3b82f6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59, 130, 246, 0.22)"/>
+          <svg width="30" height="30" viewBox="0 0 36 36" fill="none">
+            <path d="M3 31H33M5 31V19H10V31M10 19V11H15V31M15 11V5H21V31M21 13H26V31M26 17H30V31M30 22H33V31" stroke="#3b82f6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="rgba(59, 130, 246, 0.18)"/>
             <circle cx="18" cy="5" r="1.5" fill="#60a5fa"/>
           </svg>
         </div>
         <div class="brand-headings">
           <h1 class="brand-title">Traffic-Diffusion</h1>
-          <p class="brand-subtitle">Predictive Traffic Intelligence &amp; Intervention Planning</p>
+          <p class="brand-subtitle">Traffic Diversion Intelligence for Control Rooms</p>
         </div>
       </div>
 
@@ -32,16 +32,16 @@
         <!-- Live Status Pill -->
         <div class="header-pill pill-live">
           <span class="live-dot-pulse"></span>
-          <span>Live</span>
+          <span>Control Room Live</span>
         </div>
 
-        <!-- City Location Pill -->
-        <div class="header-pill pill-location" id="btnCityToggle" title="Click to switch between Bengaluru and Mangaluru sectors">
+        <!-- City Sector Badge (Unified Mangaluru Demonstration Sector) -->
+        <div class="header-pill pill-location" title="Demonstration Sector: Mangaluru Metropolitan Arterials (NH-66 / NH-73)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
             <circle cx="12" cy="10" r="3"></circle>
           </svg>
-          <span id="currentCityName">Bengaluru</span>
+          <span id="currentCityName">Mangaluru Metro (NH-66 / NH-73)</span>
         </div>
 
         <!-- Live Clock Pill -->
@@ -50,11 +50,20 @@
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
-          <span id="headerLiveClock">Mon, Apr 28, 2025 &bull; 14:32</span>
+          <span id="headerLiveClock">Live Operational Clock</span>
         </div>
 
-        <!-- User Operator Avatar -->
-        <div class="user-avatar" title="Traffic Operations Analyst">AO</div>
+        <!-- Citizen Ingestion Queue Trigger -->
+        <button type="button" class="btn-citizen-feed-toggle" id="btnOpenCitizenFeed" title="Open Citizen Ingestion Queue">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span>Citizen Feed</span>
+          <span class="feed-count-badge" id="citizenFeedCount">3</span>
+        </button>
+
+        <div class="user-avatar" title="Traffic Control Room Operator">OP</div>
       </div>
     </header>
 
@@ -65,10 +74,12 @@
       <aside class="sidebar">
         <button type="button" class="sidebar-item active" id="tabDashboard">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            <rect x="3" y="3" width="7" height="9"></rect>
+            <rect x="14" y="3" width="7" height="5"></rect>
+            <rect x="14" y="12" width="7" height="9"></rect>
+            <rect x="3" y="16" width="7" height="5"></rect>
           </svg>
-          <span>Dashboard</span>
+          <span>Diversion Studio</span>
         </button>
 
         <button type="button" class="sidebar-item" id="tabIncidentAnalysis">
@@ -77,44 +88,13 @@
             <line x1="12" y1="9" x2="12" y2="13"></line>
             <line x1="12" y1="17" x2="12.01" y2="17"></line>
           </svg>
-          <span>Incident Analysis</span>
-        </button>
-
-        <button type="button" class="sidebar-item" id="tabSimulations">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="4" y1="21" x2="4" y2="14"></line>
-            <line x1="4" y1="10" x2="4" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12" y2="3"></line>
-            <line x1="20" y1="21" x2="20" y2="16"></line>
-            <line x1="20" y1="12" x2="20" y2="3"></line>
-            <line x1="1" y1="14" x2="7" y2="14"></line>
-            <line x1="9" y1="8" x2="15" y2="8"></line>
-            <line x1="17" y1="16" x2="23" y2="16"></line>
-          </svg>
-          <span>Simulations</span>
-        </button>
-
-        <button type="button" class="sidebar-item" id="tabReports">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-          </svg>
-          <span>Reports</span>
-        </button>
-
-        <button type="button" class="sidebar-item" id="tabSettings">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-          <span>Settings</span>
+          <span>Citizen Reports</span>
         </button>
 
         <div class="sidebar-links">
-          <a href="/public" target="_blank" class="sublink" title="Open Citizen App">Public App &rarr;</a>
-          <a href="/operations" target="_blank" class="sublink" title="Open CCTV Analytics">CCTV Vision &rarr;</a>
+          <span class="sublink-header">External Portals</span>
+          <a href="/public" target="_blank" class="sublink" title="Open Public Citizen Reporting Web App">Citizen App &rarr;</a>
+          <a href="/docs" target="_blank" class="sublink" title="Open FastAPI Interactive OpenAPI Docs">API Specs &rarr;</a>
         </div>
       </aside>
 
@@ -122,127 +102,116 @@
       <main class="dashboard-viewport">
 
         <!-- ================================================================ -->
-        <!-- ROW 1: 4 TELEMETRY METRIC CARDS                                  -->
+        <!-- ROW 1: 4 TELEMETRY METRIC CARDS (REAL NETWORK-DERIVED DATA)        -->
         <!-- ================================================================ -->
         <section class="kpi-grid">
 
-          <!-- 1. Current Traffic Load -->
-          <div class="kpi-card">
-            <div class="kpi-left">
-              <div class="kpi-icon-box icon-blue">
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H7.5a1 1 0 0 0-.8.4L4 11l-5.16.86a1 1 0 0 0-.84.99V16h3m14 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-10 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"></path>
-                </svg>
-              </div>
-              <div class="kpi-content">
-                <span class="kpi-label">Current Traffic Load</span>
-                <div class="kpi-data-line">
-                  <span class="kpi-value" id="kpiTrafficLoad">68%</span>
-                  <span class="kpi-trend trend-green">&uarr; +6%</span>
-                </div>
-              </div>
-            </div>
-            <div class="kpi-sparkline">
-              <svg width="90" height="34" viewBox="0 0 90 34">
-                <path d="M 0 28 Q 22 26 38 18 T 66 15 T 90 6" fill="none" stroke="#22c55e" stroke-width="2.4" stroke-linecap="round"/>
-              </svg>
-            </div>
-          </div>
-
-          <!-- 2. Active Incidents -->
+          <!-- 1. Active Displaced Demand -->
           <div class="kpi-card">
             <div class="kpi-left">
               <div class="kpi-icon-box icon-red">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H7.5a1 1 0 0 0-.8.4L4 11l-5.16.86a1 1 0 0 0-.84.99V16h3m14 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-10 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"></path>
+                </svg>
+              </div>
+              <div class="kpi-content">
+                <span class="kpi-label">Displaced Hourly Demand</span>
+                <div class="kpi-data-line">
+                  <span class="kpi-value" id="kpiDisplacedDemand">895 PCU/hr</span>
+                  <span class="kpi-tag-provenance">[ESTIMATED]</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Active Incident Blockages -->
+          <div class="kpi-card">
+            <div class="kpi-left">
+              <div class="kpi-icon-box icon-amber">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                   <line x1="12" y1="9" x2="12" y2="13"></line>
                   <line x1="12" y1="17" x2="12.01" y2="17"></line>
                 </svg>
               </div>
               <div class="kpi-content">
-                <span class="kpi-label">Active Incidents</span>
+                <span class="kpi-label">Active Disruption Corridors</span>
                 <div class="kpi-data-line">
-                  <span class="kpi-value" id="kpiActiveIncidents">3</span>
-                  <span class="kpi-trend trend-red">&uarr; +1</span>
+                  <span class="kpi-value" id="kpiActiveIncidents">1 Corridor</span>
+                  <span class="kpi-tag-provenance">[CONFIRMED]</span>
                 </div>
               </div>
             </div>
-            <div class="kpi-sparkline">
-              <svg width="90" height="34" viewBox="0 0 90 34">
-                <path d="M 0 30 Q 24 28 42 22 T 68 12 T 90 8" fill="none" stroke="#f43f5e" stroke-width="2.4" stroke-linecap="round"/>
-              </svg>
-            </div>
           </div>
 
-          <!-- 3. Avg. Delay -->
+          <!-- 3. Network Saturated Corridors (V/C >= 1.0) -->
           <div class="kpi-card">
             <div class="kpi-left">
-              <div class="kpi-icon-box icon-amber">
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-              </div>
-              <div class="kpi-content">
-                <span class="kpi-label">Avg. Delay</span>
-                <div class="kpi-data-line">
-                  <span class="kpi-value" id="kpiAvgDelay">12 min</span>
-                  <span class="kpi-trend trend-amber">&uarr; +3 min</span>
-                </div>
-              </div>
-            </div>
-            <div class="kpi-sparkline">
-              <svg width="90" height="34" viewBox="0 0 90 34">
-                <path d="M 0 30 Q 28 30 50 20 T 72 14 T 90 10" fill="none" stroke="#fbbf24" stroke-width="2.4" stroke-linecap="round"/>
-              </svg>
-            </div>
-          </div>
-
-          <!-- 4. Network Risk -->
-          <div class="kpi-card">
-            <div class="kpi-left">
-              <div class="kpi-icon-box icon-slate">
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <div class="kpi-icon-box icon-blue">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M4 19L8 5m8 14l4-14M12 5v3m0 6v3"></path>
                 </svg>
               </div>
               <div class="kpi-content">
-                <span class="kpi-label">Network Risk</span>
+                <span class="kpi-label">Saturated Links (V/C &ge; 1.0)</span>
                 <div class="kpi-data-line">
-                  <span class="kpi-value" id="kpiNetworkRisk">Medium</span>
+                  <span class="kpi-value" id="kpiSaturatedCount">1 Segment</span>
+                  <span class="kpi-tag-provenance">[BPR MODEL]</span>
                 </div>
               </div>
             </div>
-            <div class="kpi-sparkline">
-              <svg width="90" height="34" viewBox="0 0 90 34">
-                <path d="M 0 30 Q 30 28 52 17 T 72 15 T 90 12" fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round"/>
-              </svg>
+          </div>
+
+          <!-- 4. Optimal Diversion Delay Saved -->
+          <div class="kpi-card">
+            <div class="kpi-left">
+              <div class="kpi-icon-box icon-green">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                  <polyline points="17 6 23 6 23 12"></polyline>
+                </svg>
+              </div>
+              <div class="kpi-content">
+                <span class="kpi-label">Projected Delay Reduction</span>
+                <div class="kpi-data-line">
+                  <span class="kpi-value" id="kpiDelaySaved">29.6 veh-hrs</span>
+                  <span class="kpi-tag-provenance trend-green">-64.3%</span>
+                </div>
+              </div>
             </div>
           </div>
 
         </section>
 
         <!-- ================================================================ -->
-        <!-- ROW 2: LIVE TRAFFIC MAP (LEFT) & PREDICTED IMPACT (RIGHT)         -->
+        <!-- ROW 2: 3D TRAFFIC MAP (LEFT) & INCIDENT CONTROLLER (RIGHT)        -->
         <!-- ================================================================ -->
         <section class="middle-grid">
 
-          <!-- Left Card: Live Traffic Map -->
+          <!-- Left Card: Live 3D Traffic & Diversion Map -->
           <div class="panel map-card">
             <div class="panel-topbar">
-              <h2 class="panel-title" id="mapCardTitle">Live Traffic Map &ndash; Bengaluru</h2>
+              <div class="title-with-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                  <line x1="8" y1="2" x2="8" y2="18"></line>
+                  <line x1="16" y1="6" x2="16" y2="22"></line>
+                </svg>
+                <h2 class="panel-title" id="mapCardTitle">Mangaluru Metropolitan Arterials (3D Map)</h2>
+              </div>
               <div class="map-legend-row">
-                <span class="legend-chip"><span class="chip-dot dot-smooth"></span>Smooth</span>
-                <span class="legend-chip"><span class="chip-dot dot-moderate"></span>Moderate</span>
-                <span class="legend-chip"><span class="chip-dot dot-heavy"></span>Heavy</span>
-                <span class="legend-chip"><span class="chip-dot dot-incident"></span>Incident</span>
+                <span class="legend-chip"><span class="chip-dot dot-smooth"></span>Normal Flow</span>
+                <span class="legend-chip"><span class="chip-dot dot-blocked"></span>Incident Blockage</span>
+                <span class="legend-chip"><span class="chip-dot dot-detour-a"></span>Detour Route A</span>
+                <span class="legend-chip"><span class="chip-dot dot-detour-b"></span>Detour Route B</span>
+                <span class="legend-chip"><span class="chip-dot dot-chokepoint"></span>Downstream Bottleneck</span>
               </div>
             </div>
 
             <div class="map-canvas-wrapper">
-              <div id="liveTrafficMap" class="leaflet-dark-map"></div>
+              <div id="liveTrafficMap" class="maplibre-3d-map"></div>
 
-              <!-- Floating Incident Detection Callout Banner (Exact Overlay from Image) -->
+              <!-- Floating Incident Detection Callout Banner -->
               <div class="map-incident-overlay" id="incidentOverlayCallout">
                 <div class="overlay-icon-box">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.3">
@@ -252,236 +221,197 @@
                   </svg>
                 </div>
                 <div class="overlay-info">
-                  <div class="overlay-status">Accident Detected</div>
-                  <div class="overlay-road" id="overlayRoadName">Hosur Road</div>
-                  <div class="overlay-meta" id="overlayMetaText">14:20 &bull; Severe</div>
+                  <div class="overlay-status" id="overlayStatusText">Active Arterial Disruption</div>
+                  <div class="overlay-road" id="overlayRoadName">Circuit House - Nanthoor Road</div>
+                  <div class="overlay-meta" id="overlayMetaText">80% Blockage &bull; 895 PCU/hr Displaced Demand</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Right Card: Predicted Impact (Next 30 Minutes) -->
-          <div class="panel impact-card">
+          <!-- Right Card: Incident Controller & Disruption Parameters -->
+          <div class="panel incident-controller-card">
             <div class="panel-topbar">
-              <h2 class="panel-title">Predicted Impact <span class="dim-sub">(Next 30 Minutes)</span></h2>
-            </div>
-
-            <!-- Area Chart with Red Gradient Fill & Peak Marker -->
-            <div class="chart-wrapper">
-              <div class="peak-callout-pill" id="chartPeakPill">Peak: 92% Risk</div>
-
-              <svg id="impactChartSvg" class="impact-svg" viewBox="0 0 360 165" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="impactRedGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#ef4444" stop-opacity="0.5"/>
-                    <stop offset="100%" stop-color="#ef4444" stop-opacity="0.02"/>
-                  </linearGradient>
-                </defs>
-
-                <!-- Grid Lines and Y-Axis -->
-                <line x1="42" y1="18" x2="352" y2="18" stroke="#1e293b" stroke-dasharray="2, 4"/>
-                <text x="36" y="22" fill="#64748b" font-size="10.5" text-anchor="end">100%</text>
-
-                <line x1="42" y1="49" x2="352" y2="49" stroke="#1e293b" stroke-dasharray="2, 4"/>
-                <text x="36" y="53" fill="#64748b" font-size="10.5" text-anchor="end">75%</text>
-
-                <line x1="42" y1="80" x2="352" y2="80" stroke="#1e293b" stroke-dasharray="2, 4"/>
-                <text x="36" y="84" fill="#64748b" font-size="10.5" text-anchor="end">50%</text>
-
-                <line x1="42" y1="111" x2="352" y2="111" stroke="#1e293b" stroke-dasharray="2, 4"/>
-                <text x="36" y="115" fill="#64748b" font-size="10.5" text-anchor="end">25%</text>
-
-                <line x1="42" y1="142" x2="352" y2="142" stroke="#1e293b"/>
-                <text x="36" y="146" fill="#64748b" font-size="10.5" text-anchor="end">0%</text>
-
-                <!-- X-Axis Labels -->
-                <text x="46" y="158" fill="#64748b" font-size="10.5">Now</text>
-                <text x="142" y="158" fill="#64748b" font-size="10.5">+10m</text>
-                <text x="242" y="158" fill="#64748b" font-size="10.5">+20m</text>
-                <text x="328" y="158" fill="#64748b" font-size="10.5">+30m</text>
-
-                <!-- Gradient Filled Area Curve -->
-                <path id="svgImpactArea" d="M 46 142 L 46 68 C 95 62, 165 44, 245 22 C 285 28, 318 42, 345 52 L 345 142 Z" fill="url(#impactRedGrad)"/>
-
-                <!-- Red Outline Stroke -->
-                <path id="svgImpactLine" d="M 46 68 C 95 62, 165 44, 245 22 C 285 28, 318 42, 345 52" fill="none" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/>
-
-                <!-- Peak Marker Line & Circle -->
-                <line x1="245" y1="22" x2="245" y2="142" stroke="#94a3b8" stroke-dasharray="3, 3" stroke-width="1.3"/>
-                <circle cx="245" cy="22" r="4.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"/>
-              </svg>
-            </div>
-
-            <!-- Affected Areas Section -->
-            <div class="affected-section">
-              <h3 class="affected-heading">Affected Areas</h3>
-              <div class="affected-items" id="affectedAreasContainer">
-                <div class="affected-row">
-                  <div class="affected-left">
-                    <span class="red-bullet"></span>
-                    <span class="affected-road-name">Hosur Road</span>
-                  </div>
-                  <span class="badge-high-risk">High Risk</span>
-                </div>
-                <div class="affected-row">
-                  <div class="affected-left">
-                    <span class="red-bullet"></span>
-                    <span class="affected-road-name">Sarjapur Road</span>
-                  </div>
-                  <span class="badge-high-risk">High Risk</span>
-                </div>
-                <div class="affected-row">
-                  <div class="affected-left">
-                    <span class="red-bullet"></span>
-                    <span class="affected-road-name">Outer Ring Road</span>
-                  </div>
-                  <span class="badge-high-risk">High Risk</span>
-                </div>
+              <div class="title-with-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <h2 class="panel-title">Incident &amp; Blockage Setup</h2>
               </div>
             </div>
+
+            <!-- Preset Scenarios -->
+            <div class="preset-group">
+              <span class="control-label">Mangaluru Demo Presets:</span>
+              <div class="preset-chips">
+                <button type="button" class="preset-chip active" id="presetNanthoor" data-corridor="corridor_cctv_07" data-block="80">
+                  Nanthoor Rollover (80%)
+                </button>
+                <button type="button" class="preset-chip" id="presetBunts" data-corridor="corridor_cctv_05" data-block="50">
+                  Bunts Waterlogging (50%)
+                </button>
+                <button type="button" class="preset-chip" id="presetMgRoad" data-corridor="corridor_cctv_10" data-block="60">
+                  MG Road Bus Stall (60%)
+                </button>
+                <button type="button" class="preset-chip" id="presetHampankatta" data-corridor="corridor_cctv_01" data-block="100">
+                  K.S. Rao Closure (100%)
+                </button>
+              </div>
+            </div>
+
+            <!-- Parameters Form -->
+            <div class="params-form">
+              <div class="form-row">
+                <label for="selectCorridor" class="control-label">Target Road Segment:</label>
+                <select id="selectCorridor" class="control-select">
+                  <option value="corridor_cctv_07" selected>Circuit House - Nanthoor Road (corridor_cctv_07)</option>
+                  <option value="corridor_cctv_05">Bunts Hostel - Kadri Road (corridor_cctv_05)</option>
+                  <option value="corridor_cctv_10">M.G. Road (Lalbagh - Ladyhill) (corridor_cctv_10)</option>
+                  <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
+                  <option value="corridor_cctv_08_rev">NH-66 Kuntikan to Nanthoor (corridor_cctv_08_rev)</option>
+                  <option value="corridor_cctv_15">NH-66 Pumpwell to Nanthoor Bypass (corridor_cctv_15)</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <div class="slider-header">
+                  <label for="sliderBlockage" class="control-label">Capacity Blockage Severity:</label>
+                  <span class="slider-val" id="lblBlockagePct">80% Blocked</span>
+                </div>
+                <input type="range" id="sliderBlockage" min="10" max="100" step="5" value="80" class="control-range">
+              </div>
+
+              <!-- Computed Displaced Demand Inspection Strip -->
+              <div class="computed-demand-strip">
+                <div class="demand-stat">
+                  <span class="d-label">Baseline Demand</span>
+                  <span class="d-val" id="lblNominalFlow">1,255 PCU/hr</span>
+                </div>
+                <div class="demand-stat">
+                  <span class="d-label">Effective Capacity</span>
+                  <span class="d-val" id="lblEffectiveCap">360 PCU/hr</span>
+                </div>
+                <div class="demand-stat stat-highlight">
+                  <span class="d-label">Displaced Flow to Divert</span>
+                  <span class="d-val text-red" id="lblDisplacedFlow">895 PCU/hr</span>
+                </div>
+              </div>
+
+              <!-- Primary Action Button -->
+              <button type="button" class="btn-primary-action" id="btnSimulateDiversion">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                </svg>
+                <span>Calculate &amp; Compare Diversions</span>
+              </button>
+            </div>
+
           </div>
 
         </section>
 
         <!-- ================================================================ -->
-        <!-- ROW 3: INCIDENT DETAILS | INTERVENTION OPTIONS | NETWORK RISK    -->
+        <!-- ROW 3: VIABLE DETOURS | SIDE-BY-SIDE MATRIX | RECOMMENDATION       -->
         <!-- ================================================================ -->
-        <section class="bottom-grid">
+        <section class="bottom-diversion-grid">
 
-          <!-- Card 1: Incident Details -->
-          <div class="panel incident-panel">
+          <!-- 1. Discovered Viable Detours in Graph -->
+          <div class="panel detours-card">
             <div class="panel-topbar">
               <div class="title-with-icon">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.3">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                  <line x1="12" y1="9" x2="12" y2="13"></line>
-                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="18" cy="5" r="3"></circle>
+                  <circle cx="6" cy="12" r="3"></circle>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                 </svg>
-                <h2 class="panel-title">Incident Details</h2>
+                <h2 class="panel-title">Graph-Based Detour Candidates</h2>
               </div>
-              <button type="button" class="btn-link" id="btnViewAllIncidents">View Details &rarr;</button>
+              <span class="provenance-chip" id="provenanceBadge">ESTIMATED</span>
             </div>
 
-            <div class="incident-card-content">
-              <div class="incident-main-row">
-                <img src="/img/incident_thumb.jpg" alt="Traffic Incident CCTV" class="incident-preview-img" id="incidentCctvImg">
-                <div class="incident-headings">
-                  <div class="road-primary" id="incRoadPrimary">Hosur Road</div>
-                  <div class="road-type-row">
-                    <span class="inc-category-name" id="incCategoryName">Accident</span>
-                    <span class="badge-severe" id="incSeverityBadge">Severe</span>
-                  </div>
+            <div class="detours-list" id="detoursContainer">
+              <div class="detour-item active-detour" data-index="0">
+                <div class="detour-header">
+                  <span class="detour-badge badge-route-a">Route A</span>
+                  <span class="detour-name">Via MG Road &amp; NH-66 Southbound</span>
+                </div>
+                <div class="detour-metrics">
+                  <span><strong>7.5 km</strong> length</span>
+                  <span><strong>8.9 min</strong> travel time</span>
+                  <span><strong>1,800 PCU/hr</strong> bottleneck cap</span>
                 </div>
               </div>
 
-              <div class="incident-metadata-bar">
-                <div class="meta-item">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                  </svg>
-                  <span id="incTimeMeta">14:20</span>
+              <div class="detour-item" data-index="1">
+                <div class="detour-header">
+                  <span class="detour-badge badge-route-b">Route B</span>
+                  <span class="detour-name">Via Ballalbagh &amp; Bejai Expressway</span>
                 </div>
-                <div class="meta-item">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 14 10"></polyline>
-                  </svg>
-                  <span id="incDurationMeta">~ 45 min</span>
-                </div>
-                <div class="meta-item">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 19L8 5m8 14l4-14"></path>
-                  </svg>
-                  <span id="incLanesMeta">2 lanes blocked</span>
+                <div class="detour-metrics">
+                  <span><strong>7.8 km</strong> length</span>
+                  <span><strong>9.4 min</strong> travel time</span>
+                  <span><strong>1,800 PCU/hr</strong> bottleneck cap</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Card 2: Intervention Options -->
-          <div class="panel intervention-panel">
+          <!-- 2. Side-by-Side Diversion Scenario Comparison Matrix -->
+          <div class="panel comparison-card">
             <div class="panel-topbar">
               <div class="title-with-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2">
-                  <path d="M12 3v18M3 9l9-6 9 6M6 12l-3 6h6l-3-6zm12 0l-3 6h6l-3-6z"></path>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M9 14l2 2 4-4"></path>
                 </svg>
-                <h2 class="panel-title">Intervention Options</h2>
+                <h2 class="panel-title">Diversion Impact Comparison Matrix</h2>
               </div>
-              <button type="button" class="btn-link" id="btnCompareInterventions">Compare All &rarr;</button>
+              <span class="dim-sub">Isolated Macroscopic Calculations</span>
             </div>
 
-            <div class="interventions-triplet" id="interventionsContainer">
-              <!-- Option 1 -->
-              <div class="intervention-box" data-index="0">
-                <div class="box-title" id="intervTitle0">Divert via Bellandur</div>
-                <div class="box-delay-label">Est. Delay</div>
-                <div class="box-delay-num" id="intervDelay0">+2 min</div>
-                <button type="button" class="btn-select-pill" id="btnSelect0">Select</button>
-              </div>
-
-              <!-- Option 2 -->
-              <div class="intervention-box" data-index="1">
-                <div class="box-title" id="intervTitle1">Increase Police Patrol</div>
-                <div class="box-delay-label">Est. Delay</div>
-                <div class="box-delay-num" id="intervDelay1">+4 min</div>
-                <button type="button" class="btn-select-pill" id="btnSelect1">Select</button>
-              </div>
-
-              <!-- Option 3 -->
-              <div class="intervention-box" data-index="2">
-                <div class="box-title" id="intervTitle2">Signal Adjustment (ORR)</div>
-                <div class="box-delay-label">Est. Delay</div>
-                <div class="box-delay-num" id="intervDelay2">+1 min</div>
-                <button type="button" class="btn-select-pill" id="btnSelect2">Select</button>
-              </div>
+            <div class="table-responsive">
+              <table class="comparison-table">
+                <thead>
+                  <tr>
+                    <th>Scenario</th>
+                    <th>Assigned Flow</th>
+                    <th>Route Time</th>
+                    <th>Peak V/C</th>
+                    <th>Bottlenecks</th>
+                    <th>Delay Saved</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="matrixTableBody">
+                  <!-- Populated dynamically by app.js -->
+                </tbody>
+              </table>
             </div>
-          </div>
 
-          <!-- Card 3: Network Risk Overview -->
-          <div class="panel risk-donut-panel">
-            <div class="panel-topbar">
-              <div class="title-with-icon">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <!-- Mathematical Recommendation Banner -->
+            <div class="recommendation-callout" id="recommendationBanner">
+              <div class="rec-icon-col">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
-                <h2 class="panel-title">Network Risk Overview</h2>
+              </div>
+              <div class="rec-content-col">
+                <div class="rec-title" id="recTitle">Optimal: Capacity-Aware Multi-Corridor Split</div>
+                <div class="rec-desc" id="recDesc">
+                  Reduces total network delay by 29.6 vehicle-hours (-64.3% vs unmitigated baseline). Balances load across MG Road and Ballalbagh, keeping peak V/C at 1.00 and avoiding secondary arterial gridlock.
+                </div>
+                <div class="rec-tradeoff" id="recTradeoff">
+                  Trade-off: Requires multi-junction VMS guidance; prevents overloading any single alternative corridor.
+                </div>
               </div>
             </div>
 
-            <div class="donut-content-row">
-              <div class="donut-graphic">
-                <svg width="124" height="124" viewBox="0 0 124 124">
-                  <!-- Background Track -->
-                  <circle cx="62" cy="62" r="47" fill="none" stroke="#1a2337" stroke-width="12"/>
-                  <!-- Green arc (~25%) -->
-                  <circle cx="62" cy="62" r="47" fill="none" stroke="#22c55e" stroke-width="12" stroke-dasharray="74 222" stroke-dashoffset="0" transform="rotate(-90 62 62)"/>
-                  <!-- Yellow arc (~30%) -->
-                  <circle cx="62" cy="62" r="47" fill="none" stroke="#fbbf24" stroke-width="12" stroke-dasharray="89 207" stroke-dashoffset="-74" transform="rotate(-90 62 62)"/>
-                  <!-- Red arc (~45%) -->
-                  <circle cx="62" cy="62" r="47" fill="none" stroke="#ef4444" stroke-width="12" stroke-dasharray="133 163" stroke-dashoffset="-163" transform="rotate(-90 62 62)"/>
-                </svg>
-                <div class="donut-center-labels">
-                  <div class="donut-big-pct" id="donutRiskPct">72%</div>
-                  <div class="donut-sub-text">At Risk</div>
-                </div>
-              </div>
-
-              <div class="donut-legend-col">
-                <div class="d-legend-item">
-                  <span class="d-legend-dot d-dot-low"></span>
-                  <span>Low</span>
-                </div>
-                <div class="d-legend-item">
-                  <span class="d-legend-dot d-dot-med"></span>
-                  <span>Medium</span>
-                </div>
-                <div class="d-legend-item">
-                  <span class="d-legend-dot d-dot-high"></span>
-                  <span>High</span>
-                </div>
-              </div>
-            </div>
           </div>
 
         </section>
@@ -489,11 +419,17 @@
       </main>
     </div>
 
-    <!-- Modal for Incident Analysis & Citizen Reports -->
+    <!-- Modal for Citizen Reports Ingestion Queue -->
     <div id="incidentModal" class="app-modal hidden">
       <div class="modal-window">
         <div class="modal-top">
-          <h3 class="modal-heading">Active Disruption &amp; Citizen Ingestion Feed</h3>
+          <div class="title-with-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            <h3 class="modal-heading">Public Citizen Incident Reports Queue</h3>
+          </div>
           <button type="button" class="btn-modal-close" id="btnCloseIncidentModal">&times;</button>
         </div>
         <div class="modal-scroll-area">
@@ -510,6 +446,6 @@
   </div>
 
   <script src="/js/maplibre-gl.js"></script>
-  <script src="/js/app.js?v=5.1"></script>
+  <script src="/js/app.js?v=6.0"></script>
 </body>
 </html>

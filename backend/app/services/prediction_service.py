@@ -165,6 +165,12 @@ class PredictiveIncidentEngine:
                 IncidentSeverity.CRITICAL: 1.25,
             }.get(incident.severity, 0.85)
 
+            # Precalculate target corridor displaced rate to ground bypass loading
+            target_nom_vol = target_edge.lanes * 650.0 * (0.3 + (target_edge.density_score * 0.7))
+            target_base_cap = target_edge.lanes * 900.0
+            target_eff_cap = max(100.0, target_base_cap * (1.0 - incident.capacity_reduction_pct))
+            target_displaced_rate = max(0.0, target_nom_vol - target_eff_cap)
+
             edge_impacts: List[EdgeImpactForecast] = []
             total_net_time = 0.0
             elevated_count = 0
@@ -176,7 +182,7 @@ class PredictiveIncidentEngine:
 
                 if eid == target_edge_id:
                     # Direct incident corridor
-                    effective_capacity = max(100.0, base_capacity * (1.0 - incident.capacity_reduction_pct))
+                    effective_capacity = target_eff_cap
                     vc_ratio = nominal_vol / effective_capacity
                     
                     # BPR delay growth over horizon
@@ -185,7 +191,7 @@ class PredictiveIncidentEngine:
                     delay = round(max(0.0, pred_time - base_time), 2)
 
                     # Queue buildup in meters
-                    excess_rate = max(0.0, nominal_vol - effective_capacity)
+                    excess_rate = target_displaced_rate
                     accumulated_pcu = excess_rate * h_ratio
                     queue_len = round(min(edge.length_km * 1000.0, (accumulated_pcu * 7.5) / max(1, edge.lanes)), 1)
 
@@ -214,8 +220,8 @@ class PredictiveIncidentEngine:
                         next_probable_bottlenecks.add(edge.name)
 
                 elif eid in bypass_edges:
-                    # Diversion bypass absorbing spilled traffic
-                    diverted_vol = nominal_vol * 0.40 * dur_fraction
+                    # Diversion bypass absorbing traffic genuinely displaced from the blocked segment
+                    diverted_vol = (target_displaced_rate / max(1, len(bypass_edges))) * dur_fraction
                     total_vol = nominal_vol + diverted_vol
                     vc_ratio = round(total_vol / base_capacity, 2)
 

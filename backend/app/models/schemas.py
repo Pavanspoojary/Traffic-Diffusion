@@ -30,8 +30,11 @@ class IncidentSeverity(str, Enum):
 
 class EventProvenance(str, Enum):
     OBSERVED = "OBSERVED"
+    IMPORTED = "IMPORTED"
+    ESTIMATED = "ESTIMATED"
     MANUAL_ENTRY = "MANUAL_ENTRY"
     SIMULATED = "SIMULATED"
+    UNKNOWN = "UNKNOWN"
 
 class VerificationStatus(str, Enum):
     UNVERIFIED = "UNVERIFIED"
@@ -114,7 +117,7 @@ class TrafficIncident(BaseModel):
     category: IncidentCategory = IncidentCategory.COLLISION
     affected_edge_id: str
     road_name: Optional[str] = None
-    start_timestamp: str
+    start_timestamp: Optional[str] = None
     severity: IncidentSeverity = IncidentSeverity.HIGH
     blocked_lanes: Optional[int] = 1
     total_lanes: Optional[int] = 2
@@ -255,34 +258,58 @@ class InterventionScenario(BaseModel):
     scenario_id: str
     scenario_name: str
     description: str
-    actions: List[InterventionAction]
+    actions: List[InterventionAction] = []
     dispatch_delay_min: float = 0.0
-    resource_summary: str
+    resource_summary: str = ""
     estimated_network_travel_time_min: float
     delay_reduction_relative_to_baseline_min: float
     delay_reduction_pct: float
-    elevated_risk_edges_count: int
-    saturated_junctions_count: int
-    expected_incident_duration_min: float
-    feasibility_rating: str  # HIGH | MODERATE | COMPLEX
+    elevated_risk_edges_count: int = 0
+    saturated_junctions_count: int = 0
+    expected_incident_duration_min: float = 45.0
+    feasibility_rating: str = "HIGH"  # HIGH | MODERATE | COMPLEX
     key_tradeoffs: str
     rank: int = 1
+    # Genuine Traffic Diversion & Redistribution Fields
+    assigned_demand_pcu: float = 0.0
+    route_edges: List[str] = []
+    route_names: List[str] = []
+    route_length_km: float = 0.0
+    route_travel_time_min: float = 0.0
+    max_vc_ratio: float = 0.0
+    saturated_segments: List[str] = []
+    downstream_bottlenecks: List[str] = []
+    total_delay_veh_hours: float = 0.0
+    delay_saved_veh_hours: float = 0.0
+    provenance: str = "ESTIMATED"
 
 class InterventionEvaluationRequest(BaseModel):
     incident_id: Optional[str] = None
     incident: Optional[TrafficIncident] = None
     custom_scenarios: Optional[List[InterventionScenario]] = None
     optimization_objective: str = "MINIMIZE_NETWORK_DELAY_AND_PREVENT_JUNCTION_GRIDLOCK"
+    override_displaced_demand: Optional[float] = None
+    override_blockage_pct: Optional[float] = None
 
 class InterventionEvaluationResponse(BaseModel):
     incident_id: str
     evaluation_timestamp: str
     optimization_objective: str
+    affected_corridor: Optional[str] = None
+    affected_edge_id: Optional[str] = None
+    baseline_flow_veh_hr: Optional[float] = 0.0
+    nominal_capacity_veh_hr: Optional[float] = 0.0
+    effective_capacity_veh_hr: Optional[float] = 0.0
+    displaced_demand_veh_hr: Optional[float] = 0.0
+    viable_detours_count: int = 0
+    candidate_detours: List[Dict[str, Any]] = []
     baseline_scenario: InterventionScenario
     candidate_scenarios: List[InterventionScenario]
     recommended_scenario_id: str
     recommendation_rationale: str
     tradeoff_summary: str
+    assumptions: List[str] = []
+    provenance: str = "ESTIMATED"
 
 # Historical Analytics & Recurring Hotspot Models
 class HistoricalIncidentRecord(BaseModel):
