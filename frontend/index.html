@@ -124,7 +124,7 @@
             </div>
           </div>
 
-          <!-- 2. Active Incident Blockages -->
+          <!-- 2. Capacity Lost on Blocked Corridor -->
           <div class="kpi-card">
             <div class="kpi-left">
               <div class="kpi-icon-box icon-amber">
@@ -135,10 +135,10 @@
                 </svg>
               </div>
               <div class="kpi-content">
-                <span class="kpi-label">Active Disruption Corridors</span>
+                <span class="kpi-label">Corridor Capacity Lost</span>
                 <div class="kpi-data-line">
-                  <span class="kpi-value" id="kpiActiveIncidents">1 Corridor</span>
-                  <span class="kpi-tag-provenance">[CONFIRMED]</span>
+                  <span class="kpi-value" id="kpiCapacityLost">1,440 PCU/hr</span>
+                  <span class="kpi-tag-provenance" id="kpiCapacityLostTag">[ESTIMATED]</span>
                 </div>
               </div>
             </div>
@@ -174,8 +174,8 @@
               <div class="kpi-content">
                 <span class="kpi-label">Projected Delay Reduction</span>
                 <div class="kpi-data-line">
-                  <span class="kpi-value" id="kpiDelaySaved">29.6 veh-hrs</span>
-                  <span class="kpi-tag-provenance trend-green">-64.3%</span>
+                  <span class="kpi-value" id="kpiDelaySaved">242.8 veh-hrs</span>
+                  <span class="kpi-tag-provenance trend-green" id="kpiDelayPctTag">-94.8%</span>
                 </div>
               </div>
             </div>
@@ -229,21 +229,24 @@
             </div>
           </div>
 
-          <!-- Right Card: Incident Controller & Disruption Parameters -->
+          <!-- Right Card: STEP 1 — Incident Controller & Disruption Parameters -->
           <div class="panel incident-controller-card">
             <div class="panel-topbar">
-              <div class="title-with-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-                <h2 class="panel-title">Incident &amp; Blockage Setup</h2>
+              <div>
+                <div class="step-indicator-chip"><span class="step-num">STEP 1</span><span>Detect the Problem</span></div>
+                <div class="title-with-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                  </svg>
+                  <h2 class="panel-title">Incident &amp; Disruption Setup</h2>
+                </div>
               </div>
             </div>
 
             <!-- Preset Scenarios -->
             <div class="preset-group">
-              <span class="control-label">Mangaluru Demo Presets:</span>
+              <span class="control-label">Reported Incident Presets:</span>
               <div class="preset-chips">
                 <button type="button" class="preset-chip active" id="presetNanthoor" data-corridor="corridor_cctv_07" data-block="80">
                   Nanthoor Rollover (80%)
@@ -272,14 +275,26 @@
                   <option value="corridor_cctv_08_rev">NH-66 Kuntikan to Nanthoor (corridor_cctv_08_rev)</option>
                   <option value="corridor_cctv_15">NH-66 Pumpwell to Nanthoor Bypass (corridor_cctv_15)</option>
                 </select>
+                <div style="font-size: 11px; color: #38bdf8; margin-top: 4px;">Tip: Click any corridor on the 3D map to select it directly.</div>
+              </div>
+
+              <!-- Quick Severity Level Selector -->
+              <div class="form-row">
+                <span class="control-label">Incident Severity Level:</span>
+                <div class="severity-chips">
+                  <button type="button" class="severity-chip" data-block="25">Minor (25%)</button>
+                  <button type="button" class="severity-chip" data-block="50">Moderate (50%)</button>
+                  <button type="button" class="severity-chip active" data-block="80">Severe (80%)</button>
+                  <button type="button" class="severity-chip" data-block="100">Full Block (100%)</button>
+                </div>
               </div>
 
               <div class="form-row">
                 <div class="slider-header">
-                  <label for="sliderBlockage" class="control-label">Capacity Blockage Severity:</label>
+                  <label for="sliderBlockage" class="control-label">Capacity Blockage Adjustment:</label>
                   <span class="slider-val" id="lblBlockagePct">80% Blocked</span>
                 </div>
-                <input type="range" id="sliderBlockage" min="10" max="100" step="5" value="80" class="control-range">
+                <input type="range" id="sliderBlockage" min="0" max="100" step="5" value="80" class="control-range">
               </div>
 
               <!-- Computed Displaced Demand Inspection Strip -->
@@ -304,7 +319,7 @@
                   <circle cx="12" cy="12" r="10"></circle>
                   <polygon points="10 8 16 12 10 16 10 8"></polygon>
                 </svg>
-                <span>Calculate &amp; Compare Diversions</span>
+                <span>Run Impact Analysis &amp; Diversion Comparison</span>
               </button>
             </div>
 
@@ -313,65 +328,65 @@
         </section>
 
         <!-- ================================================================ -->
-        <!-- ROW 3: VIABLE DETOURS | SIDE-BY-SIDE MATRIX | RECOMMENDATION       -->
+        <!-- ROW 3: STEP 2 (RIPPLE EFFECT) & STEP 3 (INTERVENTIONS COMPARISON)  -->
         <!-- ================================================================ -->
         <section class="bottom-diversion-grid">
 
-          <!-- 1. Discovered Viable Detours in Graph -->
+          <!-- STEP 2: Discovered Viable Detours in Graph & Ripple Effect -->
           <div class="panel detours-card">
             <div class="panel-topbar">
-              <div class="title-with-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="18" cy="5" r="3"></circle>
-                  <circle cx="6" cy="12" r="3"></circle>
-                  <circle cx="18" cy="19" r="3"></circle>
-                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                </svg>
-                <h2 class="panel-title">Graph-Based Detour Candidates</h2>
+              <div>
+                <div class="step-indicator-chip"><span class="step-num">STEP 2</span><span>Predict the Ripple Effect</span></div>
+                <div class="title-with-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                  </svg>
+                  <h2 class="panel-title">Graph Detour Candidates &amp; Ripple Risks</h2>
+                </div>
               </div>
               <span class="provenance-chip" id="provenanceBadge">ESTIMATED</span>
             </div>
 
             <div class="detours-list" id="detoursContainer">
-              <div class="detour-item active-detour" data-index="0">
-                <div class="detour-header">
-                  <span class="detour-badge badge-route-a">Route A</span>
-                  <span class="detour-name">Via MG Road &amp; NH-66 Southbound</span>
-                </div>
-                <div class="detour-metrics">
-                  <span><strong>7.5 km</strong> length</span>
-                  <span><strong>8.9 min</strong> travel time</span>
-                  <span><strong>1,800 PCU/hr</strong> bottleneck cap</span>
-                </div>
-              </div>
+              <!-- Populated dynamically by app.js -->
+            </div>
 
-              <div class="detour-item" data-index="1">
-                <div class="detour-header">
-                  <span class="detour-badge badge-route-b">Route B</span>
-                  <span class="detour-name">Via Ballalbagh &amp; Bejai Expressway</span>
-                </div>
-                <div class="detour-metrics">
-                  <span><strong>7.8 km</strong> length</span>
-                  <span><strong>9.4 min</strong> travel time</span>
-                  <span><strong>1,800 PCU/hr</strong> bottleneck cap</span>
-                </div>
+            <!-- Downstream Ripple Summary Box -->
+            <div class="ripple-summary-box" id="rippleSummaryBox">
+              <div class="ripple-stat-row">
+                <span class="ripple-stat-label">Corridors in Affected Subsystem:</span>
+                <span class="ripple-stat-val" id="rippleCorridorsCount">6 Links</span>
+              </div>
+              <div class="ripple-stat-row">
+                <span class="ripple-stat-label">Unmitigated Queue Backlog (45 min):</span>
+                <span class="ripple-stat-val" id="rippleQueueBacklog">447 PCU</span>
+              </div>
+              <div class="ripple-stat-row">
+                <span class="ripple-stat-label">Saturated Bottleneck Risk:</span>
+                <span class="ripple-stat-val" id="rippleSaturatedRisk">High (V/C &gt; 1.0)</span>
               </div>
             </div>
           </div>
 
-          <!-- 2. Side-by-Side Diversion Scenario Comparison Matrix -->
+          <!-- STEP 3: Side-by-Side Diversion Scenario Comparison Matrix & Segment Inspector -->
           <div class="panel comparison-card">
             <div class="panel-topbar">
-              <div class="title-with-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <path d="M9 14l2 2 4-4"></path>
-                </svg>
-                <h2 class="panel-title">Diversion Impact Comparison Matrix</h2>
+              <div>
+                <div class="step-indicator-chip"><span class="step-num">STEP 3</span><span>Compare Interventions</span></div>
+                <div class="title-with-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    <path d="M9 14l2 2 4-4"></path>
+                  </svg>
+                  <h2 class="panel-title">Diversion Impact Comparison Matrix</h2>
+                </div>
               </div>
-              <span class="dim-sub">Isolated Macroscopic Calculations</span>
+              <span class="dim-sub">Isolated Macroscopic Calculations &bull; Click row to inspect</span>
             </div>
 
             <div class="table-responsive">
@@ -384,7 +399,7 @@
                     <th>Peak V/C</th>
                     <th>Bottlenecks</th>
                     <th>Delay Saved</th>
-                    <th>Action</th>
+                    <th>Inspect</th>
                   </tr>
                 </thead>
                 <tbody id="matrixTableBody">
@@ -393,27 +408,104 @@
               </table>
             </div>
 
-            <!-- Mathematical Recommendation Banner -->
-            <div class="recommendation-callout" id="recommendationBanner">
-              <div class="rec-icon-col">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
+            <!-- Scenario Segment Breakdown Inspector (Dynamic) -->
+            <div class="scenario-inspector" id="scenarioSegmentInspector">
+              <div class="scenario-inspector-header">
+                <div>
+                  <span class="scenario-inspector-title">Scenario Segment Inspection: <span id="inspectorScenarioName">Optimal Split</span></span>
+                  <div class="scenario-inspector-sub">Individual link demand, capacity, and volume-to-capacity (V/C) ratios under this scenario</div>
+                </div>
+                <span class="provenance-chip" style="font-size: 10px;">SEAM INSPECTOR</span>
               </div>
-              <div class="rec-content-col">
-                <div class="rec-title" id="recTitle">Optimal: Capacity-Aware Multi-Corridor Split</div>
-                <div class="rec-desc" id="recDesc">
-                  Reduces total network delay by 29.6 vehicle-hours (-64.3% vs unmitigated baseline). Balances load across MG Road and Ballalbagh, keeping peak V/C at 1.00 and avoiding secondary arterial gridlock.
-                </div>
-                <div class="rec-tradeoff" id="recTradeoff">
-                  Trade-off: Requires multi-junction VMS guidance; prevents overloading any single alternative corridor.
-                </div>
+              <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                <table class="inspector-table">
+                  <thead>
+                    <tr>
+                      <th>Road Segment</th>
+                      <th>Role</th>
+                      <th>Flow</th>
+                      <th>Capacity</th>
+                      <th>Reserve</th>
+                      <th>V/C Ratio</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inspectorTableBody">
+                    <!-- Populated dynamically when scenario is clicked -->
+                  </tbody>
+                </table>
               </div>
             </div>
 
           </div>
 
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- ROW 4: STEP 4 (RECOMMEND AN ACTION & ADVISORY)                     -->
+        <!-- ================================================================ -->
+        <section class="panel recommendation-panel" style="margin-top: 18px;">
+          <div class="panel-topbar">
+            <div>
+              <div class="step-indicator-chip"><span class="step-num">STEP 4</span><span>Recommend an Action</span></div>
+              <div class="title-with-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <h2 class="panel-title">Decision-Support Recommendation &amp; Operational Advisory</h2>
+              </div>
+            </div>
+            <span class="provenance-chip" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">
+              CALCULATED RECOMMENDATION
+            </span>
+          </div>
+
+          <!-- Mathematical Recommendation Banner -->
+          <div class="recommendation-callout" id="recommendationBanner">
+            <div class="rec-icon-col">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <div class="rec-content-col">
+              <div class="rec-title" id="recTitle">Optimal: Capacity-Aware Multi-Corridor Split</div>
+              <div class="rec-desc" id="recDesc">
+                Recommended Strategy: 'Capacity-Aware Multi-Corridor Split (Balanced Detour)' achieves optimal network relief, saving 242.8 vehicle-hours (-94.8% vs baseline) with peak arterial V/C at 1.00.
+              </div>
+              <div class="rec-tradeoff" id="recTradeoff">
+                Trade-off Analysis: 'Capacity-Aware Multi-Corridor Split (Balanced Detour)' creates zero new saturated bottlenecks. Requires 2 units (Multi-Junction VMS Signage &amp; Dynamic Guidance).
+              </div>
+              <div id="recRouteAllocations" style="font-size: 11.5px; color: #cbd5e1; margin-top: 6px; font-weight: 500;">
+                <!-- Populated dynamically with volume and route details -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Decision-Support Disclaimer Notice -->
+          <div class="advisory-notice">
+            <svg class="advisory-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <div>
+              <strong>Decision-Support Advisory Only:</strong> This system generates macroscopic predictive evaluations to support control-room operators. It does not automatically dispatch police units, actuate signal controllers, or modify physical signage. All interventions require operator verification and command authorization.
+            </div>
+          </div>
+
+          <!-- Modeling Assumptions & Data Quality Disclosures -->
+          <div style="margin-top: 14px; font-size: 11px; color: #94a3b8; line-height: 1.6; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+            <strong style="color: #cbd5e1;">Model Assumptions &amp; Scientific Basis:</strong>
+            <ul id="recAssumptionsList" style="margin-top: 4px; padding-left: 18px;">
+              <li>Nominal segment capacities calculated from IRC lane standards (900 PCU/lane/hr).</li>
+              <li>Travel times follow Bureau of Public Roads (BPR) volume-delay curves: t = t0 * [1 + 0.15*(V/C)^4], bounded at 8.0x crawl speed.</li>
+              <li>Delays and delay savings are measured in vehicle-hours over a standardized 1-hour operational analysis horizon.</li>
+              <li>Initial network conditions are strictly isolated and identical across all candidate scenarios without shared state leakage.</li>
+              <li>Provenance: ESTIMATED FROM ROAD GRAPH TOPOLOGY &amp; MACROSCOPIC FLOW LAWS.</li>
+            </ul>
+          </div>
         </section>
 
       </main>

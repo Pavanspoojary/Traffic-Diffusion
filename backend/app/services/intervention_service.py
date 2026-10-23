@@ -314,6 +314,49 @@ class WhatIfInterventionPlanner:
         # Queue length in PCU over evaluation horizon
         queue_backlog_pcu = round(displaced_demand * (float(horizon_minutes) / 60.0), 1)
 
+        # Helper to construct detailed segment impacts for inspection
+        def _build_segment_impacts(
+            edge_volumes: Dict[str, float],
+            route_edge_ids: List[str],
+            bottleneck_names: List[str]
+        ) -> List[Dict[str, Any]]:
+            impacts = []
+            for eid in sorted(affected_edge_ids):
+                e = edges_map.get(eid)
+                if not e:
+                    continue
+                v = edge_volumes.get(eid, self._compute_edge_nominal_flow(e))
+                if eid == target_edge_id:
+                    c = max(1.0, effective_capacity)
+                    role = "BLOCKED_CORRIDOR"
+                elif eid in route_edge_ids:
+                    c = self._compute_edge_capacity(e)
+                    role = "DETOUR_ROUTE"
+                else:
+                    c = self._compute_edge_capacity(e)
+                    role = "UPSTREAM_FEEDER"
+
+                vc = round(v / c, 2)
+                reserve = max(0.0, round(c - v, 1))
+                t_bpr = self._compute_bpr_travel_time(e, v, c)
+                is_sat = (vc >= 1.0)
+                is_new_bot = (e.name in bottleneck_names)
+
+                impacts.append({
+                    "edge_id": eid,
+                    "name": e.name,
+                    "role": role,
+                    "nominal_flow_pcu": round(self._compute_edge_nominal_flow(e), 1),
+                    "assigned_flow_pcu": round(v, 1),
+                    "capacity_pcu": round(c, 1),
+                    "reserve_capacity_pcu": reserve,
+                    "vc_ratio": vc,
+                    "travel_time_min": t_bpr,
+                    "is_saturated": is_sat,
+                    "is_new_bottleneck": is_new_bot
+                })
+            return impacts
+
         baseline_scenario = InterventionScenario(
             scenario_id="scenario_baseline",
             scenario_name="Baseline: Unmitigated Corridor Blockage",
@@ -344,6 +387,7 @@ class WhatIfInterventionPlanner:
             total_delay_veh_hours=base_delay_veh_hrs,
             delay_saved_veh_hours=0.0,
             provenance="ESTIMATED",
+            segment_impacts=_build_segment_impacts(baseline_volumes, [], []),
         )
 
         candidate_scenarios: List[InterventionScenario] = []
@@ -417,6 +461,7 @@ class WhatIfInterventionPlanner:
                     total_delay_veh_hours=a_delay_veh_hrs,
                     delay_saved_veh_hours=a_saved_veh_hrs,
                     provenance="ESTIMATED",
+                    segment_impacts=_build_segment_impacts(scen_a_volumes, detour_a["edge_ids"], a_bottlenecks),
                 )
             )
 
@@ -486,6 +531,7 @@ class WhatIfInterventionPlanner:
                     total_delay_veh_hours=b_delay_veh_hrs,
                     delay_saved_veh_hours=b_saved_veh_hrs,
                     provenance="ESTIMATED",
+                    segment_impacts=_build_segment_impacts(scen_b_volumes, detour_b["edge_ids"], b_bottlenecks),
                 )
             )
 
@@ -584,6 +630,7 @@ class WhatIfInterventionPlanner:
                     total_delay_veh_hours=c_delay_veh_hrs,
                     delay_saved_veh_hours=c_saved_veh_hrs,
                     provenance="ESTIMATED",
+                    segment_impacts=_build_segment_impacts(scen_c_volumes, viable_detours[0]["edge_ids"] + viable_detours[1]["edge_ids"], c_bottlenecks),
                 )
             )
 
@@ -647,6 +694,7 @@ class WhatIfInterventionPlanner:
                     total_delay_veh_hours=m_delay_veh_hrs,
                     delay_saved_veh_hours=m_saved_veh_hrs,
                     provenance="ESTIMATED",
+                    segment_impacts=_build_segment_impacts(scen_m_volumes, detour_single["edge_ids"], m_bottlenecks),
                 )
             )
 
@@ -683,6 +731,7 @@ class WhatIfInterventionPlanner:
                     total_delay_veh_hours=round(base_delay_veh_hrs * 0.90, 2),
                     delay_saved_veh_hours=round(base_delay_veh_hrs * 0.10, 2),
                     provenance="ESTIMATED",
+                    segment_impacts=_build_segment_impacts(baseline_volumes, [], []),
                 )
             )
 

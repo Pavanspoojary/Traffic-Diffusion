@@ -283,6 +283,7 @@ class InterventionScenario(BaseModel):
     total_delay_veh_hours: float = 0.0
     delay_saved_veh_hours: float = 0.0
     provenance: str = "ESTIMATED"
+    segment_impacts: List[Dict[str, Any]] = []
 
 class InterventionEvaluationRequest(BaseModel):
     incident_id: Optional[str] = None
