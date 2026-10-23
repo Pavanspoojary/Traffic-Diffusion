@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Citizen Access Portal - Traffic Diffusion</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/public.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="login-body">
+  <div class="login-card-wrapper">
+    <div class="login-card">
+      <div class="login-brand-badge">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </div>
+
+      <div class="login-header-text">
+        <h1 class="login-title">TRAFFIC DIFFUSION</h1>
+        <p class="login-subtitle">Urban Mobility & Public Traffic Intelligence Platform</p>
+        <span class="login-portal-tag">Citizen Portal Access</span>
+      </div>
+
+      <form id="citizenLoginForm" autocomplete="on">
+        <!-- Field 1: Name -->
+        <div class="login-form-group">
+          <label class="login-label" for="citizenName">
+            <span>Full Name</span>
+            <span style="font-size: 11px; color: var(--pub-text-muted);">Required</span>
+          </label>
+          <input 
+            type="text" 
+            id="citizenName" 
+            name="citizenName"
+            class="login-input" 
+            placeholder="e.g. Rahul Sharma" 
+            required 
+            autofocus
+          />
+        </div>
+
+        <!-- Field 2: Age -->
+        <div class="login-form-group">
+          <label class="login-label" for="citizenAge">
+            <span>Age</span>
+            <span style="font-size: 11px; color: var(--pub-text-muted);">Years</span>
+          </label>
+          <input 
+            type="number" 
+            id="citizenAge" 
+            name="citizenAge"
+            class="login-input" 
+            placeholder="e.g. 28" 
+            min="1" 
+            max="120" 
+            required 
+          />
+        </div>
+
+        <!-- Field 3: Address -->
+        <div class="login-form-group">
+          <label class="login-label" for="citizenAddress">
+            <span>Address / Neighborhood</span>
+            <span style="font-size: 11px; color: var(--pub-text-muted);">Locality</span>
+          </label>
+          <input 
+            type="text" 
+            id="citizenAddress" 
+            name="citizenAddress"
+            class="login-input" 
+            placeholder="e.g. Bejai Main Road, Mangaluru" 
+            required 
+          />
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="btnSubmitLogin" class="login-btn-submit">
+          <span>Continue to Live Map</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+      </form>
+
+      <div class="login-footer-info">
+        <p>Looking for command center? <a href="/">Operations Console</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const loginForm = document.getElementById('citizenLoginForm');
+      
+      // Pre-fill if previously logged in
+      const savedUser = localStorage.getItem('trafficCitizenUser');
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          if (user.name) document.getElementById('citizenName').value = user.name;
+          if (user.age) document.getElementById('citizenAge').value = user.age;
+          if (user.address) document.getElementById('citizenAddress').value = user.address;
+        } catch (e) {}
+      }
+
+      loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('citizenName').value.trim();
+        const age = document.getElementById('citizenAge').value.trim();
+        const address = document.getElementById('citizenAddress').value.trim();
+
+        if (!name || !age || !address) {
+          alert('Please fill in your name, age, and address.');
+          return;
+        }
+
+        const citizenData = {
+          name,
+          age: parseInt(age, 10),
+          address,
+          loginTimestamp: new Date().toISOString()
+        };
+
+        // Persist locally for session
+        localStorage.setItem('trafficCitizenUser', JSON.stringify(citizenData));
+
+        // Smooth transition to public map view
+        window.location.href = '/public.html';
+      });
+    });
+  </script>
+</body>
+</html>

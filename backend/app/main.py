@@ -49,6 +49,17 @@ async def operations_page():
     """Secondary supporting view: CCTV & Legacy Operations Console."""
     return FileResponse(settings.base_dir / "frontend" / "operations.html")
 
+@app.api_route("/login", methods=["GET", "HEAD"])
+async def login_page():
+    """Citizen portal login view."""
+    return FileResponse(settings.base_dir / "frontend" / "login.html")
+
+@app.api_route("/public", methods=["GET", "HEAD"])
+async def public_page():
+    """Public live map with emergency incident reporting."""
+    return FileResponse(settings.base_dir / "frontend" / "public.html")
+
+
 # Mount static frontend files
 frontend_dir = settings.base_dir / "frontend"
 if frontend_dir.exists():
