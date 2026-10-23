@@ -79,6 +79,11 @@ class PredictiveIncidentEngine:
         )
 
         self.active_incidents[inc_id] = incident
+        # Update edge in routing_service so public map immediately renders active blockage
+        if edge:
+            edge.has_incident = True
+            edge.incident_description = incident.description
+            edge.congestion_level = CongestionLevel.BLOCKED if severity == IncidentSeverity.CRITICAL else CongestionLevel.HEAVY
         return incident
 
     def get_incident(self, incident_id: str) -> Optional[TrafficIncident]:

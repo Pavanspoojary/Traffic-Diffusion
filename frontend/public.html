@@ -126,6 +126,22 @@
               </select>
             </div>
 
+            <!-- Affected Road Corridor -->
+            <div class="login-form-group">
+              <label class="login-label" for="modalCorridorSelect">
+                <span>Affected Road Corridor</span>
+                <span style="font-size: 11px; color: var(--pub-text-muted);">Required</span>
+              </label>
+              <select id="modalCorridorSelect" class="login-input" required>
+                <option value="corridor_cctv_07" selected>Circuit House - Nanthoor Road (corridor_cctv_07)</option>
+                <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
+                <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
+                <option value="corridor_cctv_11">Bejai Green Bypass Expressway (corridor_cctv_11)</option>
+                <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial (corridor_cctv_13)</option>
+                <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
+              </select>
+            </div>
+
             <!-- Subject / Custom Title -->
             <div class="login-form-group" id="subjectGroup">
               <label class="login-label" for="modalIncidentSubject">
@@ -176,6 +192,15 @@
                 <option value="CRITICAL">Critical (Total Gridlock / High Danger)</option>
                 <option value="HIGH" selected>High (Major Lane Blockage)</option>
                 <option value="MODERATE">Moderate (Partial Slowdown)</option>
+              </select>
+            </div>
+
+            <!-- Lanes Blocked -->
+            <div class="login-form-group">
+              <label class="login-label" for="modalLanesSelect">Lanes Blocked</label>
+              <select id="modalLanesSelect" class="login-input">
+                <option value="1" selected>1 Lane Blocked</option>
+                <option value="2">2 Lanes Blocked (Severe / Multi-Lane)</option>
               </select>
             </div>
 
@@ -291,6 +316,6 @@
     }
   </script>
   <script src="/js/map.js"></script>
-  <script src="/js/public.js"></script>
+  <script src="/js/public.js?v=4.1"></script>
 </body>
 </html>

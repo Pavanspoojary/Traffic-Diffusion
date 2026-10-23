@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function populateCorridorSelect(edges) {
     const select = document.getElementById('modalCorridorSelect');
     if (!select) return;
+    const currentVal = select.value;
     select.innerHTML = '<option value="">-- Select Road Corridor --</option>';
     edges.forEach(e => {
       const opt = document.createElement('option');
@@ -86,9 +87,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       opt.textContent = `${e.name} (${e.congestion_level || 'NORMAL'})`;
       select.appendChild(opt);
     });
+    if (currentVal) select.value = currentVal;
   }
 
   await loadPublicNetwork();
+  setInterval(loadPublicNetwork, 5000);
 
   // 3. Floating Red "+" Action Button & Modal Logic
   const btnEmergencyFab = document.getElementById('btnEmergencyFab');
@@ -342,23 +345,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       const category = modalCategorySelect?.value || 'ROAD_BLOCKAGE';
       const subject = modalIncidentSubject?.value.trim() || 'Citizen Incident';
       const location = modalIncidentLocation?.value.trim() || currentCitizen.address || 'Mangaluru';
-      const description = document.getElementById('modalIncidentDesc')?.value || '';
+      const description = document.getElementById('modalIncidentDesc')?.value.trim() || '';
       const severity = document.getElementById('modalSeveritySelect')?.value || 'HIGH';
 
-      const fullDetails = `${subject} at ${location} | ${description}`.trim();
+      const corridorSelect = document.getElementById('modalCorridorSelect');
+      const corridorId = corridorSelect?.value || 'corridor_cctv_07';
+      const corridorName = corridorSelect?.options[corridorSelect.selectedIndex]?.text || corridorId;
 
-      // Submit to backend intelligence API if available
+      const lanesSelect = document.getElementById('modalLanesSelect');
+      const lanesAffected = parseInt(lanesSelect?.value || '1', 10);
+
+      const fullDetails = `${subject} (${location}) ${description ? '— ' + description : ''}`.trim();
+
+      // Submit to backend intelligence API
       try {
         const payload = {
-          edge_id: 'corridor_cctv_01',
-          category: category === 'OTHER' ? 'ROAD_BLOCKAGE' : category,
+          road_segment_id: corridorId,
+          edge_id: corridorId,
+          category: (category === 'OTHER' || category === 'EMERGENCY_AMBULANCE') ? 'ROAD_BLOCKAGE' : category,
           severity: severity,
-          capacity_reduction: 0.85,
+          lanes_affected: lanesAffected,
+          capacity_reduction: lanesAffected > 1 ? 0.75 : 0.45,
           estimated_duration_min: 45,
           custom_subject: subject,
+          description: fullDetails,
           location: location,
-          reporter: currentCitizen.name,
-          reporter_address: currentCitizen.address,
+          reporter_name: currentCitizen.name || 'Citizen Commuter',
+          reporter: currentCitizen.name || 'Citizen Commuter',
+          contact_number: currentCitizen.address || null,
           has_photo: !!capturedPhotoBase64
         };
 
@@ -369,13 +383,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         if (res.ok) {
-          showToast(`Alert dispatched: "${subject}" at ${location} with photo verification!`);
+          showToast(`Emergency alert submitted: "${subject}" on ${corridorName}! Control room notified.`);
         } else {
-          showToast(`Alert dispatched: "${subject}" recorded at ${location}.`);
+          showToast(`Alert recorded: "${subject}" at ${location}.`);
         }
       } catch (err) {
-        // Fallback demo toast if offline
-        showToast(`Alert logged: "${subject}" at ${location} verified via camera!`);
+        showToast(`Alert logged: "${subject}" at ${location}`);
       }
 
       // Close modal and clean up
