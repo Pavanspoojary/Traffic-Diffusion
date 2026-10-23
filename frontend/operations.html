@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traffic Diffusion - Smart Mobility & Emergency Intelligence</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+      <div class="brand-section">
+        <div class="brand-badge">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">TRAFFIC DIFFUSION</h1>
+          <p class="brand-subtitle">Smart Mobility & Emergency Traffic Intelligence</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="status-pill status-active">
+          <span class="status-dot"></span>
+          <span>CV SENSING ACTIVE</span>
+        </div>
+        <div class="status-pill status-incident" id="incidentBadge">
+          <span class="incident-count" id="activeIncidentsCount">1</span>
+          <span>BLOCKAGES DETECTED</span>
+        </div>
+        <a href="/" class="btn btn-primary btn-sm" style="text-decoration: none;">Driver View</a>
+        <button id="btnResetNetwork" class="btn btn-outline-sm">Reset Grid</button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      <!-- Left Controls Column -->
+      <aside class="control-sidebar">
+        <!-- Tab 1: Video Ingestion & CV -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">CCTV Footage Upload & Vision Sensing</h2>
+            <span class="badge badge-subtle">Phase 1</span>
+          </div>
+
+          <form id="uploadForm" class="control-group">
+            <label class="form-label" for="corridorSelect">Target Corridor Camera</label>
+            <select id="corridorSelect" class="form-select">
+              <option value="corridor_cctv_04">corridor_cctv_04: Old Airport Ring Road (Bottleneck)</option>
+              <option value="corridor_cctv_03">corridor_cctv_03: Brigade Arterial Link</option>
+              <option value="corridor_cctv_01">corridor_cctv_01: MG Main Avenue</option>
+              <option value="corridor_cctv_07">corridor_cctv_07: Palace Green Expressway</option>
+            </select>
+
+            <label class="form-label" for="videoFileInput">Upload CCTV Video (.mp4, .avi, .mov)</label>
+            <input type="file" id="videoFileInput" class="form-file" accept="video/mp4,video/avi,video/quicktime,video/x-matroska">
+
+            <div class="sample-actions">
+              <button type="button" id="btnLoadHeavySample" class="btn btn-sm btn-secondary">Load Heavy Traffic Sample</button>
+              <button type="button" id="btnLoadFreeflowSample" class="btn btn-sm btn-secondary">Load Free-Flow Sample</button>
+            </div>
+
+            <button type="submit" id="btnUploadSubmit" class="btn btn-primary btn-block">
+              Analyze Video Stream
+            </button>
+          </form>
+
+          <!-- CV Telemetry Results -->
+          <div id="cvResultsBox" class="cv-results-box hidden">
+            <div class="results-meta">
+              <span class="mono-label">CORRIDOR:</span>
+              <span id="resCorridorId" class="mono-val">-</span>
+              <span class="mono-label">FRAMES:</span>
+              <span id="resFrames" class="mono-val">-</span>
+            </div>
+
+            <div class="density-bar-container">
+              <div class="density-header">
+                <span>Calculated Density</span>
+                <span id="resDensityScore" class="density-score">0.00</span>
+              </div>
+              <div class="progress-track">
+                <div id="densityProgressBar" class="progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div class="telemetry-grid">
+              <div class="stat-pill">
+                <div class="stat-num" id="resCars">0</div>
+                <div class="stat-name">Cars</div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-num" id="resTrucks">0</div>
+                <div class="stat-name">Trucks</div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-num" id="resBuses">0</div>
+                <div class="stat-name">Buses</div>
+              </div>
+              <div class="stat-pill">
+                <div class="stat-num" id="resBikes">0</div>
+                <div class="stat-name">Bikes</div>
+              </div>
+            </div>
+
+            <div class="status-row">
+              <span class="mono-label">Congestion:</span>
+              <span id="resCongestionBadge" class="status-tag tag-free">FREE_FLOW</span>
+            </div>
+
+            <!-- Preview Image Snapshot -->
+            <div id="previewContainer" class="preview-container hidden">
+              <p class="preview-title">Annotated CV Detection Frame</p>
+              <img id="previewImage" alt="Vehicle Detection Frame" class="preview-img">
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 2: Emergency Green Corridor Dispatcher -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Emergency Green Corridor Routing</h2>
+            <span class="badge badge-accent">Priority EMS</span>
+          </div>
+
+          <div class="control-group">
+            <label class="form-label" for="originSelect">EMS Dispatch Origin</label>
+            <select id="originSelect" class="form-select">
+              <option value="EMS_HQ_SOUTH">Central EMS Station Alpha</option>
+              <option value="INT_CENTRAL_SQUARE">Central Square Junction</option>
+              <option value="INT_WEST_EXPRESSWAY">West Expressway Terminal</option>
+            </select>
+
+            <label class="form-label" for="destinationSelect">Trauma Center Destination</label>
+            <select id="destinationSelect" class="form-select">
+              <option value="HOSPITAL_TRAUMA_CENTER">Apex City Trauma Center (East)</option>
+              <option value="HOSPITAL_GENERAL">Metro General Hospital (West)</option>
+            </select>
+
+            <div class="toggle-row">
+              <label class="toggle-label">
+                <input type="checkbox" id="chkAvoidCongestion" checked>
+                <span>Dynamic Incident Avoidance</span>
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="chkPreemption" checked>
+                <span>Traffic Light Preemption</span>
+              </label>
+            </div>
+
+            <button id="btnComputeRoute" class="btn btn-emergency btn-block">
+              Dispatch Green Corridor
+            </button>
+          </div>
+        </section>
+
+        <!-- Tab 3: Interactive Incident Simulator -->
+        <section class="card panel-section">
+          <div class="card-header">
+            <h2 class="card-title">Live Roadblock Simulator</h2>
+            <span class="badge badge-subtle">Stress Test</span>
+          </div>
+
+          <div class="control-group">
+            <label class="form-label" for="simEdgeSelect">Select Target Edge</label>
+            <select id="simEdgeSelect" class="form-select">
+              <!-- Dynamically populated -->
+            </select>
+
+            <div class="button-row">
+              <button id="btnInjectBlockage" class="btn btn-danger btn-sm">Inject Blockage</button>
+              <button id="btnClearBlockage" class="btn btn-outline-sm btn-sm">Clear Edge</button>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- Right Visualization Column -->
+      <section class="map-container-wrapper">
+        <!-- Interactive Map -->
+        <div id="map" class="map-view"></div>
+
+        <!-- Telemetry & Performance Metrics Banner -->
+        <div class="metrics-banner" id="metricsBanner">
+          <div class="metric-card">
+            <span class="metric-title">Green Corridor Distance</span>
+            <span class="metric-value" id="valDistance">0.00 km</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Estimated EMS Transit</span>
+            <span class="metric-value highlight-green" id="valEmsTime">0.0 min</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Standard Route Transit</span>
+            <span class="metric-value highlight-muted" id="valStandardTime">0.0 min</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Critical Time Saved</span>
+            <span class="metric-value highlight-amber" id="valTimeSaved">0.0 min</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Preempted Signals</span>
+            <span class="metric-value highlight-cyan" id="valSignals">0</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/js/map.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

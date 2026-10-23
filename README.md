@@ -12,11 +12,12 @@ Traffic Diffusion is an intelligent urban mobility platform built for emergency 
 
 ## 2. Key Capabilities
 
+- **Ambulance Driver PWA**: Progressive Web App with Google Maps-style navigation UI (turn-by-turn maneuvers, ETA, speed limits, free OpenStreetMap tiles with zero API keys or watermarks).
 - **CCTV Video Sensing**: Supports automated vehicle detection (cars, trucks, buses, motorcycles) and flow density tracking from uploaded traffic surveillance footage.
 - **Dynamic Congestion Scoring**: Continuous calculation of corridor congestion indices (`FREE_FLOW`, `MODERATE`, `HEAVY`, `BLOCKED`) based on weighted vehicle capacity.
 - **Emergency Green Corridor Dispatch**: Graph-based shortest-path routing (Dijkstra / A*) that dynamically diverts ambulances around active collisions and heavy bottlenecks.
 - **Signal Preemption Telemetry**: Quantifies traffic signals along the emergency corridor to coordinate priority signal green waves.
-- **Interactive Command Dashboard**: Operations interface combining live road network mapping (Leaflet), video inspection, telemetry counters, and live incident simulation.
+- **Dual Presentation Layer**: Ambulance Driver mobile navigation (`/`) and CCTV Operations Command Center (`/operations`).
 
 ---
 
@@ -150,7 +151,8 @@ Start the unified application (FastAPI backend + integrated dashboard):
 uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 Open your browser to:
-- **Interactive Dashboard**: `http://localhost:8000`
+- **Ambulance Driver Navigator (PWA)**: `http://localhost:8000`
+- **CCTV & Operations Command Center**: `http://localhost:8000/operations`
 - **Interactive API Documentation (Swagger)**: `http://localhost:8000/docs`
 
 ### 3. Run Test Suite

@@ -26,6 +26,8 @@ app.add_middleware(
 app.include_router(cv_router)
 app.include_router(navigation_router)
 
+from fastapi.responses import FileResponse
+
 @app.get("/health")
 async def health_check():
     """System health check endpoint."""
@@ -34,6 +36,11 @@ async def health_check():
         "service": settings.app_name,
         "version": settings.version,
     }
+
+@app.get("/operations")
+async def operations_page():
+    """Direct route for Operations Command Center dashboard."""
+    return FileResponse(settings.base_dir / "frontend" / "operations.html")
 
 # Mount static frontend
 frontend_dir = settings.base_dir / "frontend"
