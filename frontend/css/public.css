@@ -1,0 +1,708 @@
+/* Public Citizen Portal & Emergency Alert Styling */
+
+:root {
+  --pub-bg-primary: #0a0f1d;
+  --pub-bg-secondary: #111827;
+  --pub-bg-card: rgba(22, 32, 50, 0.85);
+  --pub-bg-input: #0f172a;
+  --pub-border: #27374d;
+  --pub-border-focus: #3b82f6;
+  --pub-text: #f8fafc;
+  --pub-text-muted: #94a3b8;
+  --pub-accent-red: #ef4444;
+  --pub-accent-red-hover: #dc2626;
+  --pub-accent-blue: #3b82f6;
+  --pub-accent-green: #10b981;
+}
+
+/* ==========================================================================
+   Login Page Styling
+   ========================================================================== */
+.login-body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 20%, #172554 0%, #0a0f1d 70%);
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.login-card-wrapper {
+  width: 100%;
+  max-width: 480px;
+  animation: fadeInCard 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInCard {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-card {
+  background: var(--pub-bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--pub-border);
+  border-radius: 16px;
+  padding: 36px 32px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+}
+
+.login-brand-badge {
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 0 24px rgba(37, 99, 235, 0.45);
+  color: #fff;
+}
+
+.login-header-text {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.login-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--pub-text);
+  margin-bottom: 6px;
+}
+
+.login-subtitle {
+  font-size: 13px;
+  color: var(--pub-text-muted);
+  line-height: 1.4;
+}
+
+.login-portal-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #60a5fa;
+  margin-top: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.login-form-group {
+  margin-bottom: 18px;
+}
+
+.login-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pub-text);
+  margin-bottom: 6px;
+}
+
+.login-input {
+  width: 100%;
+  padding: 12px 14px;
+  background-color: var(--pub-bg-input);
+  border: 1px solid var(--pub-border);
+  border-radius: 8px;
+  color: var(--pub-text);
+  font-family: inherit;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: var(--pub-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.login-input::placeholder {
+  color: #475569;
+}
+
+.login-btn-submit {
+  width: 100%;
+  padding: 13px 20px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  margin-top: 24px;
+}
+
+.login-btn-submit:hover {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+}
+
+.login-btn-submit:active {
+  transform: translateY(0);
+}
+
+.login-footer-info {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #475569;
+}
+
+.login-footer-info a {
+  color: #60a5fa;
+  text-decoration: none;
+}
+
+/* ==========================================================================
+   Public Map View Styling
+   ========================================================================== */
+.public-map-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+}
+
+.public-top-nav {
+  height: 60px;
+  background-color: var(--pub-bg-secondary);
+  border-bottom: 1px solid var(--pub-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  flex-shrink: 0;
+  z-index: 500;
+}
+
+.public-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.public-brand-logo {
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.public-brand-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--pub-text);
+  line-height: 1.2;
+}
+
+.public-brand-subtitle {
+  font-size: 11px;
+  color: var(--pub-text-muted);
+}
+
+.public-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background-color: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--pub-border);
+  border-radius: 30px;
+}
+
+.user-avatar-circle {
+  width: 24px;
+  height: 24px;
+  background: #3b82f6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.user-info-text {
+  font-size: 12px;
+  color: var(--pub-text);
+  line-height: 1.2;
+}
+
+.user-info-meta {
+  font-size: 10px;
+  color: var(--pub-text-muted);
+}
+
+.btn-switch-user {
+  background: transparent;
+  border: 1px solid #334155;
+  color: var(--pub-text-muted);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn-switch-user:hover {
+  border-color: #64748b;
+  color: var(--pub-text);
+}
+
+.public-map-wrapper {
+  flex: 1 1 auto;
+  width: 100%;
+  height: calc(100vh - 60px);
+  min-height: 300px;
+  position: relative;
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--pub-bg-primary);
+  z-index: 10;
+}
+
+/* ==========================================================================
+   Red "+" Floating Action Button (FAB)
+   ========================================================================== */
+.fab-emergency-add {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 24px rgba(239, 68, 68, 0.55), 0 0 12px rgba(239, 68, 68, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  z-index: 1000;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  outline: none;
+}
+
+.fab-emergency-add svg {
+  width: 28px;
+  height: 28px;
+  transition: transform 0.25s ease;
+}
+
+.fab-emergency-add:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 30px rgba(239, 68, 68, 0.75), 0 0 18px rgba(239, 68, 68, 0.5);
+  background: linear-gradient(135deg, #f87171, #ef4444);
+}
+
+.fab-emergency-add:active {
+  transform: scale(0.96);
+}
+
+.fab-tooltip {
+  position: absolute;
+  right: 70px;
+  background-color: rgba(17, 24, 39, 0.95);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(8px);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.fab-emergency-add:hover .fab-tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ==========================================================================
+   Emergency Incident Report Modal
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 15, 29, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+}
+
+.modal-backdrop.active {
+  display: flex;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--pub-bg-secondary);
+  border: 1px solid var(--pub-border);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: modalEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-header {
+  padding: 18px 22px;
+  background-color: rgba(239, 68, 68, 0.1);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.modal-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #f87171;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--pub-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.modal-close-btn:hover {
+  color: var(--pub-text);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.modal-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Camera-Only Capture Box */
+.camera-control-box {
+  background-color: var(--pub-bg-input);
+  border: 1px dashed var(--pub-border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+  transition: all 0.2s ease;
+  margin-top: 6px;
+}
+
+.camera-control-box:hover {
+  border-color: #3b82f6;
+}
+
+.camera-stream-wrapper {
+  position: relative;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  display: none;
+  margin-bottom: 10px;
+}
+
+.camera-stream-wrapper.active {
+  display: block;
+}
+
+.camera-video-preview {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-actions-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.btn-camera-action {
+  padding: 8px 14px;
+  background-color: #1e293b;
+  border: 1px solid var(--pub-border);
+  color: var(--pub-text);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.btn-camera-action:hover {
+  background-color: #334155;
+  border-color: #64748b;
+}
+
+.btn-camera-snap {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: none;
+  color: #fff;
+}
+
+.btn-camera-snap:hover {
+  background: linear-gradient(135deg, #f87171, #ef4444);
+}
+
+.photo-preview-card {
+  display: none;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #10b981;
+  margin-top: 10px;
+}
+
+.photo-preview-card.active {
+  display: block;
+}
+
+.photo-preview-img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-preview-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(16, 185, 129, 0.95);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.photo-remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f87171;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.photo-remove-btn:hover {
+  background: #dc2626;
+  color: #fff;
+}
+
+#emergencyReportForm {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.btn-location-gps {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+
+.btn-location-gps:hover {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: #60a5fa;
+  color: #fff;
+}
+
+.gps-active-badge {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(16, 185, 129, 0.2);
+  border: 1px solid #10b981;
+  color: #34d399;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.modal-footer {
+  padding: 16px 22px;
+  background-color: var(--pub-bg-secondary);
+  border-top: 1px solid var(--pub-border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.btn-modal-cancel {
+  padding: 10px 18px;
+  background: transparent;
+  border: 1px solid var(--pub-border);
+  color: var(--pub-text-muted);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-modal-cancel:hover {
+  border-color: #64748b;
+  color: var(--pub-text);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.btn-modal-submit {
+  padding: 11px 22px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: none;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.45);
+}
+
+.btn-modal-submit:hover {
+  background: linear-gradient(135deg, #f87171, #ef4444);
+  transform: translateY(-1px);
+}
+
+/* Toast alert notification */
+.public-toast {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background-color: #064e3b;
+  border: 1px solid #10b981;
+  color: #ecfdf5;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  z-index: 1200;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.public-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
