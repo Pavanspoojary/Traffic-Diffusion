@@ -52,6 +52,7 @@ async def police_control_room_dashboard():
     )
 
 @app.api_route("/driver", methods=["GET", "HEAD"])
+@app.api_route("/driver.html", methods=["GET", "HEAD"])
 async def driver_page():
     """Secondary supporting view: Field EMS Ambulance Navigator."""
     return FileResponse(
@@ -64,16 +65,19 @@ async def driver_page():
     )
 
 @app.api_route("/operations", methods=["GET", "HEAD"])
+@app.api_route("/operations.html", methods=["GET", "HEAD"])
 async def operations_page():
     """Secondary supporting view: CCTV & Legacy Operations Console."""
     return FileResponse(settings.base_dir / "frontend" / "operations.html")
 
 @app.api_route("/login", methods=["GET", "HEAD"])
+@app.api_route("/login.html", methods=["GET", "HEAD"])
 async def login_page():
     """Citizen portal login view."""
     return FileResponse(settings.base_dir / "frontend" / "login.html")
 
 @app.api_route("/public", methods=["GET", "HEAD"])
+@app.api_route("/public.html", methods=["GET", "HEAD"])
 async def public_page():
     """Public live map with emergency incident reporting."""
     return FileResponse(settings.base_dir / "frontend" / "public.html")
