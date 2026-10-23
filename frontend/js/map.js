@@ -39,10 +39,12 @@ class TrafficMap {
       const targetNode = this.nodeMap.get(edge.target);
       if (!sourceNode || !targetNode) return;
 
-      const latlngs = [
-        [sourceNode.lat, sourceNode.lng],
-        [targetNode.lat, targetNode.lng]
-      ];
+      const latlngs = (edge.path_coordinates && Array.isArray(edge.path_coordinates) && edge.path_coordinates.length >= 2)
+        ? edge.path_coordinates
+        : [
+            [sourceNode.lat, sourceNode.lng],
+            [targetNode.lat, targetNode.lng]
+          ];
 
       const style = this._getEdgeStyle(edge);
       const polyline = L.polyline(latlngs, style);

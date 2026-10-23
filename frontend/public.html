@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Public Traffic Map - Traffic Diffusion</title>
-  <link rel="stylesheet" href="/css/leaflet.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/public.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- MapLibre GL JS - WebGL 3D Vector Maps with 3D Buildings -->
+  <link rel="stylesheet" href="/css/maplibre-gl.css">
+  <script src="/js/maplibre-gl.js"></script>
 </head>
 <body>
   <div class="public-map-layout">
@@ -29,7 +31,24 @@
       </div>
 
       <!-- Right Profile & Navigation Controls -->
-      <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <!-- Live Incident History Button with Counter Badge -->
+        <button type="button" id="btnOpenHistoryModal" class="btn-history-pill" title="View posted incident history">
+          <span class="history-pill-icon">🚨</span>
+          <span class="history-pill-text">Incidents Log</span>
+          <span id="navIncidentCountBadge" class="incident-counter-badge">3</span>
+        </button>
+
+        <!-- 3D Perspective Tilt View Toggle -->
+        <button type="button" id="btnToggle3DView" class="btn-3d-toggle active" title="Toggle 3D Building Extrusions Perspective">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+          <span id="label3DView">3D Buildings</span>
+        </button>
+
         <!-- Logged-in User Profile Chip -->
         <div class="public-user-chip" id="userProfileChip">
           <div class="user-avatar-circle" id="citizenAvatarInitials">U</div>
@@ -50,8 +69,9 @@
 
       <!-- Floating Map Legend Overlay -->
       <div class="map-legend-overlay" style="top: 16px; left: 16px; z-index: 400;">
-        <div style="font-weight: 800; font-size: 11px; color: #fff; margin-bottom: 6px;">
-          CITY CORRIDOR STATUS
+        <div style="font-weight: 800; font-size: 11px; color: #fff; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+          <span>CITY CORRIDORS</span>
+          <span style="font-size: 9px; color: #38bdf8; font-weight: 700;">MAPLIBRE 3D</span>
         </div>
         <div class="legend-item">
           <div class="legend-color-box" style="background-color: #ef4444;"></div>
@@ -71,24 +91,55 @@
         </div>
       </div>
 
-      <!-- Prominent Red "+" Floating Action Button (FAB) on Bottom Right Corner -->
-      <button 
-        type="button" 
-        id="btnEmergencyFab" 
-        class="fab-emergency-add" 
-        aria-label="Report Incident or Emergency"
-      >
-        <span class="fab-tooltip">Report Incident / SOS</span>
-        <!-- Bold White "+" Icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-      </button>
+      <!-- Floating Incident Metrics & History Overview Card -->
+      <div class="map-stats-overlay" id="mapStatsOverlay">
+        <div class="stats-header">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 13px;">🚨</span>
+            <span style="font-weight: 800; font-size: 11px; color: #f8fafc; letter-spacing: 0.02em;">LIVE INCIDENT COUNTER</span>
+          </div>
+          <button type="button" id="btnQuickViewHistory" class="btn-stats-link">View Log →</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-number" id="statTotalIncidents">3</span>
+            <span class="stat-label">Total Posted</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-number" id="statCriticalIncidents" style="color: #f87171;">1</span>
+            <span class="stat-label">Critical</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-number" id="statMyIncidents" style="color: #60a5fa;">0</span>
+            <span class="stat-label">My Reports</span>
+          </div>
+        </div>
+        <div class="stat-footer-text">
+          <span style="color: #64748b;">Latest:</span>
+          <span id="statLatestTitle" style="color: #cbd5e1; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 150px; display: inline-block; vertical-align: middle;">Freight Rollover</span>
+        </div>
+      </div>
     </main>
+  </div>
 
-    <!-- Emergency Incident Report Modal (Triggered by the Red "+" button) -->
-    <div id="incidentReportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <!-- Prominent Red "+" Floating Action Button (FAB) on Bottom Right Corner -->
+  <button 
+    type="button" 
+    id="btnEmergencyFab" 
+    class="fab-emergency-add" 
+    aria-label="Report Incident or Emergency"
+    onclick="window.openCitizenReportModal && window.openCitizenReportModal()"
+  >
+    <span class="fab-tooltip">Report Incident / SOS</span>
+    <!-- Bold White "+" Icon -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  </button>
+
+  <!-- Emergency Incident Report Modal (Triggered by the Red "+" button) -->
+  <div id="incidentReportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-card">
         <div class="modal-header">
           <div class="modal-header-title">
@@ -126,13 +177,12 @@
               </select>
             </div>
 
-            <!-- Affected Road Corridor -->
-            <div class="login-form-group">
+            <!-- Affected Road Corridor (Hidden input for backend ingestion compatibility) -->
+            <div class="login-form-group" style="display: none;">
               <label class="login-label" for="modalCorridorSelect">
                 <span>Affected Road Corridor</span>
-                <span style="font-size: 11px; color: var(--pub-text-muted);">Required</span>
               </label>
-              <select id="modalCorridorSelect" class="login-input" required>
+              <select id="modalCorridorSelect" class="login-input">
                 <option value="corridor_cctv_07" selected>Circuit House - Nanthoor Road (corridor_cctv_07)</option>
                 <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
                 <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
@@ -307,15 +357,64 @@
       </svg>
       <span id="toastMessage">Report dispatched successfully!</span>
     </div>
-  </div>
 
-  <script src="/js/leaflet.js"></script>
-  <script>
-    if (typeof L === 'undefined') {
-      document.write('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>');
-    }
-  </script>
-  <script src="/js/map.js"></script>
-  <script src="/js/public.js?v=4.1"></script>
+    <!-- Incident History Log Modal -->
+    <div id="incidentHistoryModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
+      <div class="modal-card modal-card-wide">
+        <div class="modal-header">
+          <div class="modal-header-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span id="historyModalTitle">Citizen Incident Log & History</span>
+            <span id="historyModalCountBadge" class="incident-counter-badge" style="margin-left: 8px;">3 Posted</span>
+          </div>
+          <button type="button" id="btnCloseHistoryModal" class="modal-close-btn" aria-label="Close dialog">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-body" style="padding-bottom: 12px;">
+          <!-- Filter Tabs -->
+          <div class="history-filters-bar">
+            <button type="button" class="filter-chip active" data-filter="ALL">All Incidents (<span id="countFilterAll">3</span>)</button>
+            <button type="button" class="filter-chip" data-filter="COLLISION">Collisions (<span id="countFilterCollision">1</span>)</button>
+            <button type="button" class="filter-chip" data-filter="ROAD_BLOCKAGE">Blockages (<span id="countFilterBlockage">0</span>)</button>
+            <button type="button" class="filter-chip" data-filter="WEATHER_WATERLOGGING">Flooding (<span id="countFilterWater">1</span>)</button>
+            <button type="button" class="filter-chip" data-filter="VEHICLE_BREAKDOWN">Breakdowns (<span id="countFilterBreakdown">1</span>)</button>
+            <button type="button" class="filter-chip" data-filter="MY_REPORTS">My Reports (<span id="countFilterMy">0</span>)</button>
+          </div>
+
+          <!-- Incidents History Card Stream -->
+          <div id="incidentHistoryList" class="incident-history-stream">
+            <!-- Dynamically populated by public.js -->
+          </div>
+        </div>
+
+        <div class="modal-footer" style="justify-content: space-between;">
+          <div style="font-size: 12px; color: var(--pub-text-muted);">
+            Real-time feed connected to Traffic Intelligence Control Room
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" id="btnCloseHistoryBtn" class="btn-modal-cancel">Close</button>
+            <button type="button" id="btnReportFromHistory" class="btn-modal-submit" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>+ Report Incident</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <!-- MapLibre 3D Vector Map & Citizen Controller Scripts -->
+  <script src="/js/maplibre_3d_traffic_map.js"></script>
+  <script src="/js/public.js?v=5.1"></script>
 </body>
 </html>
