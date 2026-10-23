@@ -4,7 +4,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   // Free OpenStreetMap Tile Layer (100% free, no API key or watermark)
   const map = L.map('driverMap', {
-    center: [12.9750, 77.6000],
+    center: [12.8750, 74.8550], // Mangaluru city center
     zoom: 14,
     zoomControl: false,
     attributionControl: true,
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          origin_node_id: 'EMS_HQ_SOUTH',
+          origin_node_id: 'EMS_STATE_BANK',
           destination_node_id: destId,
           is_emergency: true,
           avoid_congestion: true,

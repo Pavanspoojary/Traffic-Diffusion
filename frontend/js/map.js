@@ -2,7 +2,7 @@
 class TrafficMap {
   constructor(containerId) {
     this.map = L.map(containerId, {
-      center: [12.9820, 77.5980],
+      center: [12.8750, 74.8550], // Mangaluru city center
       zoom: 13,
       zoomControl: false,
     });

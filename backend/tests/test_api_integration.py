@@ -20,16 +20,16 @@ def test_get_network():
 
 def test_emergency_route_api():
     payload = {
-        "origin_node_id": "EMS_HQ_SOUTH",
-        "destination_node_id": "HOSPITAL_TRAUMA_CENTER",
+        "origin_node_id": "EMS_STATE_BANK",
+        "destination_node_id": "HOSPITAL_AJ_KUNTIKAN",
         "is_emergency": True,
         "avoid_congestion": True
     }
     response = client.post("/api/v1/navigation/route", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["origin"]["id"] == "EMS_HQ_SOUTH"
-    assert data["destination"]["id"] == "HOSPITAL_TRAUMA_CENTER"
+    assert data["origin"]["id"] == "EMS_STATE_BANK"
+    assert data["destination"]["id"] == "HOSPITAL_AJ_KUNTIKAN"
     assert data["total_distance_km"] > 0
     assert data["estimated_travel_time_min"] > 0
     assert len(data["path_coordinates"]) >= 3
