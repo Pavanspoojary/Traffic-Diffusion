@@ -1,0 +1,229 @@
+{
+  "city": "Bengaluru Central Sector",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "EMS_HQ_SOUTH",
+      "name": "Central EMS Station Alpha",
+      "type": "ems_station",
+      "lat": 12.9650,
+      "lng": 77.5850,
+      "address": "South Corridor Dispatch Base"
+    },
+    {
+      "id": "HOSPITAL_TRAUMA_CENTER",
+      "name": "Apex City Trauma & Multi-Speciality Hospital",
+      "type": "hospital",
+      "lat": 13.0020,
+      "lng": 77.6320,
+      "address": "East Wing Emergency Intake"
+    },
+    {
+      "id": "HOSPITAL_GENERAL",
+      "name": "Metro General Hospital",
+      "type": "hospital",
+      "lat": 12.9850,
+      "lng": 77.5650,
+      "address": "West Medical Square"
+    },
+    {
+      "id": "INT_CENTRAL_SQUARE",
+      "name": "Central Square Junction",
+      "type": "intersection",
+      "lat": 12.9780,
+      "lng": 77.5980
+    },
+    {
+      "id": "INT_TECH_CORRIDOR",
+      "name": "Tech Corridor Crossing",
+      "type": "intersection",
+      "lat": 12.9720,
+      "lng": 77.6150
+    },
+    {
+      "id": "INT_NORTH_RING",
+      "name": "North Ring Junction",
+      "type": "intersection",
+      "lat": 12.9950,
+      "lng": 77.6050
+    },
+    {
+      "id": "INT_WEST_EXPRESSWAY",
+      "name": "West Expressway Terminal",
+      "type": "intersection",
+      "lat": 12.9680,
+      "lng": 77.5720
+    },
+    {
+      "id": "INT_EAST_FREEWAY",
+      "name": "East Freeway Interchange",
+      "type": "intersection",
+      "lat": 12.9880,
+      "lng": 77.6250
+    },
+    {
+      "id": "INT_CIVIC_CENTER",
+      "name": "Civic Center Roundabout",
+      "type": "intersection",
+      "lat": 12.9860,
+      "lng": 77.5880
+    }
+  ],
+  "edges": [
+    {
+      "id": "corridor_cctv_01",
+      "source": "EMS_HQ_SOUTH",
+      "target": "INT_CENTRAL_SQUARE",
+      "name": "Mahatma Gandhi Main Avenue",
+      "corridor_id": "corridor_cctv_01",
+      "length_km": 2.1,
+      "base_speed_kmh": 45,
+      "lanes": 3,
+      "density_score": 0.30,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 2
+    },
+    {
+      "id": "corridor_cctv_02",
+      "source": "INT_CENTRAL_SQUARE",
+      "target": "EMS_HQ_SOUTH",
+      "name": "Mahatma Gandhi Main Avenue (Return)",
+      "corridor_id": "corridor_cctv_02",
+      "length_km": 2.1,
+      "base_speed_kmh": 45,
+      "lanes": 3,
+      "density_score": 0.28,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 2
+    },
+    {
+      "id": "corridor_cctv_03",
+      "source": "INT_CENTRAL_SQUARE",
+      "target": "INT_TECH_CORRIDOR",
+      "name": "Brigade Arterial Link",
+      "corridor_id": "corridor_cctv_03",
+      "length_km": 2.4,
+      "base_speed_kmh": 40,
+      "lanes": 2,
+      "density_score": 0.85,
+      "congestion_level": "HEAVY",
+      "has_incident": false,
+      "traffic_signals": 3
+    },
+    {
+      "id": "corridor_cctv_04",
+      "source": "INT_TECH_CORRIDOR",
+      "target": "INT_EAST_FREEWAY",
+      "name": "Old Airport Ring Road",
+      "corridor_id": "corridor_cctv_04",
+      "length_km": 2.8,
+      "base_speed_kmh": 50,
+      "lanes": 3,
+      "density_score": 0.95,
+      "congestion_level": "BLOCKED",
+      "has_incident": true,
+      "incident_description": "Multi-vehicle collision blocking 2 lanes; bottleneck formed",
+      "traffic_signals": 4
+    },
+    {
+      "id": "corridor_cctv_05",
+      "source": "INT_EAST_FREEWAY",
+      "target": "HOSPITAL_TRAUMA_CENTER",
+      "name": "Trauma Rapid Access Flyover",
+      "corridor_id": "corridor_cctv_05",
+      "length_km": 1.6,
+      "base_speed_kmh": 60,
+      "lanes": 3,
+      "density_score": 0.20,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 1
+    },
+    {
+      "id": "corridor_cctv_06",
+      "source": "INT_CENTRAL_SQUARE",
+      "target": "INT_CIVIC_CENTER",
+      "name": "Cunningham Bypass Road",
+      "corridor_id": "corridor_cctv_06",
+      "length_km": 1.8,
+      "base_speed_kmh": 50,
+      "lanes": 2,
+      "density_score": 0.25,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 1
+    },
+    {
+      "id": "corridor_cctv_07",
+      "source": "INT_CIVIC_CENTER",
+      "target": "INT_NORTH_RING",
+      "name": "Palace Green Expressway",
+      "corridor_id": "corridor_cctv_07",
+      "length_km": 2.0,
+      "base_speed_kmh": 55,
+      "lanes": 3,
+      "density_score": 0.22,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 2
+    },
+    {
+      "id": "corridor_cctv_08",
+      "source": "INT_NORTH_RING",
+      "target": "INT_EAST_FREEWAY",
+      "name": "Outer Elevated Bypass",
+      "corridor_id": "corridor_cctv_08",
+      "length_km": 2.5,
+      "base_speed_kmh": 60,
+      "lanes": 3,
+      "density_score": 0.18,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 1
+    },
+    {
+      "id": "corridor_cctv_09",
+      "source": "EMS_HQ_SOUTH",
+      "target": "INT_WEST_EXPRESSWAY",
+      "name": "Kanakapura Radial Road",
+      "corridor_id": "corridor_cctv_09",
+      "length_km": 1.9,
+      "base_speed_kmh": 50,
+      "lanes": 2,
+      "density_score": 0.35,
+      "congestion_level": "MODERATE",
+      "has_incident": false,
+      "traffic_signals": 2
+    },
+    {
+      "id": "corridor_cctv_10",
+      "source": "INT_WEST_EXPRESSWAY",
+      "target": "HOSPITAL_GENERAL",
+      "name": "West Medical Link",
+      "corridor_id": "corridor_cctv_10",
+      "length_km": 2.2,
+      "base_speed_kmh": 45,
+      "lanes": 2,
+      "density_score": 0.25,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 2
+    },
+    {
+      "id": "corridor_cctv_11",
+      "source": "INT_CIVIC_CENTER",
+      "target": "HOSPITAL_GENERAL",
+      "name": "Raj Bhavan Corridor",
+      "corridor_id": "corridor_cctv_11",
+      "length_km": 2.7,
+      "base_speed_kmh": 45,
+      "lanes": 2,
+      "density_score": 0.40,
+      "congestion_level": "MODERATE",
+      "has_incident": false,
+      "traffic_signals": 3
+    }
+  ]
+}

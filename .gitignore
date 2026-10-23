@@ -1,0 +1,50 @@
+# Local Project Context (Strictly Local per team mandate)
+CONTEXT.md
+*.local.md
+
+# Python Environment & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+dist/
+build/
+*.egg-info/
+
+# Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next/
+out/
+
+# Video Datasets & Model Weights (Avoid pushing heavy binary media to git)
+data/uploads/
+data/processed/
+weights/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.pt
+*.onnx
+*.engine
+
+# Secrets & Environment Variables
+.env
+.env.local
+.env.*.local
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
