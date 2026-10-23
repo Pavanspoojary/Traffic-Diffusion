@@ -1,11 +1,13 @@
-// Traffic Diffusion - Traffic Police & Control Room Command Center Controller
+// Traffic Diffusion - Traffic Police & Control Room Operations Center Controller (Pure Dashboard, No Map)
 document.addEventListener('DOMContentLoaded', () => {
-  const trafficMap = new TrafficMap('map');
 
-  // Top Telemetry Elements
+  // Top KPI Elements
+  const kpiSeverity = document.getElementById('kpiSeverity');
+  const kpiLocation = document.getElementById('kpiLocation');
   const valActiveHorizon = document.getElementById('valActiveHorizon');
   const valNetworkDelay = document.getElementById('valNetworkDelay');
-  const valElevatedCorridors = document.getElementById('valElevatedCorridors');
+  const kpiQueueMeters = document.getElementById('kpiQueueMeters');
+  const kpiExcessPcu = document.getElementById('kpiExcessPcu');
   const valSaturatedJunctions = document.getElementById('valSaturatedJunctions');
   const valOptimalMitigation = document.getElementById('valOptimalMitigation');
   const btnResetAll = document.getElementById('btnResetAll');
@@ -44,6 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const forecastNarrative = document.getElementById('forecastNarrative');
   const statQueueMeters = document.getElementById('statQueueMeters');
   const statExcessPcu = document.getElementById('statExcessPcu');
+  const corridorSpreadTbody = document.getElementById('corridorSpreadTbody');
+  const saturatedJuncTbody = document.getElementById('saturatedJuncTbody');
 
   // Risk Assessment Elements
   const riskRankList = document.getElementById('riskRankList');
@@ -54,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const intervScenarioList = document.getElementById('intervScenarioList');
 
   // State
-  let networkNodes = [];
   let networkEdges = [];
   let activeIncident = null;
   let activeHorizon = 30; // default 30 minutes
@@ -71,13 +74,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const netRes = await fetch('/api/v1/navigation/network');
       if (netRes.ok) {
         const netData = await netRes.json();
-        networkNodes = netData.nodes;
         networkEdges = netData.edges;
-        trafficMap.renderNetwork(networkNodes, networkEdges);
         populateEdgeDropdown(networkEdges);
       }
 
-      // Load Citizen Reports & Tactical Dispatches
       await loadCitizenReports();
       await loadResourceDispatches();
 
@@ -205,9 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         dispatchOrdersList.appendChild(item);
       });
-
-      // Render tactical assets onto the Leaflet map!
-      trafficMap.renderDispatches(activeDispatches);
     } catch (err) {
       console.warn('Dispatch load error:', err);
     }
@@ -405,6 +402,9 @@ document.addEventListener('DOMContentLoaded', () => {
     txtIncidentStatus.textContent = forecastData.incident.severity;
     txtIncidentDesc.textContent = forecastData.incident.description;
 
+    kpiSeverity.textContent = forecastData.incident.severity;
+    kpiLocation.textContent = forecastData.incident.affected_edge_id;
+
     // Narrative & Titles
     forecastHorizonTitle.textContent = `Forecast Horizon: T+${horizon} Minutes (Model: ${snap.model_method})`;
     forecastNarrative.textContent = snap.propagation_summary;
@@ -412,20 +412,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Metrics
     valNetworkDelay.textContent = `+${snap.network_delay_relative_to_baseline_min.toFixed(1)} min`;
-    valElevatedCorridors.textContent = snap.elevated_risk_corridors_count;
     valSaturatedJunctions.textContent = snap.saturated_junctions_count;
 
     const directImpact = snap.edge_impacts.find(e => e.impact_type === 'DIRECT_INCIDENT');
     if (directImpact) {
-      statQueueMeters.textContent = `${Math.round(directImpact.estimated_queue_length_meters)} m`;
-      statExcessPcu.textContent = `${Math.round(directImpact.accumulated_excess_volume_pcu)} PCU`;
+      const qMeters = Math.round(directImpact.estimated_queue_length_meters);
+      const exPcu = Math.round(directImpact.accumulated_excess_volume_pcu);
+      statQueueMeters.textContent = `${qMeters} m`;
+      statExcessPcu.textContent = `${exPcu} PCU`;
+      kpiQueueMeters.textContent = `${qMeters} m`;
+      kpiExcessPcu.textContent = `${exPcu} PCU Backlog`;
     }
 
-    // Leaflet map render
-    trafficMap.renderPredictiveForecast(snap, networkNodes, networkEdges);
-    
-    // Re-render tactical field assets
-    trafficMap.renderDispatches(activeDispatches);
+    // Render Corridor Spread Table
+    renderCorridorSpreadTable(snap.edge_impacts);
+
+    // Render Saturated Junctions Table
+    renderSaturatedJunctionsTable(snap.junction_saturations);
+  }
+
+  function renderCorridorSpreadTable(impacts) {
+    corridorSpreadTbody.innerHTML = '';
+    // Show top 6 most impacted edges
+    const sorted = [...impacts].sort((a, b) => b.risk_score - a.risk_score).slice(0, 6);
+
+    sorted.forEach(imp => {
+      let tagHtml = `<span class="tag-spillback">${imp.impact_type.replace(/_/g, ' ')}</span>`;
+      if (imp.impact_type === 'DIRECT_INCIDENT') {
+        tagHtml = `<span class="tag-critical-sat">DIRECT DISRUPTION</span>`;
+      } else if (imp.impact_type === 'DIVERSION_LOADED') {
+        tagHtml = `<span class="tag-diversion">DIVERSION BYPASS</span>`;
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight: 700; color: var(--text-primary);">${imp.road_name}</td>
+        <td>${tagHtml}</td>
+        <td><strong>${imp.predicted_travel_time_min.toFixed(1)}m</strong> <span style="font-size: 10px; color: var(--accent-red);">(+${imp.expected_delay_min.toFixed(1)}m)</span></td>
+        <td style="font-family: var(--font-mono);">${Math.round(imp.queue_length_meters)} m</td>
+        <td style="font-family: var(--font-mono); font-weight: 700; color: ${imp.predicted_volume_capacity_ratio > 1.0 ? 'var(--accent-red)' : 'var(--accent-amber)'};">
+          ${imp.predicted_volume_capacity_ratio.toFixed(2)}
+        </td>
+      `;
+      corridorSpreadTbody.appendChild(tr);
+    });
+  }
+
+  function renderSaturatedJunctionsTable(juncs) {
+    saturatedJuncTbody.innerHTML = '';
+    const critical = juncs.filter(j => j.saturation_index >= 0.65);
+
+    if (critical.length === 0) {
+      saturatedJuncTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No junctions exceeding capacity thresholds</td></tr>';
+      return;
+    }
+
+    critical.forEach(j => {
+      const satPct = Math.round(j.saturation_index * 100);
+      let riskTag = `<span class="status-tag tag-moderate">${j.inflow_spillback_risk}</span>`;
+      if (j.inflow_spillback_risk === 'CRITICAL') {
+        riskTag = `<span class="status-tag tag-blocked">CRITICAL SPILLBACK</span>`;
+      } else if (j.inflow_spillback_risk === 'HIGH') {
+        riskTag = `<span class="status-tag tag-heavy">HIGH SPILLBACK</span>`;
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight: 700; color: var(--text-primary);">${j.junction_name}</td>
+        <td style="font-family: var(--font-mono); font-weight: 800; color: ${satPct >= 80 ? 'var(--accent-red)' : 'var(--accent-amber)'};">${satPct}% Capacity</td>
+        <td>${riskTag}</td>
+        <td style="font-size: 10px; color: var(--text-muted);">${j.incoming_delayed_edges.length > 0 ? j.incoming_delayed_edges.join(', ') : 'Direct Feeders Overloaded'}</td>
+      `;
+      saturatedJuncTbody.appendChild(tr);
+    });
   }
 
   // =========================================================================

@@ -39,11 +39,30 @@ async def health_check():
         "platform_purpose": "Predictive Incident Impact Forecasting & What-If Intervention Planning",
     }
 
+@app.api_route("/", methods=["GET", "HEAD"])
+async def police_control_room_dashboard():
+    """Traffic Police & Control Room Operators Command Center Dashboard (Pure Dashboard, No Map)."""
+    return FileResponse(
+        settings.base_dir / "frontend" / "index.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
 @app.api_route("/driver", methods=["GET", "HEAD"])
 @app.api_route("/public", methods=["GET", "HEAD"])
 async def public_driver_page():
-    """Dashboard 1: Public Citizen Navigator & Incident Reporter (teammate track)."""
-    return FileResponse(settings.base_dir / "frontend" / "driver.html")
+    """Public Citizen Navigation Map & Incident Reporter (teammate track)."""
+    return FileResponse(
+        settings.base_dir / "frontend" / "driver.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 @app.api_route("/operations", methods=["GET", "HEAD"])
 async def operations_page():
