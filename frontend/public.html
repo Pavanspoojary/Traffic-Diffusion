@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Public Traffic Map - Traffic Diffusion</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="/css/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/public.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -116,12 +117,28 @@
             <div class="login-form-group">
               <label class="login-label" for="modalCategorySelect">Incident Type</label>
               <select id="modalCategorySelect" class="login-input" required>
-                <option value="COLLISION">Vehicle Collision / Accident</option>
                 <option value="ROAD_BLOCKAGE" selected>Road Blockage / Tree Fall</option>
+                <option value="COLLISION">Vehicle Collision / Accident</option>
                 <option value="VEHICLE_BREAKDOWN">Vehicle Breakdown / Stalled Bus</option>
                 <option value="WEATHER_WATERLOGGING">Flooding / Waterlogging</option>
                 <option value="EMERGENCY_AMBULANCE">Emergency Vehicle Passage Request</option>
+                <option value="OTHER">Other (Specify Custom Subject)</option>
               </select>
+            </div>
+
+            <!-- Subject / Custom Title -->
+            <div class="login-form-group" id="subjectGroup">
+              <label class="login-label" for="modalIncidentSubject">
+                <span>Incident Subject / Title</span>
+                <span id="subjectHint" style="font-size: 11px; color: var(--pub-text-muted);">Required</span>
+              </label>
+              <input 
+                type="text" 
+                id="modalIncidentSubject" 
+                class="login-input" 
+                placeholder="e.g. Fallen electrical wire blocking junction" 
+                required 
+              />
             </div>
 
             <!-- Road Corridor -->
@@ -142,13 +159,82 @@
               </select>
             </div>
 
+            <!-- Camera-Only Photo Capture -->
+            <div class="login-form-group">
+              <label class="login-label">
+                <span>Live Camera Verification</span>
+                <span style="font-size: 11px; color: #10b981; font-weight: 700;">Camera Only (No Albums)</span>
+              </label>
+              
+              <div class="camera-control-box">
+                <!-- Hidden camera-only input strictly invoking camera -->
+                <input 
+                  type="file" 
+                  id="cameraInput" 
+                  accept="image/*" 
+                  capture="environment" 
+                  style="display: none;" 
+                />
+                
+                <!-- Live WebRTC Camera Stream Container -->
+                <div id="cameraStreamWrapper" class="camera-stream-wrapper">
+                  <video id="cameraVideo" class="camera-video-preview" autoplay playsinline muted></video>
+                  <canvas id="cameraCanvas" style="display: none;"></canvas>
+                </div>
+
+                <!-- Camera Action Controls -->
+                <div class="camera-actions-row">
+                  <button type="button" id="btnStartLiveCamera" class="btn-camera-action">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                      <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Open Live Camera</span>
+                  </button>
+
+                  <button type="button" id="btnSnapPhoto" class="btn-camera-action btn-camera-snap" style="display: none;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <span>Snap Photo</span>
+                  </button>
+
+                  <button type="button" id="btnStopLiveCamera" class="btn-camera-action" style="display: none; color: #ef4444;">
+                    <span>Close Camera</span>
+                  </button>
+
+                  <button type="button" id="btnTriggerNativeCamera" class="btn-camera-action" title="Direct hardware camera trigger">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    <span>Device Camera</span>
+                  </button>
+                </div>
+
+                <!-- Captured Photo Thumbnail Card -->
+                <div id="photoPreviewCard" class="photo-preview-card">
+                  <img id="photoPreviewImg" class="photo-preview-img" alt="Captured incident" />
+                  <div class="photo-preview-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Photo Verified</span>
+                  </div>
+                  <button type="button" id="btnRemovePhoto" class="photo-remove-btn" title="Remove photo">Retake</button>
+                </div>
+              </div>
+            </div>
+
             <!-- Description -->
             <div class="login-form-group" style="margin-bottom: 0;">
               <label class="login-label" for="modalIncidentDesc">Additional Details / Landmark</label>
               <textarea 
                 id="modalIncidentDesc" 
                 class="login-input" 
-                rows="3" 
+                rows="2" 
                 placeholder="e.g. Broken down private bus near junction blocking right two lanes..."
                 style="resize: vertical;"
               ></textarea>
@@ -178,7 +264,12 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/js/leaflet.js"></script>
+  <script>
+    if (typeof L === 'undefined') {
+      document.write('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>');
+    }
+  </script>
   <script src="/js/map.js"></script>
   <script src="/js/public.js"></script>
 </body>

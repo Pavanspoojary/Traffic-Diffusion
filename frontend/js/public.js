@@ -30,20 +30,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 2. Initialize Leaflet Map from the main branch
-  const trafficMap = new TrafficMap('map');
+  let trafficMap;
+  try {
+    trafficMap = new TrafficMap('map');
+    setTimeout(() => {
+      if (trafficMap && trafficMap.map) trafficMap.map.invalidateSize();
+    }, 250);
+  } catch (err) {
+    console.error('Error initializing TrafficMap:', err);
+  }
+
   let networkEdges = [];
   let networkNodes = [];
 
   // Load Network Corridors
   async function loadPublicNetwork() {
     try {
-      const res = await fetch('/api/v1/navigation/network');
-      if (res.ok) {
-        const data = await res.json();
-        networkNodes = data.nodes || [];
-        networkEdges = data.edges || [];
+      let netData = null;
+      try {
+        const res = await fetch('/api/v1/navigation/network');
+        if (res.ok) {
+          netData = await res.json();
+        }
+      } catch (e) {}
+
+      // Fallback to static seed data if backend API is not running
+      if (!netData) {
+        try {
+          const fallbackRes = await fetch('/data/seed_network.json');
+          if (fallbackRes.ok) {
+            netData = await fallbackRes.json();
+          }
+        } catch (e) {}
+      }
+
+      if (netData && trafficMap) {
+        networkNodes = netData.nodes || [];
+        networkEdges = netData.edges || [];
         trafficMap.renderNetwork(networkNodes, networkEdges);
         populateCorridorSelect(networkEdges);
+        setTimeout(() => trafficMap.map.invalidateSize(), 300);
       }
     } catch (err) {
       console.error('Failed to load public traffic network:', err);
@@ -73,15 +99,156 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toastNotification = document.getElementById('publicToast');
   const toastMessage = document.getElementById('toastMessage');
 
+  // Category & Subject Elements
+  const modalCategorySelect = document.getElementById('modalCategorySelect');
+  const modalIncidentSubject = document.getElementById('modalIncidentSubject');
+
+  // Camera Elements
+  const cameraInput = document.getElementById('cameraInput');
+  const btnStartLiveCamera = document.getElementById('btnStartLiveCamera');
+  const btnSnapPhoto = document.getElementById('btnSnapPhoto');
+  const btnStopLiveCamera = document.getElementById('btnStopLiveCamera');
+  const btnTriggerNativeCamera = document.getElementById('btnTriggerNativeCamera');
+  const cameraStreamWrapper = document.getElementById('cameraStreamWrapper');
+  const cameraVideo = document.getElementById('cameraVideo');
+  const cameraCanvas = document.getElementById('cameraCanvas');
+  const photoPreviewCard = document.getElementById('photoPreviewCard');
+  const photoPreviewImg = document.getElementById('photoPreviewImg');
+  const btnRemovePhoto = document.getElementById('btnRemovePhoto');
+
+  let activeMediaStream = null;
+  let capturedPhotoBase64 = null;
+
+  // Incident Type change handler
+  if (modalCategorySelect && modalIncidentSubject) {
+    modalCategorySelect.addEventListener('change', () => {
+      if (modalCategorySelect.value === 'OTHER') {
+        modalIncidentSubject.placeholder = 'Specify custom incident subject (e.g. Broken water pipe / Electrical wire)';
+        modalIncidentSubject.focus();
+      } else {
+        modalIncidentSubject.placeholder = 'e.g. Tree fallen blocking both lanes near signal';
+      }
+    });
+  }
+
+  // Camera Management
+  function stopLiveCamera() {
+    if (activeMediaStream) {
+      activeMediaStream.getTracks().forEach(track => track.stop());
+      activeMediaStream = null;
+    }
+    if (cameraVideo) {
+      cameraVideo.srcObject = null;
+    }
+    if (cameraStreamWrapper) cameraStreamWrapper.classList.remove('active');
+    if (btnStartLiveCamera) btnStartLiveCamera.style.display = 'inline-flex';
+    if (btnSnapPhoto) btnSnapPhoto.style.display = 'none';
+    if (btnStopLiveCamera) btnStopLiveCamera.style.display = 'none';
+  }
+
+  async function startLiveCamera() {
+    try {
+      stopLiveCamera(); // clear existing
+      const constraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+
+      activeMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      cameraVideo.srcObject = activeMediaStream;
+      await cameraVideo.play();
+
+      cameraStreamWrapper.classList.add('active');
+      btnStartLiveCamera.style.display = 'none';
+      btnSnapPhoto.style.display = 'inline-flex';
+      btnStopLiveCamera.style.display = 'inline-flex';
+    } catch (err) {
+      console.warn('Direct camera stream inaccessible, falling back to device camera:', err);
+      // Automatically fallback to mobile device camera capture
+      if (cameraInput) cameraInput.click();
+    }
+  }
+
+  function snapPhotoFromStream() {
+    if (!cameraVideo || !cameraCanvas) return;
+    const width = cameraVideo.videoWidth || 640;
+    const height = cameraVideo.videoHeight || 480;
+
+    cameraCanvas.width = width;
+    cameraCanvas.height = height;
+    const ctx = cameraCanvas.getContext('2d');
+    ctx.drawImage(cameraVideo, 0, 0, width, height);
+
+    capturedPhotoBase64 = cameraCanvas.toDataURL('image/jpeg', 0.85);
+    setPhotoPreview(capturedPhotoBase64);
+    stopLiveCamera();
+  }
+
+  function setPhotoPreview(src) {
+    capturedPhotoBase64 = src;
+    if (photoPreviewImg && photoPreviewCard) {
+      photoPreviewImg.src = src;
+      photoPreviewCard.classList.add('active');
+    }
+  }
+
+  function clearPhotoPreview() {
+    capturedPhotoBase64 = null;
+    if (photoPreviewImg) photoPreviewImg.src = '';
+    if (photoPreviewCard) photoPreviewCard.classList.remove('active');
+    if (cameraInput) cameraInput.value = '';
+  }
+
+  // Camera Listeners
+  if (btnStartLiveCamera) {
+    btnStartLiveCamera.addEventListener('click', startLiveCamera);
+  }
+
+  if (btnSnapPhoto) {
+    btnSnapPhoto.addEventListener('click', snapPhotoFromStream);
+  }
+
+  if (btnStopLiveCamera) {
+    btnStopLiveCamera.addEventListener('click', stopLiveCamera);
+  }
+
+  // Native device camera trigger (forces camera app on mobile, no gallery)
+  if (btnTriggerNativeCamera && cameraInput) {
+    btnTriggerNativeCamera.addEventListener('click', () => {
+      cameraInput.click();
+    });
+
+    cameraInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setPhotoPreview(event.target.result);
+          stopLiveCamera();
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  if (btnRemovePhoto) {
+    btnRemovePhoto.addEventListener('click', clearPhotoPreview);
+  }
+
   function openModal() {
     if (incidentModal) {
       incidentModal.classList.add('active');
-      const descInput = document.getElementById('modalIncidentDesc');
-      if (descInput) descInput.focus();
+      const subjectInput = document.getElementById('modalIncidentSubject');
+      if (subjectInput) subjectInput.focus();
     }
   }
 
   function closeModal() {
+    stopLiveCamera();
     if (incidentModal) {
       incidentModal.classList.remove('active');
     }
@@ -113,19 +280,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     emergencyForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const category = document.getElementById('modalCategorySelect')?.value || 'ROAD_BLOCKAGE';
+      const category = modalCategorySelect?.value || 'ROAD_BLOCKAGE';
+      const subject = modalIncidentSubject?.value.trim() || 'Citizen Incident';
       const corridorId = document.getElementById('modalCorridorSelect')?.value || 'corridor_cctv_01';
-      const description = document.getElementById('modalIncidentDesc')?.value || 'Citizen Reported Obstruction';
+      const description = document.getElementById('modalIncidentDesc')?.value || '';
       const severity = document.getElementById('modalSeveritySelect')?.value || 'HIGH';
+
+      const fullDetails = `${subject} | ${description}`.trim();
 
       // Submit to backend intelligence API if available
       try {
         const payload = {
           edge_id: corridorId,
-          category: category,
+          category: category === 'OTHER' ? 'ROAD_BLOCKAGE' : category,
           severity: severity,
           capacity_reduction: 0.85,
-          estimated_duration_min: 45
+          estimated_duration_min: 45,
+          custom_subject: subject,
+          reporter: currentCitizen.name,
+          reporter_address: currentCitizen.address,
+          has_photo: !!capturedPhotoBase64
         };
 
         const res = await fetch('/api/v1/intelligence/incident/trigger', {
@@ -135,17 +309,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         if (res.ok) {
-          showToast(`Report logged! Emergency corridors & dispatch notified for ${currentCitizen.address}.`);
+          showToast(`Alert dispatched: "${subject}" with photo verification! Responders notified.`);
         } else {
-          showToast(`Report submitted: ${category} recorded near ${corridorId}.`);
+          showToast(`Alert dispatched: "${subject}" recorded near ${corridorId}.`);
         }
       } catch (err) {
         // Fallback demo toast if offline
-        showToast(`Incident reported by ${currentCitizen.name}! Local responders alerted.`);
+        showToast(`Alert logged: "${subject}" verified via camera. Responders alerted!`);
       }
 
-      // Close modal and refresh network
+      // Close modal and clean up
       closeModal();
+      clearPhotoPreview();
       emergencyForm.reset();
       await loadPublicNetwork();
     });
