@@ -10,11 +10,14 @@ class MapLibre3DTrafficMap {
     this.isLoaded = false;
     this.nodeMarkers = [];
     this.incidentMarkers = [];
+    this.placeMarkers = [];
+    this.routeMarkers = [];
     this.userGpsMarker = null;
     this.nodeMap = new Map();
     this.pendingEdges = null;
     this.pendingNodes = null;
     this.pendingIncidents = null;
+    this.pendingPlaces = null;
     this.popup = null;
   }
 
@@ -354,6 +357,10 @@ class MapLibre3DTrafficMap {
       if (!e.features || e.features.length === 0) return;
       const props = e.features[0].properties;
 
+      window.dispatchEvent(new CustomEvent('gmaps:junction-clicked', { 
+        detail: { ...props, lngLat: e.lngLat } 
+      }));
+
       this.popup
         .setLngLat(e.lngLat)
         .setHTML(`
@@ -431,19 +438,38 @@ class MapLibre3DTrafficMap {
       });
     }
 
-    // Update WebGL Junctions GeoJSON Source (locked to coordinates, zero lag, zero drifting)
-    const junctionFeatures = nodes.map(node => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [node.lng, node.lat]
-      },
-      properties: {
-        id: node.id,
-        name: node.name,
-        type: node.type || 'Key Intersection'
+    // Update WebGL Junctions GeoJSON Source (strictly road-snapped, zero drifting, zero off-road placement)
+    const junctionFeatures = nodes.map(node => {
+      let nodeLng = node.lng;
+      let nodeLat = node.lat;
+
+      // Snap blue dot directly onto the road corridor endpoint
+      const connectedEdge = edges.find(e => e.source === node.id || e.target === node.id);
+      if (connectedEdge && Array.isArray(connectedEdge.path_coordinates) && connectedEdge.path_coordinates.length > 0) {
+        if (connectedEdge.source === node.id) {
+          const pt = connectedEdge.path_coordinates[0];
+          nodeLat = pt[0];
+          nodeLng = pt[1];
+        } else {
+          const pt = connectedEdge.path_coordinates[connectedEdge.path_coordinates.length - 1];
+          nodeLat = pt[0];
+          nodeLng = pt[1];
+        }
       }
-    }));
+
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [nodeLng, nodeLat]
+        },
+        properties: {
+          id: node.id,
+          name: node.name,
+          type: node.type || 'Key Intersection'
+        }
+      };
+    });
 
     const junctionSource = this.map.getSource('traffic-junctions');
     if (junctionSource) {
@@ -451,6 +477,10 @@ class MapLibre3DTrafficMap {
         type: 'FeatureCollection',
         features: junctionFeatures
       });
+    }
+    this.edges = edges;
+    if (this.lastIncidents && this.lastIncidents.length > 0) {
+      this.renderIncidents(this.lastIncidents);
     }
   }
 
@@ -464,8 +494,55 @@ class MapLibre3DTrafficMap {
     return '#3b82f6';
   }
 
-  // Render Incident SOS Pins on 3D Map
+  // Snap any coordinate directly onto the closest point of the actual road corridor polyline
+  _snapToCorridor(lat, lng, corridorId = null, locationText = '') {
+    const edges = this.edges || this.pendingEdges || [];
+    if (!edges || edges.length === 0) return [lng, lat];
+
+    let candidates = edges;
+    if (corridorId) {
+      const match = edges.filter(e => e.id === corridorId || e.corridor_id === corridorId);
+      if (match.length > 0) candidates = match;
+    } else if (locationText) {
+      const lower = locationText.toLowerCase();
+      const match = edges.filter(e => {
+        if (!e.name) return false;
+        const eLower = e.name.toLowerCase();
+        const words = eLower.split(/\s+/).filter(w => w.length > 3);
+        return words.some(w => lower.includes(w));
+      });
+      if (match.length > 0) candidates = match;
+    }
+
+    let bestDistSq = Infinity;
+    let bestCoord = [lng, lat]; // [lng, lat] for MapLibre
+
+    for (const edge of candidates) {
+      if (!edge.path_coordinates || !Array.isArray(edge.path_coordinates)) continue;
+      for (const pt of edge.path_coordinates) {
+        // pt is [lat, lng]
+        const dLat = pt[0] - lat;
+        const dLng = pt[1] - lng;
+        const distSq = dLat * dLat + dLng * dLng;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          bestCoord = [pt[1], pt[0]]; // [lng, lat]
+        }
+      }
+    }
+
+    // If within ~3km (distSq < 0.0009), snap directly onto the road polyline
+    if (bestDistSq < 0.0009) {
+      return bestCoord;
+    }
+
+    return [lng, lat];
+  }
+
+  // Render Incident SOS Pins on 3D Map (Snapped Directly Onto Road Corridors)
   renderIncidents(incidents) {
+    this.lastIncidents = incidents;
+
     if (!this.isLoaded) {
       this.pendingIncidents = incidents;
       return;
@@ -478,6 +555,16 @@ class MapLibre3DTrafficMap {
     incidents.forEach(inc => {
       if (!inc.lat || !inc.lng) return;
 
+      // Ensure coordinate is snapped directly onto the actual road corridor polyline
+      const snapped = this._snapToCorridor(
+        inc.lat, 
+        inc.lng, 
+        inc.corridor_id || inc.corridorId, 
+        inc.location || inc.subject
+      );
+      const incLng = snapped[0];
+      const incLat = snapped[1];
+
       // Safe Marker Anchor (MapLibre controls transform here without CSS conflict)
       const anchor = document.createElement('div');
       anchor.className = 'maplibre-marker-anchor';
@@ -487,6 +574,12 @@ class MapLibre3DTrafficMap {
       innerPin.className = 'maplibre-incident-pin-inner';
       innerPin.innerHTML = '⚠️';
       anchor.appendChild(innerPin);
+
+      anchor.addEventListener('click', (e) => {
+        window.dispatchEvent(new CustomEvent('gmaps:incident-clicked', { 
+          detail: { ...inc, lat: incLat, lng: incLng } 
+        }));
+      });
 
       const photoHtml = inc.photo
         ? `<div style="margin-top: 8px; border-radius: 6px; overflow: hidden; max-height: 120px; border: 1px solid #10b981;">
@@ -508,7 +601,7 @@ class MapLibre3DTrafficMap {
       `;
 
       const marker = new maplibregl.Marker({ element: anchor, anchor: 'center' })
-        .setLngLat([inc.lng, inc.lat])
+        .setLngLat([incLng, incLat])
         .setPopup(
           new maplibregl.Popup({ offset: 14, className: 'maplibre-dark-popup' })
             .setHTML(popupContent)
@@ -523,8 +616,13 @@ class MapLibre3DTrafficMap {
   focusLocation(lat, lng, label = 'Selected Location', zoomLevel = 16) {
     if (!this.map) return;
 
+    // Snap focus target to corridor if near road
+    const snapped = this._snapToCorridor(lat, lng, null, label);
+    const targetLng = snapped[0];
+    const targetLat = snapped[1];
+
     this.map.flyTo({
-      center: [lng, lat],
+      center: [targetLng, targetLat],
       zoom: zoomLevel,
       pitch: 58,
       bearing: -20,
@@ -544,18 +642,194 @@ class MapLibre3DTrafficMap {
     anchor.appendChild(beacon);
 
     this.userGpsMarker = new maplibregl.Marker({ element: anchor, anchor: 'center' })
-      .setLngLat([lng, lat])
+      .setLngLat([targetLng, targetLat])
       .setPopup(
         new maplibregl.Popup({ offset: 14, className: 'maplibre-dark-popup' })
           .setHTML(`
             <div style="font-family: sans-serif; font-size: 12px; padding: 2px;">
               <div style="font-weight: 800; font-size: 13px; color: #f8fafc;">${label}</div>
-              <div style="color: #60a5fa; font-size: 10px; margin-top: 2px;">GPS: ${lat.toFixed(5)}° N, ${lng.toFixed(5)}° E</div>
+              <div style="color: #60a5fa; font-size: 10px; margin-top: 2px;">GPS: ${targetLat.toFixed(5)}° N, ${targetLng.toFixed(5)}° E</div>
             </div>
           `)
       )
       .addTo(this.map);
 
     this.userGpsMarker.togglePopup();
+  }
+
+  // Render Connected Street Route on MapLibre Map with Google Style
+  renderRoute(coordinates, originPoint = null, destinationPoint = null) {
+    if (!this.map) return;
+
+    // Normalise coordinates to [lng, lat]
+    const lineCoords = coordinates.map(pt => {
+      if (Array.isArray(pt)) {
+        return pt[0] < pt[1] ? [pt[1], pt[0]] : [pt[0], pt[1]];
+      }
+      return [pt.lng, pt.lat];
+    });
+
+    const geojsonData = {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: lineCoords
+      }
+    };
+
+    if (this.map.getSource('gmaps-route-source')) {
+      this.map.getSource('gmaps-route-source').setData(geojsonData);
+    } else {
+      this.map.addSource('gmaps-route-source', {
+        type: 'geojson',
+        data: geojsonData
+      });
+
+      // White outline casing
+      this.map.addLayer({
+        id: 'gmaps-route-casing',
+        type: 'line',
+        source: 'gmaps-route-source',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 10.0,
+          'line-opacity': 0.98
+        }
+      });
+
+      // Luminous blue core line
+      this.map.addLayer({
+        id: 'gmaps-route-line',
+        type: 'line',
+        source: 'gmaps-route-source',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#1a73e8',
+          'line-width': 6.5,
+          'line-opacity': 1.0
+        }
+      });
+    }
+
+    // Clear previous route markers
+    this.routeMarkers.forEach(m => m.remove());
+    this.routeMarkers = [];
+
+    // Origin "A" Green Marker
+    const startCoord = originPoint && originPoint.lng && originPoint.lat 
+      ? [originPoint.lng, originPoint.lat] 
+      : lineCoords[0];
+    
+    if (startCoord) {
+      const originEl = document.createElement('div');
+      originEl.className = 'maplibre-route-marker maplibre-marker-origin';
+      originEl.innerHTML = 'A';
+      originEl.title = originPoint ? originPoint.name : 'Origin';
+
+      const originMarker = new maplibregl.Marker({ element: originEl, anchor: 'center' })
+        .setLngLat(startCoord)
+        .addTo(this.map);
+      this.routeMarkers.push(originMarker);
+    }
+
+    // Destination "B" Red Marker
+    const endCoord = destinationPoint && destinationPoint.lng && destinationPoint.lat
+      ? [destinationPoint.lng, destinationPoint.lat]
+      : lineCoords[lineCoords.length - 1];
+
+    if (endCoord) {
+      const destEl = document.createElement('div');
+      destEl.className = 'maplibre-route-marker maplibre-marker-destination';
+      destEl.innerHTML = 'B';
+      destEl.title = destinationPoint ? destinationPoint.name : 'Destination';
+
+      const destMarker = new maplibregl.Marker({ element: destEl, anchor: 'center' })
+        .setLngLat(endCoord)
+        .addTo(this.map);
+      this.routeMarkers.push(destMarker);
+    }
+
+    // Smooth camera framing
+    if (lineCoords.length > 1 && typeof maplibregl !== 'undefined') {
+      const bounds = new maplibregl.LngLatBounds();
+      lineCoords.forEach(pt => bounds.extend(pt));
+      this.map.fitBounds(bounds, {
+        padding: { top: 90, bottom: 90, left: 430, right: 90 },
+        duration: 1200,
+        pitch: 45
+      });
+    }
+  }
+
+  clearActiveRoute() {
+    if (!this.map) return;
+    if (this.map.getSource('gmaps-route-source')) {
+      this.map.getSource('gmaps-route-source').setData({
+        type: 'FeatureCollection',
+        features: []
+      });
+    }
+    this.routeMarkers.forEach(m => m.remove());
+    this.routeMarkers = [];
+  }
+
+  // Render Key Place POI Pins on the Map
+  renderPlaces(places, force = false) {
+    if (!this.map || !Array.isArray(places)) return;
+
+    if (!force && this.placeMarkers && this.placeMarkers.length > 0) {
+      return;
+    }
+
+    // Clear previous place markers
+    this.placeMarkers.forEach(m => m.remove());
+    this.placeMarkers = [];
+
+    places.forEach(place => {
+      if (!place.lat || !place.lng) return;
+
+      const el = document.createElement('div');
+      el.className = 'maplibre-marker-anchor';
+      
+      const pin = document.createElement('div');
+      pin.style.cssText = `
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 2px solid #1a73e8;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.15s;
+      `;
+      pin.innerHTML = place.icon || '📍';
+      pin.title = place.name;
+      el.appendChild(pin);
+
+      pin.onmouseenter = () => { pin.style.transform = 'scale(1.2)'; };
+      pin.onmouseleave = () => { pin.style.transform = 'scale(1)'; };
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent('gmaps:place-clicked', { detail: place }));
+      });
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([place.lng, place.lat])
+        .addTo(this.map);
+
+      this.placeMarkers.push(marker);
+    });
   }
 }
