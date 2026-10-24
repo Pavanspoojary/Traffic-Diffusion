@@ -342,4 +342,47 @@ def test_citizen_incident_trigger_and_edge_marking():
     assert edges["corridor_cctv_05"]["has_incident"] is True
     assert edges["corridor_cctv_05"]["congestion_level"] in ["HEAVY", "BLOCKED"]
 
+def test_diversion_deployment_lifecycle():
+    """Verify control-room operator diversion deployment and public API broadcast."""
+    deploy_payload = {
+        "incident_id": "INC-MNG-403",
+        "edge_id": "corridor_cctv_08_rev",
+        "edge_name": "NH-66 Highway Corridor (Southbound)",
+        "scenario_id": "scenario_capacity_split",
+        "scenario_name": "Capacity-Aware Multi-Corridor Split",
+        "detour_route_ids": ["corridor_cctv_11_rev", "corridor_cctv_10_rev", "corridor_cctv_09_rev", "corridor_cctv_06", "corridor_cctv_07"],
+        "detour_name": "Detour via Bejai Green Bypass and Kadri Road",
+        "displaced_demand_pcu_hr": 1620.0,
+        "delay_saved_veh_hours": 521.6,
+        "advisory_text": "MANGALURU POLICE: NH-66 Southbound blocked. Detour via Bejai & Kadri.",
+        "deployed_by": "Senior Traffic Controller"
+    }
+    dep_res = client.post("/api/v1/intelligence/diversions/deploy", json=deploy_payload)
+    assert dep_res.status_code == 201
+    record = dep_res.json()
+    assert record["incident_id"] == "INC-MNG-403"
+    assert record["status"] == "ACTIVE"
+    assert len(record["detour_path_coordinates"]) > 0
+    assert record["delay_saved_veh_hours"] == 521.6
+
+    # Test listing active diversions
+    active_res = client.get("/api/v1/intelligence/diversions/active")
+    assert active_res.status_code == 200
+    active_list = active_res.json()
+    assert len(active_list) >= 1
+    matched = [d for d in active_list if d["incident_id"] == "INC-MNG-403"]
+    assert len(matched) == 1
+    assert matched[0]["detour_name"] == "Detour via Bejai Green Bypass and Kadri Road"
+
+    # Test canceling diversion
+    del_res = client.delete("/api/v1/intelligence/diversions/active/INC-MNG-403")
+    assert del_res.status_code == 200
+    assert del_res.json()["status"] == "success"
+
+    # Confirm cleared
+    after_res = client.get("/api/v1/intelligence/diversions/active")
+    assert after_res.status_code == 200
+    assert len([d for d in after_res.json() if d["incident_id"] == "INC-MNG-403"]) == 0
+
+
 

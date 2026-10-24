@@ -605,6 +605,123 @@ document.addEventListener('DOMContentLoaded', async () => {
           recRouteAllocations.innerHTML = `<strong>Volume Allocation Split:</strong> ${allocHtml}`;
         }
       }
+      updateDeployButtonStatus();
+    }
+  }
+
+  // Active Deployed Diversions Management
+  const activeDeployedDiversions = new Map();
+
+  async function syncActiveDiversions() {
+    try {
+      const res = await fetch('/api/v1/intelligence/diversions/active');
+      if (res.ok) {
+        const list = await res.json();
+        activeDeployedDiversions.clear();
+        list.forEach(d => activeDeployedDiversions.set(d.incident_id, d));
+        updateDeployButtonStatus();
+        updateIncidentQueueDeployedBadges();
+      }
+    } catch (e) {
+      console.warn('Could not sync active diversions:', e);
+    }
+  }
+
+  function updateDeployButtonStatus() {
+    const btn = document.getElementById('btnConfirmDeployDiversion');
+    const feedback = document.getElementById('deployStatusFeedback');
+    const lbl = document.getElementById('lblDeployActionText');
+    if (!btn) return;
+
+    const isDeployed = activeDeployedDiversions.has(activeIncidentId);
+    if (isDeployed) {
+      btn.classList.add('deployed');
+      if (lbl) lbl.textContent = 'Diversion Active on Public Map (Live)';
+      if (feedback) feedback.style.display = 'flex';
+    } else {
+      btn.classList.remove('deployed');
+      if (lbl) lbl.textContent = 'Confirm & Deploy Diversion to Public Map';
+      if (feedback) feedback.style.display = 'none';
+    }
+  }
+
+  function updateIncidentQueueDeployedBadges() {
+    const cards = document.querySelectorAll('#incidentQueueList .incident-card');
+    cards.forEach(c => {
+      const incId = c.dataset.incidentId;
+      const topRow = c.querySelector('.incident-card-top');
+      const existingTag = c.querySelector('.inc-deployed-tag');
+      if (activeDeployedDiversions.has(incId)) {
+        if (!existingTag && topRow) {
+          const tag = document.createElement('span');
+          tag.className = 'inc-deployed-tag';
+          tag.textContent = 'DIVERSION ACTIVE';
+          topRow.appendChild(tag);
+        }
+      } else {
+        existingTag?.remove();
+      }
+    });
+  }
+
+  async function handleDeployDiversion() {
+    if (!latestEvaluation) {
+      showToast('Run simulation before deploying diversion');
+      return;
+    }
+
+    const currentScenId = activeSelectedScenarioId || latestEvaluation.recommended_scenario_id;
+    const scen = (latestEvaluation.candidate_scenarios || []).find(s => s.scenario_id === currentScenId) ||
+                 (latestEvaluation.candidate_scenarios || [])[0];
+
+    if (!scen) {
+      showToast('No valid diversion scenario found to deploy');
+      return;
+    }
+
+    let routeEdgeIds = scen.diversion_route_ids || [];
+    if (!routeEdgeIds.length && latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length) {
+      routeEdgeIds = latestEvaluation.candidate_detours[0].edge_ids || [];
+    }
+
+    const edgeObj = currentEdgesMap.get(activeCorridorId);
+    const roadName = edgeObj ? edgeObj.name : 'Arterial Corridor';
+    const dispPcu = latestEvaluation.displaced_demand_veh_hr || activeDisplacedDemand;
+    const delaySaved = scen.delay_saved_veh_hours || 0;
+
+    const payload = {
+      incident_id: activeIncidentId,
+      edge_id: activeCorridorId,
+      edge_name: roadName,
+      scenario_id: scen.scenario_id,
+      scenario_name: scen.scenario_name,
+      detour_route_ids: routeEdgeIds,
+      detour_name: scen.scenario_name.split(':')[0],
+      displaced_demand_pcu_hr: dispPcu,
+      delay_saved_veh_hours: delaySaved,
+      advisory_text: `MANGALURU POLICE: Diversion active for ${roadName}. Traffic routed via ${scen.scenario_name.split(':')[0]}. Delay relief: ${delaySaved.toFixed(0)} veh-hrs.`,
+      deployed_by: 'Control Room Senior Controller'
+    };
+
+    try {
+      const res = await fetch('/api/v1/intelligence/diversions/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const record = await res.json();
+        activeDeployedDiversions.set(activeIncidentId, record);
+        updateDeployButtonStatus();
+        updateIncidentQueueDeployedBadges();
+        showToast('Diversion deployed successfully! Broadcast to Public 3D Map.');
+      } else {
+        showToast('Error deploying diversion to network');
+      }
+    } catch (e) {
+      console.error('Deploy error:', e);
+      showToast('Failed to connect to diversion deployment service');
     }
   }
 
@@ -736,8 +853,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           const popupContent = `
             <div style="font-family: var(--font-sans); padding: 4px 6px;">
               <div style="font-weight: 700; color: #ef4444; font-size: 11px; text-transform: uppercase;">Active Road Incident</div>
-              <div style="font-weight: 600; color: #0f172a; font-size: 12px; margin: 2px 0;">${targetEdge.name}</div>
-              <div style="font-size: 11px; color: #64748b;">${activeBlockagePct}% Blockage &bull; ${dispPcu} PCU/hr Displaced Demand</div>
+              <div style="font-weight: 600; color: #f8fafc; font-size: 12px; margin: 2px 0;">${targetEdge.name}</div>
+              <div style="font-size: 11px; color: #94a3b8;">${activeBlockagePct}% Blockage &bull; ${dispPcu} PCU/hr Displaced Demand</div>
             </div>
           `;
           activeIncidentMarker = new maplibregl.Marker({ element: markerEl, offset: [0, -4] })
@@ -1029,6 +1146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           queueList.appendChild(card);
         });
+        updateIncidentQueueDeployedBadges();
       }
 
       // 3. Initialize default incident
@@ -1252,6 +1370,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       triggerDiversionEvaluation();
     });
   }
+
+  // Deploy Diversion to Public Map Button
+  const btnDeploy = document.getElementById('btnConfirmDeployDiversion');
+  if (btnDeploy) {
+    btnDeploy.addEventListener('click', () => {
+      handleDeployDiversion();
+    });
+  }
+
+  // Initial sync of deployed diversions
+  syncActiveDiversions();
+  setInterval(syncActiveDiversions, 8000);
 
   // =========================================================================
   // 11. Global Toast Notification

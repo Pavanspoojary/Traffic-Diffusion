@@ -60,6 +60,26 @@
       <!-- Underlying Preserved MapLibre 3D Vector Map -->
       <div id="map"></div>
 
+      <!-- Real-Time Police Traffic Advisory Banner (Broadcast from Control Room) -->
+      <div id="policeAdvisoryBanner" class="police-advisory-banner" style="display:none;">
+        <div class="advisory-icon-wrapper">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div class="advisory-text-body">
+          <div class="advisory-badge-row">
+            <span class="advisory-badge-live">POLICE DIVERSION ACTIVE</span>
+            <span id="advisoryIncidentId" class="advisory-badge-sub">INC-MNG-403</span>
+            <span id="advisorySavings" class="advisory-badge-savings">Saves ~520 veh-hrs</span>
+          </div>
+          <div id="advisoryMessageText" class="advisory-headline">NH-66 Highway Southbound is blocked. Official Diversion Active via Bejai Green Bypass and Kadri Road.</div>
+        </div>
+        <button type="button" id="btnFocusAdvisoryMap" class="btn-advisory-action">View Detour</button>
+      </div>
+
       <!-- ====================================================================
            Google Maps Floating Search & Destination / Directions Widget
            ==================================================================== -->

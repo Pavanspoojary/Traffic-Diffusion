@@ -20,6 +20,8 @@ from backend.app.models.schemas import (
     PrioritizedRoadRisk,
     PrioritizedJunctionRisk,
     RiskAssessmentResponse,
+    DiversionDeploymentRequest,
+    ActiveDiversionRecord,
 )
 
 class PredictiveIncidentEngine:
@@ -31,6 +33,7 @@ class PredictiveIncidentEngine:
     def __init__(self, routing_service):
         self.routing_service = routing_service
         self.active_incidents: Dict[str, TrafficIncident] = {}
+        self.active_diversions: Dict[str, ActiveDiversionRecord] = {}
         self._init_default_assumptions()
         self._seed_default_incidents()
 
@@ -202,6 +205,59 @@ class PredictiveIncidentEngine:
 
     def list_incidents(self) -> List[TrafficIncident]:
         return list(self.active_incidents.values())
+
+    def deploy_diversion(self, request: DiversionDeploymentRequest) -> ActiveDiversionRecord:
+        """
+        Deploys an approved incident diversion plan to the network and broadcasts
+        it to the public app and citizen navigation routing engine.
+        """
+        coords: List[List[float]] = []
+        for eid in request.detour_route_ids:
+            edge = self.routing_service.edges.get(eid)
+            if edge and edge.path_coordinates:
+                if coords and coords[-1] == edge.path_coordinates[0]:
+                    coords.extend(edge.path_coordinates[1:])
+                else:
+                    coords.extend(edge.path_coordinates)
+
+        div_id = f"DIV-{request.incident_id.replace('INC-MNG-', '').replace('INC-', '')}"
+        advisory_msg = request.advisory_text or (
+            f"POLICE TRAFFIC ADVISORY: {request.edge_name} is restricted. "
+            f"Official detour active via {request.detour_name}. "
+            f"Expected delay saved: {request.delay_saved_veh_hours:.1f} vehicle-hours."
+        )
+
+        record = ActiveDiversionRecord(
+            diversion_id=div_id,
+            incident_id=request.incident_id,
+            edge_id=request.edge_id,
+            edge_name=request.edge_name or "Corridor",
+            scenario_id=request.scenario_id,
+            scenario_name=request.scenario_name,
+            detour_route_ids=request.detour_route_ids,
+            detour_name=request.detour_name or "Official Detour",
+            detour_path_coordinates=coords,
+            displaced_demand_pcu_hr=request.displaced_demand_pcu_hr,
+            delay_saved_veh_hours=request.delay_saved_veh_hours,
+            advisory_text=advisory_msg,
+            deployed_by=request.deployed_by or "Control Room Operator",
+            deployed_at=datetime.utcnow().isoformat() + "Z",
+            status="ACTIVE"
+        )
+        self.active_diversions[request.incident_id] = record
+        return record
+
+    def list_active_diversions(self) -> List[ActiveDiversionRecord]:
+        return list(self.active_diversions.values())
+
+    def get_active_diversion(self, incident_id: str) -> Optional[ActiveDiversionRecord]:
+        return self.active_diversions.get(incident_id)
+
+    def cancel_diversion(self, incident_id: str) -> bool:
+        if incident_id in self.active_diversions:
+            del self.active_diversions[incident_id]
+            return True
+        return False
 
     def simulate_network_forecast(
         self,

@@ -350,6 +350,18 @@
               <strong>Control Room Advisory:</strong> Model estimates assist situational decision-making. Field deployment requires traffic controller authorization.
             </div>
 
+            <!-- Confirm & Deploy Diversion to Public Map -->
+            <div class="deploy-action-box">
+              <button type="button" id="btnConfirmDeployDiversion" class="btn-confirm-deploy">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span id="lblDeployActionText">Confirm &amp; Deploy Diversion to Public Map</span>
+              </button>
+              <div id="deployStatusFeedback" class="deploy-status-feedback" style="display: none;">
+                <span class="deploy-live-dot"></span>
+                <span id="deployStatusMessage">Diversion deployed &bull; Live on Public Map &amp; Citizen GPS</span>
+              </div>
+            </div>
+
             <!-- Model Assumptions & Standards -->
             <details class="assumptions-toggle">
               <summary class="assumptions-summary">Model Assumptions &amp; Standards</summary>

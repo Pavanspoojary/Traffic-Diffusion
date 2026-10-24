@@ -107,16 +107,58 @@ class WhatIfInterventionPlanner:
         if not nx.has_path(subgraph, source_node_id, target_node_id):
             return []
 
-        try:
-            # Shortest simple paths ordered by cumulative distance
-            path_generator = nx.shortest_simple_paths(
-                subgraph,
-                source=source_node_id,
-                target=target_node_id,
-                weight="distance_km"
-            )
+        # Annotate subgraph edges with multi-criteria impedance considering width, lanes, capacity and saturation
+        for u, v, data in subgraph.edges(data=True):
+            edge_id = data.get("edge_id")
+            edge_obj = edges_map.get(edge_id)
+            if edge_obj:
+                t0 = self._compute_free_flow_time(edge_obj)
+                # Road width & lane capacity: 4+ lane bypasses get priority incentive; 2-lane get penalty
+                lane_mult = 0.75 if edge_obj.lanes >= 4 else (1.0 if edge_obj.lanes == 3 else 1.25)
+                # Headroom and current congestion saturation penalty
+                nom_flow = self._compute_edge_nominal_flow(edge_obj)
+                cap = self._compute_edge_capacity(edge_obj)
+                vc = nom_flow / max(cap, 100.0)
+                vc_penalty = 1.0 + 1.2 * (vc ** 2)
+                signals_delay = (edge_obj.traffic_signals or 0) * 0.35
+                data["diversion_impedance"] = (t0 * lane_mult * vc_penalty) + signals_delay
+            else:
+                data["diversion_impedance"] = data.get("distance_km", 1.0)
 
-            for path_idx, node_path in enumerate(path_generator):
+        try:
+            # Query candidate simple paths using multi-criteria impedance (width, lanes, headroom) and distance
+            impedance_paths = []
+            try:
+                gen1 = nx.shortest_simple_paths(subgraph, source=source_node_id, target=target_node_id, weight="diversion_impedance")
+                for _ in range(max_candidates * 2):
+                    p = next(gen1, None)
+                    if not p:
+                        break
+                    impedance_paths.append(p)
+            except Exception:
+                pass
+
+            distance_paths = []
+            try:
+                gen2 = nx.shortest_simple_paths(subgraph, source=source_node_id, target=target_node_id, weight="distance_km")
+                for _ in range(max_candidates * 2):
+                    p = next(gen2, None)
+                    if not p:
+                        break
+                    distance_paths.append(p)
+            except Exception:
+                pass
+
+            # Combine and deduplicate candidate node paths
+            candidate_node_paths = []
+            seen_tuples = set()
+            for p in (impedance_paths + distance_paths):
+                tup = tuple(p)
+                if tup not in seen_tuples:
+                    seen_tuples.add(tup)
+                    candidate_node_paths.append(p)
+
+            for path_idx, node_path in enumerate(candidate_node_paths):
                 if len(viable_routes) >= max_candidates:
                     break
 
@@ -155,17 +197,19 @@ class WhatIfInterventionPlanner:
                     max(self._compute_edge_nominal_flow(e) / self._compute_edge_capacity(e) for e in route_edges),
                     2
                 )
+                min_lanes = min(e.lanes for e in route_edges)
+                road_width_desc = f"{min_lanes}-Lane Arterial" if min_lanes < 4 else "4-Lane High Capacity Bypass"
 
                 # Generate clean human-readable route title
                 via_names = [e.name for e in route_edges if e.name not in ["Connector", "Link Road"]]
                 if via_names:
-                    primary_corridor = via_names[min(1, len(via_names) - 1)]
-                    route_title = f"Detour {path_idx + 1} via {primary_corridor}"
+                    primary_corridor = via_names[0]
+                    route_title = f"Detour {len(viable_routes) + 1} via {primary_corridor}"
                 else:
-                    route_title = f"Detour {path_idx + 1}"
+                    route_title = f"Detour {len(viable_routes) + 1}"
 
                 viable_routes.append({
-                    "detour_index": path_idx + 1,
+                    "detour_index": len(viable_routes) + 1,
                     "title": route_title,
                     "node_path": node_path,
                     "edge_ids": route_edge_ids,
@@ -175,6 +219,8 @@ class WhatIfInterventionPlanner:
                     "baseline_travel_time_min": baseline_travel_min,
                     "bottleneck_capacity_pcu": bottleneck_cap,
                     "max_baseline_vc": max_baseline_vc,
+                    "min_lanes": min_lanes,
+                    "road_width_desc": road_width_desc,
                 })
 
         except Exception as e:

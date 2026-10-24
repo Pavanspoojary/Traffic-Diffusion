@@ -609,3 +609,34 @@ class IncidentSimulateRequest(BaseModel):
 
 class ResetNetworkRequest(BaseModel):
     preserve_incidents: bool = False
+
+class DiversionDeploymentRequest(BaseModel):
+    incident_id: str
+    edge_id: str
+    edge_name: Optional[str] = "Corridor"
+    scenario_id: str
+    scenario_name: str
+    detour_route_ids: List[str] = []
+    detour_name: Optional[str] = "Official Detour Route"
+    displaced_demand_pcu_hr: float = 0.0
+    delay_saved_veh_hours: float = 0.0
+    advisory_text: Optional[str] = None
+    deployed_by: Optional[str] = "Control Room Operator"
+
+class ActiveDiversionRecord(BaseModel):
+    diversion_id: str
+    incident_id: str
+    edge_id: str
+    edge_name: str
+    scenario_id: str
+    scenario_name: str
+    detour_route_ids: List[str]
+    detour_name: str
+    detour_path_coordinates: List[List[float]] = []
+    displaced_demand_pcu_hr: float
+    delay_saved_veh_hours: float
+    advisory_text: str
+    deployed_by: str
+    deployed_at: str
+    status: str = "ACTIVE"
+

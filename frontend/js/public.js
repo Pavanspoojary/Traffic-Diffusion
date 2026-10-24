@@ -2608,4 +2608,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Periodic network refresh
   setInterval(loadPublicNetwork, 8000);
+
+  // Active Police Diversions Polling & Live Map Broadcast
+  let currentActiveDiversion = null;
+
+  async function checkActiveDiversions() {
+    try {
+      const res = await fetch('/api/v1/intelligence/diversions/active');
+      if (!res.ok) return;
+      const diversions = await res.json();
+      const banner = document.getElementById('policeAdvisoryBanner');
+      if (!banner) return;
+
+      if (diversions && diversions.length > 0) {
+        const latest = diversions[diversions.length - 1];
+        currentActiveDiversion = latest;
+
+        const elId = document.getElementById('advisoryIncidentId');
+        const elSavings = document.getElementById('advisorySavings');
+        const elMsg = document.getElementById('advisoryMessageText');
+
+        if (elId) elId.textContent = latest.incident_id.replace('INC-MNG-', 'INC-');
+        if (elSavings) elSavings.textContent = `Saves ~${latest.delay_saved_veh_hours.toFixed(0)} veh-hrs`;
+        if (elMsg) elMsg.textContent = latest.advisory_text;
+
+        banner.style.display = 'flex';
+
+        if (activeMap && typeof activeMap.renderPoliceDiversion === 'function') {
+          activeMap.renderPoliceDiversion(latest);
+        }
+      } else {
+        currentActiveDiversion = null;
+        banner.style.display = 'none';
+        if (activeMap && typeof activeMap.renderPoliceDiversion === 'function') {
+          activeMap.renderPoliceDiversion(null);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not poll active diversions:', err);
+    }
+  }
+
+  const btnFocusDetour = document.getElementById('btnFocusAdvisoryMap');
+  if (btnFocusDetour) {
+    btnFocusDetour.addEventListener('click', () => {
+      if (currentActiveDiversion && activeMap && typeof activeMap.renderPoliceDiversion === 'function') {
+        activeMap.renderPoliceDiversion(currentActiveDiversion);
+      }
+    });
+  }
+
+  // Initial check & continuous poll for deployed control-room diversions
+  setTimeout(checkActiveDiversions, 1500);
+  setInterval(checkActiveDiversions, 5000);
 });

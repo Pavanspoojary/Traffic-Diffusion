@@ -23,6 +23,8 @@ from backend.app.models.schemas import (
     TrafficPatternComparison,
     InfrastructureSimulateRequest,
     InfrastructureSimulateResponse,
+    DiversionDeploymentRequest,
+    ActiveDiversionRecord,
 )
 from backend.app.services.prediction_service import prediction_service
 from backend.app.services.risk_service import risk_service
@@ -76,6 +78,31 @@ async def get_incident_details(incident_id: str):
             detail=f"Incident '{incident_id}' not found in active registry"
         )
     return incident
+
+@router.post("/diversions/deploy", response_model=ActiveDiversionRecord, status_code=status.HTTP_201_CREATED)
+async def deploy_incident_diversion(request: DiversionDeploymentRequest):
+    """
+    Control-room operator confirms and deploys a simulated diversion route.
+    Broadcasts the official detour to the public map and citizen route navigation.
+    """
+    record = prediction_service.deploy_diversion(request)
+    return record
+
+@router.get("/diversions/active", response_model=List[ActiveDiversionRecord])
+async def list_active_diversions():
+    """Returns all currently active incident diversion plans deployed across the network."""
+    return prediction_service.list_active_diversions()
+
+@router.delete("/diversions/active/{incident_id}")
+async def cancel_active_diversion(incident_id: str):
+    """Cancels or resolves an active diversion once the incident has been cleared."""
+    success = prediction_service.cancel_diversion(incident_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No active diversion found for incident '{incident_id}'"
+        )
+    return {"status": "success", "message": f"Diversion for {incident_id} cancelled."}
 
 @router.post("/forecast", response_model=MultiHorizonForecastResponse)
 async def generate_impact_forecast(request: ForecastRequest):

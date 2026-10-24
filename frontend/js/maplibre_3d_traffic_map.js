@@ -832,4 +832,71 @@ class MapLibre3DTrafficMap {
       this.placeMarkers.push(marker);
     });
   }
+
+  // Render Confirmed Police Diversion on Public 3D Map
+  renderPoliceDiversion(diversionRecord) {
+    if (!this.map || !this.isLoaded) return;
+
+    if (!diversionRecord || !diversionRecord.detour_path_coordinates || !diversionRecord.detour_path_coordinates.length) {
+      if (this.map.getSource('police-diversion-source')) {
+        this.map.getSource('police-diversion-source').setData({ type: 'FeatureCollection', features: [] });
+      }
+      return;
+    }
+
+    const lineCoords = diversionRecord.detour_path_coordinates.map(pt => {
+      return pt[0] < pt[1] ? [pt[1], pt[0]] : [pt[0], pt[1]];
+    });
+
+    const geojsonData = {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: lineCoords
+      },
+      properties: {
+        title: diversionRecord.detour_name || 'Official Police Detour'
+      }
+    };
+
+    if (this.map.getSource('police-diversion-source')) {
+      this.map.getSource('police-diversion-source').setData(geojsonData);
+    } else {
+      this.map.addSource('police-diversion-source', {
+        type: 'geojson',
+        data: geojsonData
+      });
+
+      this.map.addLayer({
+        id: 'police-diversion-casing',
+        type: 'line',
+        source: 'police-diversion-source',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#064e3b',
+          'line-width': 9.0,
+          'line-opacity': 0.95
+        }
+      });
+
+      this.map.addLayer({
+        id: 'police-diversion-core',
+        type: 'line',
+        source: 'police-diversion-source',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#10b981',
+          'line-width': 5.5,
+          'line-opacity': 0.98
+        }
+      });
+    }
+
+    if (lineCoords.length > 1 && typeof maplibregl !== 'undefined') {
+      const bounds = new maplibregl.LngLatBounds();
+      lineCoords.forEach(c => bounds.extend(c));
+      this.map.fitBounds(bounds, { padding: 90, maxZoom: 15.2, duration: 1200 });
+    }
+  }
 }
+

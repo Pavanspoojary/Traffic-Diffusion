@@ -748,13 +748,104 @@ body {
   background: #0f172a !important;
   color: #f8fafc !important;
   border: 1px solid #334155 !important;
-  border-radius: 6px !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7) !important;
-  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75) !important;
+  padding: 10px 12px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+.maplibregl-popup-content div {
+  color: #f8fafc;
+}
+
+.maplibregl-popup-close-button {
+  color: #94a3b8 !important;
+  font-size: 16px !important;
+  padding: 4px 8px !important;
 }
 
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
   border-top-color: #0f172a !important;
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: #0f172a !important;
+}
+
+/* Deploy Diversion to Public Map Button */
+.deploy-action-box {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-confirm-deploy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #ffffff;
+  border: 1px solid #34d399;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  transition: all 0.18s ease;
+}
+
+.btn-confirm-deploy:hover {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-confirm-deploy.deployed {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #34d399;
+  box-shadow: none;
+  cursor: default;
+}
+
+.deploy-status-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.deploy-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse-live 1.8s infinite;
+}
+
+.inc-deployed-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid #10b981;
+  border-radius: 3px;
+  margin-top: 4px;
 }
 
 /* Active Incident Context Card */
