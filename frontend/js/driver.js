@@ -95,34 +95,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!route.path_coordinates || route.path_coordinates.length < 2) return;
 
-    // A. Outer Ambient Green Glow
-    const underglow = L.polyline(route.path_coordinates, {
-      color: '#34d399',
-      weight: 14,
-      opacity: 0.35,
-      lineCap: 'round',
-      lineJoin: 'round',
-    });
-
-    // B. Google Maps Dark Casing Border
+    // A. Outer White Halo Casing Border
     const casingBorder = L.polyline(route.path_coordinates, {
-      color: '#0d652d',
-      weight: 9,
+      color: '#FFFFFF',
+      weight: 10,
       opacity: 0.95,
       lineCap: 'round',
       lineJoin: 'round',
     });
 
-    // C. Core Solid Google Maps Emerald Green Route
+    // B. Core Recommended Route: Blue (#1565FF)
     const coreRoute = L.polyline(route.path_coordinates, {
-      color: '#1e8e3e',
+      color: '#1565FF',
       weight: 6,
       opacity: 1.0,
       lineCap: 'round',
       lineJoin: 'round',
     });
 
-    corridorLayer.addLayer(underglow);
     corridorLayer.addLayer(casingBorder);
     corridorLayer.addLayer(coreRoute);
 
@@ -207,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const incidentIcon = L.divIcon({
           className: 'incident-badge-icon',
           html: `
-            <div style="background: #ef4444; border: 2px solid #ffffff; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35); font-weight: 800; font-size: 13px;">
+            <div style="background: #E53935; border: 2px solid #ffffff; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35); font-weight: 800; font-size: 13px;">
               !
             </div>
           `,

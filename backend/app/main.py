@@ -70,7 +70,14 @@ async def driver_page():
 @app.api_route("/operations.html", methods=["GET", "HEAD"])
 async def operations_page():
     """Secondary supporting view: CCTV & Legacy Operations Console."""
-    return FileResponse(settings.base_dir / "frontend" / "operations.html")
+    return FileResponse(
+        settings.base_dir / "frontend" / "operations.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 @app.api_route("/login", methods=["GET", "HEAD"])
 @app.api_route("/login.html", methods=["GET", "HEAD"])

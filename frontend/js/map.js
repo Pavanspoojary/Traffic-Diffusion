@@ -1,4 +1,10 @@
-// Traffic Diffusion Map Controller
+// Traffic Diffusion Map Controller - Leaflet Engine
+// Enforces strict 3-colour scheme:
+// - Red (#E53935): Confirmed blocked road segments
+// - Blue (#1565FF): Recommended route
+// - Orange (#FF9800): Alternative routes
+// All unrelated roads retain their normal basemap appearance.
+
 class TrafficMap {
   constructor(containerId) {
     this.map = L.map(containerId, {
@@ -9,31 +15,91 @@ class TrafficMap {
 
     L.control.zoom({ position: 'topright' }).addTo(this.map);
 
-    // Free OpenStreetMap Standard Basemap (100% free, no API key or watermark required)
+    // Free OpenStreetMap Standard Basemap (100% free, normal clean basemap appearance)
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(this.map);
 
+    // Explicit Layer Stacking Order to guarantee clean visual hierarchy:
+    // 1. Unrelated network edges: Transparent hitboxes for tooltips, NO black or colored lines drawn
     this.edgeLayers = L.layerGroup().addTo(this.map);
+    // 2. Alternative routes layer: Orange (#FF9800)
+    this.altRouteLayer = L.layerGroup().addTo(this.map);
+    // 3. Recommended route layer: Blue (#1565FF) - higher visual prominence
+    this.recommendedRouteLayer = L.layerGroup().addTo(this.map);
+    // 4. Blocked segments layer: Red (#E53935) - on top so blockage is never obscured
+    this.blockageLayer = L.layerGroup().addTo(this.map);
+    // 5. Node / Incident Marker layers
+    this.incidentMarkerLayer = L.layerGroup().addTo(this.map);
     this.nodeLayers = L.layerGroup().addTo(this.map);
-    this.routeLayer = L.layerGroup().addTo(this.map);
     this.dispatchLayer = L.layerGroup().addTo(this.map);
 
+    // Legacy compatibility reference
+    this.routeLayer = this.recommendedRouteLayer;
+
     this.nodeMap = new Map();
+    this.edgeMap = new Map();
+
+    this._addLegend();
+
+    setTimeout(() => {
+      this.map.invalidateSize();
+    }, 200);
+  }
+
+  _addLegend() {
+    const legendControl = L.control({ position: 'topright' });
+    legendControl.onAdd = () => {
+      const div = L.DomUtil.create('div', 'leaflet-traffic-legend');
+      div.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.94); border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 11px; color: #f8fafc; box-shadow: 0 4px 14px rgba(0,0,0,0.45); backdrop-filter: blur(8px); min-width: 230px;">
+          <div style="font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+            <span>Route &amp; Disruption Legend</span>
+            <span style="font-size: 9px; background: #1e293b; padding: 2px 5px; border-radius: 4px; border: 1px solid #475569; color: #38bdf8;">3-COLOUR</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span style="display: inline-block; width: 22px; height: 5px; background: #E53935; border-radius: 2px; border: 1px solid #ffffff; box-shadow: 0 0 4px rgba(229,57,53,0.5);"></span>
+            <span style="font-weight: 600; color: #f87171;">Red (#E53935): Confirmed Blockage</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span style="display: inline-block; width: 22px; height: 5px; background: #1565FF; border-radius: 2px; border: 1px solid #ffffff; box-shadow: 0 0 4px rgba(21,101,255,0.5);"></span>
+            <span style="font-weight: 600; color: #60a5fa;">Blue (#1565FF): Recommended Route</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; width: 22px; height: 4px; background: #FF9800; border-radius: 2px; border-top: 2px dashed #FF9800; box-shadow: 0 0 4px rgba(255,152,0,0.5);"></span>
+            <span style="font-weight: 600; color: #fbbf24;">Orange (#FF9800): Alternative Route</span>
+          </div>
+        </div>
+      `;
+      return div;
+    };
+    legendControl.addTo(this.map);
   }
 
   renderNetwork(nodes, edges) {
     this.edgeLayers.clearLayers();
     this.nodeLayers.clearLayers();
+    this.blockageLayer.clearLayers();
+    this.incidentMarkerLayer.clearLayers();
     this.nodeMap.clear();
+    this.edgeMap.clear();
 
     // Cache node coordinates
     nodes.forEach(n => {
       this.nodeMap.set(n.id, n);
     });
 
-    // Draw Edges
+    // Cache edges
+    edges.forEach(e => {
+      this.edgeMap.set(e.id, e);
+    });
+
+    // Draw Edges:
+    // IMPORTANT: Unrelated roads must retain normal basemap appearance.
+    // They are rendered with transparent strokes (opacity: 0) as interactive hitboxes
+    // so no thick dark or black lines obscure the map.
+    // Confirmed blocked segments are rendered in exact RED (#E53935) with white halo casing.
     edges.forEach(edge => {
       const sourceNode = this.nodeMap.get(edge.source);
       const targetNode = this.nodeMap.get(edge.target);
@@ -46,81 +112,206 @@ class TrafficMap {
             [targetNode.lat, targetNode.lng]
           ];
 
-      const style = this._getEdgeStyle(edge);
-      const polyline = L.polyline(latlngs, style);
+      const isBlocked = (edge.has_incident || edge.congestion_level === 'BLOCKED');
 
-      const tooltipContent = `
-        <div style="font-family: var(--font-sans); font-size: 11px;">
-          <strong>${edge.name}</strong><br/>
-          Status: <span style="font-family: var(--font-mono);">${edge.congestion_level}</span><br/>
-          Density: ${(edge.density_score * 100).toFixed(0)}% | Est: ${edge.estimated_travel_time_min} min<br/>
-          ${edge.has_incident ? `<span style="color: #ef4444; font-weight: bold;">INCIDENT: ${edge.incident_description || 'Blockage'}</span>` : ''}
-        </div>
-      `;
-      polyline.bindTooltip(tooltipContent, { sticky: true });
-      this.edgeLayers.addLayer(polyline);
+      if (isBlocked) {
+        this.renderBlockedSegment(latlngs, edge);
+      } else {
+        // Transparent interaction hitbox (valid hex + 0 opacity ensures no black fallback)
+        const hitbox = L.polyline(latlngs, {
+          color: '#ffffff',
+          weight: 12,
+          opacity: 0,
+        });
+
+        const tooltipContent = `
+          <div style="font-family: var(--font-sans); font-size: 11px;">
+            <strong>${edge.name}</strong><br/>
+            Status: <span style="font-family: var(--font-mono);">${edge.congestion_level}</span><br/>
+            Transit: ${edge.estimated_travel_time_min} min
+          </div>
+        `;
+        hitbox.bindTooltip(tooltipContent, { sticky: true });
+        this.edgeLayers.addLayer(hitbox);
+      }
     });
 
-    // Draw Nodes
+    // Draw key emergency destination / origin node markers
     nodes.forEach(node => {
-      const marker = this._createNodeMarker(node);
-      this.nodeLayers.addLayer(marker);
+      if (node.type === 'ems_station' || node.type === 'hospital') {
+        const marker = this._createNodeMarker(node);
+        this.nodeLayers.addLayer(marker);
+      }
     });
   }
 
-  renderGreenCorridor(pathCoordinates, routeData, altCoordinates = null) {
-    this.routeLayer.clearLayers();
+  renderBlockedSegment(latlngs, edge) {
+    if (!latlngs || latlngs.length < 2) return;
 
-    // Draw Alternative Route in subtle dashed slate/cyan if present
-    if (altCoordinates && altCoordinates.length >= 2) {
-      const altPolyline = L.polyline(altCoordinates, {
-        color: '#64748b',
-        weight: 4,
-        opacity: 0.75,
-        dashArray: '6, 10',
+    // 1. White high-contrast halo casing so blockage remains completely visible
+    // even when overlapping recommended or alternative routes
+    const whiteCasing = L.polyline(latlngs, {
+      color: '#FFFFFF',
+      weight: 12,
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round',
+    });
+
+    // 2. Core Confirmed Blockage segment in exact RED (#E53935)
+    const redCore = L.polyline(latlngs, {
+      color: '#E53935',
+      weight: 7.5,
+      opacity: 1.0,
+      lineCap: 'round',
+      lineJoin: 'round',
+    });
+
+    const tooltipContent = `
+      <div style="font-family: var(--font-sans); font-size: 12px; line-height: 1.4;">
+        <strong style="color: #E53935;">⛔ CONFIRMED ROAD BLOCKAGE</strong><br/>
+        <strong>${edge.name || 'Blocked Segment'}</strong><br/>
+        <span>${edge.incident_description || 'Impassable closure - diversion active'}</span>
+      </div>
+    `;
+    redCore.bindTooltip(tooltipContent, { sticky: true });
+
+    this.blockageLayer.addLayer(whiteCasing);
+    this.blockageLayer.addLayer(redCore);
+
+    // Midpoint Closed Badge Marker
+    const midIdx = Math.floor(latlngs.length / 2);
+    const midCoord = latlngs[midIdx] || latlngs[0];
+    const incidentBadge = L.divIcon({
+      className: 'confirmed-blockage-marker',
+      html: `
+        <div style="background: #E53935; border: 2px solid #FFFFFF; color: #FFFFFF; border-radius: 12px; padding: 2px 7px; font-weight: 800; font-size: 10px; font-family: var(--font-mono); box-shadow: 0 2px 8px rgba(0,0,0,0.5); white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+          <span>⛔</span><span>CLOSED</span>
+        </div>
+      `,
+      iconSize: [68, 22],
+      iconAnchor: [34, 11],
+    });
+    const badgeMarker = L.marker(midCoord, { icon: incidentBadge, zIndexOffset: 2000 });
+    badgeMarker.bindTooltip(tooltipContent);
+    this.incidentMarkerLayer.addLayer(badgeMarker);
+  }
+
+  // Render Routes adhering strictly to 3-colour scheme:
+  // - Recommended route: Blue (#1565FF), solid, higher visual prominence
+  // - Alternative routes: Orange (#FF9800), dashed/distinguishable
+  // - Blocked segment: Red (#E53935), on top layer
+  renderRoutes(routeData) {
+    // Clear obsolete route layers
+    this.recommendedRouteLayer.clearLayers();
+    this.altRouteLayer.clearLayers();
+
+    if (!routeData) return;
+
+    const primary = routeData.primary_route || routeData;
+    const alternatives = routeData.alternative_routes || [];
+
+    const boundsGroup = L.featureGroup();
+
+    // 1. Draw Alternative Routes FIRST (Orange #FF9800)
+    // Placed below recommended route in layer stacking order
+    alternatives.forEach((alt, idx) => {
+      const altCoords = alt.path_coordinates;
+      if (altCoords && altCoords.length >= 2) {
+        // Subtle white halo casing
+        const altCasing = L.polyline(altCoords, {
+          color: '#FFFFFF',
+          weight: 7.5,
+          opacity: 0.85,
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+
+        // Core Alternative line in exact ORANGE (#FF9800)
+        const altPolyline = L.polyline(altCoords, {
+          color: '#FF9800',
+          weight: 4.5,
+          opacity: 0.95,
+          dashArray: '7, 9',
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+
+        const tooltip = `
+          <div style="font-family: var(--font-sans); font-size: 11px;">
+            <strong style="color: #FF9800;">Alternative Route ${idx + 1}</strong>: ${alt.label || alt.primary_road_name || 'Detour corridor'}<br/>
+            Transit: <strong>${alt.estimated_travel_time_min?.toFixed(1) || '?'} min</strong> &bull; Distance: <strong>${alt.total_distance_km?.toFixed(1) || '?'} km</strong>
+          </div>
+        `;
+        altPolyline.bindTooltip(tooltip, { sticky: true });
+
+        this.altRouteLayer.addLayer(altCasing);
+        this.altRouteLayer.addLayer(altPolyline);
+        boundsGroup.addLayer(altPolyline);
+      }
+    });
+
+    // 2. Draw Recommended Route (Blue #1565FF)
+    // Clearly visible solid line with higher visual prominence
+    const primaryCoords = primary.path_coordinates || routeData.path_coordinates;
+    if (primaryCoords && primaryCoords.length >= 2) {
+      // Crisp white casing border
+      const primaryCasing = L.polyline(primaryCoords, {
+        color: '#FFFFFF',
+        weight: 10,
+        opacity: 0.95,
         lineCap: 'round',
+        lineJoin: 'round',
       });
-      altPolyline.bindTooltip('<div style="font-size: 11px;"><strong>Alternative Backup Corridor</strong></div>', { sticky: true });
-      this.routeLayer.addLayer(altPolyline);
+
+      // Core Recommended route line in exact BLUE (#1565FF)
+      const primaryCore = L.polyline(primaryCoords, {
+        color: '#1565FF',
+        weight: 6.5,
+        opacity: 1.0,
+        lineCap: 'round',
+        lineJoin: 'round',
+      });
+
+      const tooltip = `
+        <div style="font-family: var(--font-sans); font-size: 11px;">
+          <strong style="color: #1565FF;">Recommended Route</strong>: ${primary.label || primary.primary_road_name || 'Fastest viable path'}<br/>
+          Transit: <strong>${primary.estimated_travel_time_min?.toFixed(1) || routeData.estimated_travel_time_min?.toFixed(1) || '?'} min</strong> &bull; Distance: <strong>${primary.total_distance_km?.toFixed(1) || routeData.total_distance_km?.toFixed(1) || '?'} km</strong>
+        </div>
+      `;
+      primaryCore.bindTooltip(tooltip, { sticky: true });
+
+      this.recommendedRouteLayer.addLayer(primaryCasing);
+      this.recommendedRouteLayer.addLayer(primaryCore);
+      boundsGroup.addLayer(primaryCore);
     }
 
-    if (!pathCoordinates || pathCoordinates.length < 2) return;
+    // Include any active blocked segments in bounds
+    this.blockageLayer.eachLayer(l => boundsGroup.addLayer(l));
 
-    // Outer luminous glow
-    const glowPolyline = L.polyline(pathCoordinates, {
-      color: '#10b981',
-      weight: 12,
-      opacity: 0.35,
-      lineCap: 'round',
-    });
+    // Pan map to fit active scenario bounds smoothly
+    this.map.invalidateSize();
+    if (boundsGroup.getLayers().length > 0) {
+      this.map.fitBounds(boundsGroup.getBounds(), { padding: [50, 50], maxZoom: 15 });
+    }
+  }
 
-    // Core Green Corridor Path
-    const corePolyline = L.polyline(pathCoordinates, {
-      color: '#34d399',
-      weight: 6,
-      opacity: 0.95,
-      dashArray: '8, 8',
-      lineCap: 'round',
-    });
-
-    this.routeLayer.addLayer(glowPolyline);
-    this.routeLayer.addLayer(corePolyline);
-
-    // Pan map to fit active emergency route bounds
-    this.map.fitBounds(corePolyline.getBounds(), { padding: [50, 50] });
+  // Backward-compatible alias for existing callers
+  renderGreenCorridor(pathCoordinates, routeData, altCoordinates = null) {
+    const formattedData = {
+      path_coordinates: pathCoordinates,
+      primary_route: routeData && routeData.primary_route ? routeData.primary_route : { path_coordinates: pathCoordinates, label: 'Recommended Route' },
+      alternative_routes: altCoordinates ? [{ path_coordinates: altCoordinates, label: 'Alternative Route' }] : (routeData && routeData.alternative_routes ? routeData.alternative_routes : [])
+    };
+    this.renderRoutes(formattedData);
   }
 
   _getEdgeStyle(edge) {
     if (edge.has_incident || edge.congestion_level === 'BLOCKED') {
-      return { color: '#ef4444', weight: 5, opacity: 0.9, dashArray: '6, 6' };
+      return { color: '#E53935', weight: 7, opacity: 1.0 };
     }
-    if (edge.congestion_level === 'HEAVY') {
-      return { color: '#f97316', weight: 4.5, opacity: 0.85 };
-    }
-    if (edge.congestion_level === 'MODERATE') {
-      return { color: '#f59e0b', weight: 3.5, opacity: 0.8 };
-    }
-    return { color: '#3b82f6', weight: 3, opacity: 0.7 };
+    // Unrelated roads retain normal basemap appearance (opacity 0 prevents black line fallback)
+    return { color: '#ffffff', weight: 10, opacity: 0 };
   }
 
   _createNodeMarker(node) {
@@ -129,23 +320,23 @@ class TrafficMap {
 
     if (node.type === 'ems_station') {
       iconHtml = `
-        <div style="background: #0284c7; border: 2px solid #38bdf8; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold;">
+        <div style="background: #1565FF; border: 2px solid #FFFFFF; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold; box-shadow: 0 2px 8px rgba(21,101,255,0.5);">
           EMS
         </div>
       `;
       markerSize = [26, 26];
     } else if (node.type === 'hospital') {
       iconHtml = `
-        <div style="background: #dc2626; border: 2px solid #f87171; border-radius: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 800;">
+        <div style="background: #E53935; border: 2px solid #FFFFFF; border-radius: 6px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 800; box-shadow: 0 2px 8px rgba(229,57,53,0.5);">
           +
         </div>
       `;
-      markerSize = [28, 28];
+      markerSize = [26, 26];
     } else {
       iconHtml = `
-        <div style="background: #1e293b; border: 2px solid #64748b; border-radius: 50%; width: 14px; height: 14px;"></div>
+        <div style="background: #1e293b; border: 2px solid #64748b; border-radius: 50%; width: 12px; height: 12px;"></div>
       `;
-      markerSize = [14, 14];
+      markerSize = [12, 12];
     }
 
     const customIcon = L.divIcon({
@@ -165,10 +356,10 @@ class TrafficMap {
     return marker;
   }
 
-  // Render Predictive Cascading Impact Forecast across selected horizon
+  // Render Predictive Cascading Impact Forecast without black lines across unrelated roads
   renderPredictiveForecast(snapshot, nodes, activeIncident = null) {
     this.edgeLayers.clearLayers();
-    this.routeLayer.clearLayers();
+    this.blockageLayer.clearLayers();
 
     // Cache nodes
     nodes.forEach(n => this.nodeMap.set(n.id, n));
@@ -183,78 +374,30 @@ class TrafficMap {
         [targetNode.lat, targetNode.lng]
       ];
 
-      let color = '#475569';
-      let weight = 3;
-      let opacity = 0.7;
-      let dashArray = null;
-
       if (impact.impact_type === 'DIRECT_INCIDENT') {
-        color = '#ef4444';
-        weight = 7;
-        opacity = 1.0;
-        dashArray = '8, 6';
-      } else if (impact.impact_type === 'UPSTREAM_SPILLBACK') {
-        color = '#f97316';
-        weight = 5.5;
-        opacity = 0.95;
-      } else if (impact.impact_type === 'DIVERSION_LOADED') {
-        color = '#06b6d4';
-        weight = 4.5;
-        opacity = 0.9;
-        dashArray = '6, 6';
-      } else if (impact.impact_type === 'DOWNSTREAM_BOTTLENECK') {
-        color = '#a855f7';
-        weight = 4;
-        opacity = 0.85;
-      } else {
-        color = impact.predicted_volume_capacity_ratio > 0.85 ? '#eab308' : '#334155';
-        weight = 2.5;
-        opacity = 0.65;
-      }
-
-      const polyline = L.polyline(latlngs, {
-        color: color,
-        weight: weight,
-        opacity: opacity,
-        dashArray: dashArray,
-        lineCap: 'round',
-      });
-
-      const tooltipContent = `
-        <div style="font-family: var(--font-sans); font-size: 11px; line-height: 1.4;">
-          <div style="font-weight: 800; color: #fff;">${impact.road_name}</div>
-          <div style="color: ${color}; font-weight: 700; font-size: 10px;">${impact.impact_type.replace(/_/g, ' ')} [T+${snapshot.horizon_minutes}m]</div>
-          <div style="color: #94a3b8; margin-top: 2px;">
-            Pred Travel Time: <strong>${impact.predicted_travel_time_min.toFixed(1)} min</strong> (+${impact.expected_delay_min.toFixed(1)}m delay)<br/>
-            V/C Load: <strong>${impact.predicted_volume_capacity_ratio.toFixed(2)}</strong> | Queue: <strong>${Math.round(impact.queue_length_meters)}m</strong><br/>
-            Risk Score: <strong>${impact.risk_score.toFixed(1)} / 100</strong>
-          </div>
-        </div>
-      `;
-      polyline.bindTooltip(tooltipContent, { sticky: true });
-      this.edgeLayers.addLayer(polyline);
-    });
-
-    // Highlight Saturated Junctions
-    snapshot.junction_saturations.forEach(junc => {
-      const node = this.nodeMap.get(junc.junction_id);
-      if (!node) return;
-
-      if (junc.saturation_index >= 0.70) {
-        const satPercent = Math.round(junc.saturation_index * 100);
-        const satIcon = L.divIcon({
-          className: 'saturated-junc-icon',
-          html: `
-            <div style="background: #ef4444; border: 2px solid #ffffff; color: white; border-radius: 6px; padding: 2px 5px; font-weight: 800; font-size: 10px; font-family: var(--font-mono); box-shadow: 0 2px 10px rgba(0,0,0,0.5);">
-              ${satPercent}% SAT
-            </div>
-          `,
-          iconSize: [52, 22],
-          iconAnchor: [26, 11],
+        this.renderBlockedSegment(latlngs, {
+          name: impact.road_name,
+          incident_description: `Direct Incident [T+${snapshot.horizon_minutes}m]`
         });
-        L.marker([node.lat, node.lng], { icon: satIcon })
-          .bindTooltip(`<strong>${junc.junction_name}</strong><br/>Gridlock Risk: ${junc.inflow_spillback_risk}<br/>Saturation: ${satPercent}%`)
-          .addTo(this.routeLayer);
+      } else {
+        // Unrelated roads retain normal basemap appearance
+        const polyline = L.polyline(latlngs, {
+          color: '#ffffff',
+          weight: 12,
+          opacity: 0,
+        });
+
+        const tooltipContent = `
+          <div style="font-family: var(--font-sans); font-size: 11px; line-height: 1.4;">
+            <div style="font-weight: 800; color: #fff;">${impact.road_name}</div>
+            <div style="color: #94a3b8; margin-top: 2px;">
+              Pred Transit: <strong>${impact.predicted_travel_time_min.toFixed(1)} min</strong><br/>
+              V/C Load: <strong>${impact.predicted_volume_capacity_ratio.toFixed(2)}</strong>
+            </div>
+          </div>
+        `;
+        polyline.bindTooltip(tooltipContent, { sticky: true });
+        this.edgeLayers.addLayer(polyline);
       }
     });
   }
@@ -267,18 +410,12 @@ class TrafficMap {
 
     dispatches.forEach(d => {
       const node = this.nodeMap.get(d.target_location_id);
-      let latlng;
-      if (node) {
-        latlng = [node.lat, node.lng];
-      } else {
-        // Default near Nanthoor / Kadri coordinates
-        latlng = [12.8790, 74.8650];
-      }
+      const latlng = node ? [node.lat, node.lng] : [12.8790, 74.8650];
 
-      let badgeColor = '#3b82f6';
+      let badgeColor = '#1565FF';
       let label = 'POLICE';
       if (d.resource_type === 'HEAVY_TOW_UNIT') {
-        badgeColor = '#f59e0b';
+        badgeColor = '#FF9800';
         label = 'TOW CRANE';
       } else if (d.resource_type === 'PATROL_INTERCEPTOR') {
         badgeColor = '#06b6d4';
