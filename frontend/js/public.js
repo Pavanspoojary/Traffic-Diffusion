@@ -220,6 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeMediaStream = null;
   let capturedPhotoBase64 = null;
   let currentCoordinates = { lat: 12.8750, lng: 74.8550 };
+  let hasCurrentGpsFix = false;
 
   // Toast Function
   function showToast(msg) {
@@ -520,6 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const lng = position.coords.longitude;
             const accuracy = Math.round(position.coords.accuracy || 15);
             currentCoordinates = { lat, lng };
+            hasCurrentGpsFix = true;
 
             if (modalIncidentLocation) {
               modalIncidentLocation.value = `GPS: ${lat.toFixed(5)}° N, ${lng.toFixed(5)}° E (±${accuracy}m)`;
@@ -566,22 +568,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const fullDetails = `${subject} (${location}) ${description ? '— ' + description : ''}`.trim();
 
-      // Snap coordinates to selected corridor polyline or extract verified GPS
-      let incLat = currentCoordinates.lat;
-      let incLng = currentCoordinates.lng;
+      // Keep an actual reported GPS position and map-match it to the chosen road.
+      // Never replace an incident location with the road's arbitrary midpoint.
+      const gpsMatch = location.match(/GPS:\s*([\d.]+)°\s*N,\s*([\d.]+)°\s*E/i);
+      let incidentPoint = gpsMatch
+        ? { lat: Number(gpsMatch[1]), lng: Number(gpsMatch[2]) }
+        : (hasCurrentGpsFix ? { ...currentCoordinates } : null);
 
       const selectedEdge = networkEdges.find(e => e.id === corridorId || e.corridor_id === corridorId);
-      if (selectedEdge && Array.isArray(selectedEdge.path_coordinates) && selectedEdge.path_coordinates.length > 0) {
-        const midIdx = Math.floor(selectedEdge.path_coordinates.length / 2);
-        incLat = selectedEdge.path_coordinates[midIdx][0];
-        incLng = selectedEdge.path_coordinates[midIdx][1];
-      } else {
-        const match = location.match(/GPS:\s*([\d\.]+)°\s*N,\s*([\d\.]+)°\s*E/i);
-        if (match) {
-          incLat = parseFloat(match[1]);
-          incLng = parseFloat(match[2]);
+      const path = selectedEdge?.path_coordinates;
+      if (incidentPoint && Array.isArray(path) && path.length > 1) {
+        const metersPerDegree = 111320;
+        const xScale = metersPerDegree * Math.cos(incidentPoint.lat * Math.PI / 180);
+        let best = null;
+        for (let i = 0; i < path.length - 1; i += 1) {
+          const [lat1, lng1] = path[i];
+          const [lat2, lng2] = path[i + 1];
+          const ax = (lng1 - incidentPoint.lng) * xScale;
+          const ay = (lat1 - incidentPoint.lat) * metersPerDegree;
+          const bx = (lng2 - incidentPoint.lng) * xScale;
+          const by = (lat2 - incidentPoint.lat) * metersPerDegree;
+          const dx = bx - ax;
+          const dy = by - ay;
+          const lengthSquared = dx * dx + dy * dy;
+          const t = lengthSquared ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lengthSquared)) : 0;
+          const distanceMeters = Math.hypot(ax + dx * t, ay + dy * t);
+          if (!best || distanceMeters < best.distanceMeters) {
+            best = {
+              lat: lat1 + (lat2 - lat1) * t,
+              lng: lng1 + (lng2 - lng1) * t,
+              distanceMeters
+            };
+          }
         }
+        incidentPoint = best && best.distanceMeters <= 80 ? { lat: best.lat, lng: best.lng } : null;
+      } else if (!path?.length) {
+        incidentPoint = null;
       }
+
+      const incLat = incidentPoint?.lat;
+      const incLng = incidentPoint?.lng;
+      const locationLabel = location.replace(/GPS:\s*[\d.]+°\s*N,\s*[\d.]+°\s*E(?:\s*\(±[\d.]+m\))?/i, '')
+        .replace(/[()]\s*$/g, '').trim() || corridorName;
+      const locationWithGps = incidentPoint
+        ? `${locationLabel} (GPS: ${incLat.toFixed(5)}° N, ${incLng.toFixed(5)}° E)`
+        : locationLabel;
 
       // Create new incident record
       const newIncident = {
@@ -591,7 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
         subject: subject,
         category: category,
         corridor_id: corridorId,
-        location: `${corridorName} (GPS: ${incLat.toFixed(5)}° N, ${incLng.toFixed(5)}° E)`,
+        location: locationWithGps,
         lat: incLat,
         lng: incLng,
         severity: severity,
@@ -618,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
           description: fullDetails,
           lat: incLat,
           lng: incLng,
-          location: location,
+          location: locationWithGps,
           lanes_affected: lanesAffected,
           reporter_name: currentCitizen.name || 'Citizen Commuter',
           citizen_name: currentCitizen.name || 'Citizen Commuter',
@@ -2611,6 +2642,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Active Police Diversions Polling & Live Map Broadcast
   let currentActiveDiversion = null;
+  let currentActiveDiversionRouteIndex = 0;
+
+  function renderPublicDiversionRouteControls(diversion) {
+    const controls = document.getElementById('publicDiversionRouteControls');
+    if (!controls) return;
+    const groups = Array.isArray(diversion?.detour_routes) && diversion.detour_routes.length
+      ? diversion.detour_routes
+      : [{ edge_ids: diversion?.detour_route_ids || [], name: diversion?.detour_name || 'Official Detour', allocation: 1 }];
+
+    controls.replaceChildren();
+    controls.hidden = groups.length < 2;
+    if (groups.length < 2) return;
+
+    groups.forEach((group, index) => {
+      const button = document.createElement('button');
+      const allocation = Math.round((Number(group.allocation) || 0) * 100);
+      const distanceKm = Number(group.distance_km);
+      const routeLengthKm = Number.isFinite(distanceKm)
+        ? distanceKm
+        : (group.edge_ids || []).reduce((sum, edgeId) => {
+          const edge = networkEdges.find(item => item.id === edgeId);
+          const points = edge?.path_coordinates || [];
+          if (points.length < 2) return sum + (Number(edge?.length_km) || 0);
+          let geometryKm = 0;
+          for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
+            const [lat1, lng1] = points[pointIndex - 1].map(Number);
+            const [lat2, lng2] = points[pointIndex].map(Number);
+            const rad = value => value * Math.PI / 180;
+            const dLat = rad(lat2 - lat1);
+            const dLng = rad(lng2 - lng1);
+            const haversine = Math.sin(dLat / 2) ** 2
+              + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+            geometryKm += 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(haversine)));
+          }
+          return sum + geometryKm;
+        }, 0);
+      button.type = 'button';
+      button.className = 'public-diversion-route-button';
+      button.textContent = `Route ${String.fromCharCode(65 + index)} · ${allocation}% · ${routeLengthKm.toFixed(1)} km`;
+      const routeTime = Number(group.estimated_time_min);
+      button.title = `${group.name || `Published route ${index + 1}`} · ${routeLengthKm.toFixed(1)} km${Number.isFinite(routeTime) ? ` · ${routeTime.toFixed(1)} min` : ''}`;
+      button.setAttribute('aria-label', `${button.title}, ${allocation}% traffic allocation`);
+      button.setAttribute('aria-pressed', String(index === currentActiveDiversionRouteIndex));
+      button.addEventListener('click', () => {
+        currentActiveDiversionRouteIndex = index;
+        controls.querySelectorAll('.public-diversion-route-button').forEach((item, itemIndex) => {
+          item.setAttribute('aria-pressed', String(itemIndex === index));
+        });
+        if (activeMap && currentActiveDiversion) {
+          activeMap.renderPoliceDiversion(currentActiveDiversion, currentActiveDiversionRouteIndex);
+        }
+      });
+      controls.appendChild(button);
+    });
+  }
 
   async function checkActiveDiversions() {
     try {
@@ -2622,6 +2708,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (diversions && diversions.length > 0) {
         const latest = diversions[diversions.length - 1];
+        if (currentActiveDiversion?.diversion_id !== latest.diversion_id) {
+          currentActiveDiversionRouteIndex = 0;
+        }
         currentActiveDiversion = latest;
 
         const elId = document.getElementById('advisoryIncidentId');
@@ -2633,13 +2722,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elMsg) elMsg.textContent = latest.advisory_text;
 
         banner.style.display = 'flex';
+        renderPublicDiversionRouteControls(latest);
 
         if (activeMap && typeof activeMap.renderPoliceDiversion === 'function') {
-          activeMap.renderPoliceDiversion(latest);
+          activeMap.renderPoliceDiversion(latest, currentActiveDiversionRouteIndex);
         }
       } else {
         currentActiveDiversion = null;
+        currentActiveDiversionRouteIndex = 0;
         banner.style.display = 'none';
+        renderPublicDiversionRouteControls(null);
         if (activeMap && typeof activeMap.renderPoliceDiversion === 'function') {
           activeMap.renderPoliceDiversion(null);
         }

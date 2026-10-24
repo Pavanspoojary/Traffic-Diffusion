@@ -228,6 +228,26 @@ body {
   border-radius: 4px;
 }
 
+.header-console-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.header-console-link:hover,
+.header-console-link:focus-visible {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
 .user-avatar {
   width: 26px;
   height: 26px;
@@ -637,11 +657,43 @@ body {
   gap: 5px;
 }
 
+.route-legend-control {
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.route-legend-control:hover,
+.route-legend-control.active {
+  border-color: var(--border-panel);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+}
+
+.route-legend-control:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
 .legend-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
 }
+
+.legend-line {
+  width: 14px;
+  height: 3px;
+  border-radius: 3px;
+}
+
+.route-line-a { background: #0284c7; }
+.route-line-b { background: #9333ea; }
+.route-line-c { background: #10b981; }
 
 .dot-freeflow {
   background: #10b981;
@@ -756,17 +808,33 @@ body {
 /* Rich Incident Map Popup Card */
 .incident-map-popup {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  padding: 4px;
-  min-width: 260px;
-  max-width: 320px;
+  width: 300px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 4px 18px 4px 4px;
+  overflow-wrap: anywhere;
+}
+
+.maplibre-dark-popup.maplibregl-popup {
+  max-width: calc(100vw - 32px) !important;
+}
+
+.maplibre-dark-popup .maplibregl-popup-content {
+  width: 320px;
+  max-width: calc(100vw - 32px) !important;
+  box-sizing: border-box;
+  padding: 12px 14px !important;
+  overflow: hidden;
 }
 
 .incident-map-popup-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   margin-bottom: 6px;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .incident-map-popup-badge {
@@ -776,6 +844,7 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
   text-transform: uppercase;
+  line-height: 1.35;
 }
 
 .incident-map-popup-badge.sev-critical {
@@ -809,6 +878,7 @@ body {
   color: #f8fafc;
   margin-bottom: 5px;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .incident-map-popup-cause {
@@ -818,6 +888,7 @@ body {
   border-left: 2px solid #ef4444;
   padding-left: 7px;
   margin-bottom: 8px;
+  overflow-wrap: anywhere;
 }
 
 .incident-map-popup-stats {
@@ -825,6 +896,8 @@ body {
   font-size: 10.5px;
   color: #94a3b8;
   margin-bottom: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .btn-map-popup-simulate {
@@ -933,6 +1006,14 @@ body {
 
 .maplibregl-popup-anchor-top .maplibregl-popup-tip {
   border-bottom-color: #0f172a !important;
+}
+
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: #0f172a !important;
+}
+
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: #0f172a !important;
 }
 
 /* Deploy Diversion to Public Map Button */
@@ -1681,4 +1762,368 @@ tr.table-row-selected .btn-inspect-action {
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
+}
+
+/* Readability and map-first control-room layout */
+:root {
+  --text-secondary: #b2bfd2;
+  --text-dim: #8797ae;
+  --bg-panel: #101a2d;
+  --bg-panel-inner: #162238;
+  --border-panel: #28364d;
+}
+
+.dashboard-main {
+  max-width: 1760px;
+  gap: 12px;
+  padding: 14px 18px 28px;
+}
+
+.app-header {
+  min-height: 58px;
+  height: auto;
+  padding: 8px 18px;
+}
+
+.brand-subtitle,
+.panel-meta,
+.control-tip,
+.ctx-edge-id,
+.metric-sub,
+.rec-advisory,
+.assumptions-summary,
+.assumptions-items {
+  color: var(--text-secondary);
+}
+
+.workspace-grid {
+  grid-template-columns: minmax(310px, 0.72fr) minmax(0, 1.9fr);
+  gap: 12px;
+  min-height: 570px;
+}
+
+.incident-panel .panel-body {
+  gap: 11px;
+  padding: 12px;
+}
+
+.control-label,
+.ctx-road-name,
+.metric-sub,
+.rec-advisory,
+.panel-meta {
+  font-size: 12px;
+}
+
+.ctx-cause-text {
+  font-size: 12px;
+  color: #bac7da;
+  line-height: 1.5;
+}
+
+.ctx-blocked-section {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.09);
+  color: #fecaca;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.simulation-hint {
+  margin: 0;
+  color: #b8c6d9;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.map-panel .panel-header {
+  min-height: 50px;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.map-title-row {
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.map-legend {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  font-size: 12px;
+  color: #b2bfd2;
+}
+
+.map-canvas-container {
+  min-height: 520px;
+}
+
+.maplibre-incident-marker {
+  width: 24px;
+  height: 24px;
+  opacity: 0.82;
+}
+
+.maplibre-incident-marker .maplibre-incident-marker-pulse {
+  display: none;
+}
+
+.maplibre-incident-marker-inner {
+  width: 18px;
+  height: 18px;
+  border-width: 1.5px;
+  font-size: 9px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+}
+
+.maplibre-incident-marker.selected {
+  width: 34px;
+  height: 34px;
+  opacity: 1;
+}
+
+.maplibre-incident-marker.selected .maplibre-incident-marker-pulse {
+  display: block;
+}
+
+.maplibre-incident-marker.selected .maplibre-incident-marker-inner {
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  border-width: 2px;
+}
+
+.data-table {
+  color: #dce5f2;
+  font-size: 12px;
+}
+
+.data-table th {
+  color: #a8b7cc;
+  font-size: 11px;
+}
+
+.scenario-subname,
+.summary-badge,
+.rec-advisory,
+.assumptions-summary,
+.assumptions-items {
+  color: #a7b6ca;
+}
+
+.rec-allocations-box {
+  gap: 8px;
+  font-size: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.rec-route-allocation {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  width: 100%;
+  color: #dce5f2;
+  line-height: 1.4;
+}
+
+.rec-route-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rec-route-name {
+  display: block;
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+  color: #bac7da;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.rec-route-volume {
+  display: block;
+  align-self: flex-start;
+  color: #bac7da;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  padding-left: 13px;
+}
+
+.rec-route-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  align-self: center;
+}
+
+.rec-route-dot-empty {
+  visibility: hidden;
+}
+
+@media (max-width: 700px) {
+  .rec-route-allocation {
+    gap: 2px;
+  }
+}
+
+.bottom-decision-grid,
+.summary-strip {
+  gap: 12px;
+}
+
+@media (max-width: 1060px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .map-canvas-container {
+    min-height: 430px;
+  }
+}
+
+@media (max-width: 700px) {
+  .app-header {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .header-right {
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .header-clock,
+  .user-avatar {
+    display: none;
+  }
+
+  .dashboard-main {
+    padding: 10px 10px 22px;
+  }
+
+  .map-panel .panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .map-legend {
+    justify-content: flex-start;
+  }
+
+  .map-canvas-container {
+    min-height: 360px;
+  }
+}
+
+/* Neutral charcoal control-room palette; map route/status colors stay semantic. */
+body.theme-control-room {
+  --bg-app: #090909;
+  --bg-header: #0c0c0c;
+  --bg-panel: #141414;
+  --bg-panel-inner: #1b1b1b;
+  --bg-input: #111111;
+  --border-panel: #303030;
+  --border-subtle: rgba(255, 255, 255, 0.09);
+  --text-secondary: #b0b0b0;
+  --text-dim: #858585;
+  --accent-blue: #737373;
+  --accent-blue-hover: #8a8a8a;
+  --accent-cyan: #d0d0d0;
+}
+
+body.theme-control-room .app-header {
+  background: #0c0c0c;
+  border-color: #292929;
+}
+
+body.theme-control-room .btn-run-analysis {
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.32);
+}
+
+body.theme-control-room .btn-run-analysis:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+body.theme-control-room .action-toast {
+  background: #191919;
+  border-color: #3a3a3a;
+}
+
+/* Fixed-size road pins: the tapered tip is anchored to the snapped GPS point. */
+.maplibre-incident-marker,
+.maplibre-incident-marker.selected {
+  display: block;
+  width: 24px;
+  height: 28px;
+  opacity: 1;
+  transform: none;
+  transition: none !important;
+}
+
+.maplibre-incident-marker:hover,
+.maplibre-incident-marker.selected:hover {
+  transform: none;
+}
+
+.maplibre-incident-marker .maplibre-incident-marker-pulse {
+  display: none !important;
+}
+
+.maplibre-incident-marker-inner,
+.maplibre-incident-marker.selected .maplibre-incident-marker-inner {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translateX(-50%);
+  border: 2px solid #fff;
+  font-size: 10px;
+  z-index: 1;
+}
+
+.maplibre-incident-marker-inner::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 10px;
+  height: 8px;
+  transform: translateX(-50%);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: inherit;
+  z-index: -1;
+}
+
+.maplibre-incident-marker.selected .maplibre-incident-marker-inner {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3), 0 2px 7px rgba(0, 0, 0, 0.55);
 }

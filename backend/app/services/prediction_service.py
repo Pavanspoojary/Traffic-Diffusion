@@ -53,6 +53,8 @@ class PredictiveIncidentEngine:
                 "incident_id": "INC-MNG-401",
                 "category": IncidentCategory.COLLISION,
                 "affected_edge_id": "corridor_cctv_07",
+                "lat": 12.88307,
+                "lng": 74.86340,
                 "road_name": "Circuit House - Nanthoor Road",
                 "severity": IncidentSeverity.CRITICAL,
                 "blocked_lanes": 2,
@@ -64,8 +66,10 @@ class PredictiveIncidentEngine:
             {
                 "incident_id": "INC-MNG-402",
                 "category": IncidentCategory.COLLISION,
-                "affected_edge_id": "corridor_cctv_05",
-                "road_name": "Bunts Hostel Avenue",
+                "affected_edge_id": "corridor_cctv_06",
+                "lat": 12.87967,
+                "lng": 74.85544,
+                "road_name": "Bunts Hostel - Kadri Road",
                 "severity": IncidentSeverity.HIGH,
                 "blocked_lanes": 1,
                 "total_lanes": 2,
@@ -101,6 +105,8 @@ class PredictiveIncidentEngine:
                 "incident_id": "INC-MNG-405",
                 "category": IncidentCategory.COLLISION,
                 "affected_edge_id": "corridor_cctv_10",
+                "lat": 12.88336,
+                "lng": 74.84532,
                 "road_name": "Mahatma Gandhi (MG) Road",
                 "severity": IncidentSeverity.MODERATE,
                 "blocked_lanes": 1,
@@ -142,6 +148,8 @@ class PredictiveIncidentEngine:
                 incident_id=inc["incident_id"],
                 category=inc["category"],
                 affected_edge_id=inc["affected_edge_id"],
+                lat=inc.get("lat"),
+                lng=inc.get("lng"),
                 road_name=inc["road_name"],
                 start_timestamp=now_iso,
                 severity=inc["severity"],
@@ -167,6 +175,8 @@ class PredictiveIncidentEngine:
         estimated_duration_min: float = 45.0,
         description: Optional[str] = None,
         provenance: EventProvenance = EventProvenance.SIMULATED,
+        lat: Optional[float] = None,
+        lng: Optional[float] = None,
     ) -> TrafficIncident:
         """Registers a new traffic incident in the predictive intelligence store."""
         edge = self.routing_service.edges.get(affected_edge_id)
@@ -178,6 +188,8 @@ class PredictiveIncidentEngine:
             incident_id=inc_id,
             category=category,
             affected_edge_id=affected_edge_id,
+            lat=lat,
+            lng=lng,
             road_name=road_name,
             start_timestamp=now_iso,
             severity=severity,
@@ -211,8 +223,27 @@ class PredictiveIncidentEngine:
         Deploys an approved incident diversion plan to the network and broadcasts
         it to the public app and citizen navigation routing engine.
         """
+        known_edge_ids = set(self.routing_service.edges)
+        requested_groups = request.detour_routes or ([{
+            "edge_ids": request.detour_route_ids,
+            "allocation": 1.0,
+            "name": request.detour_name or "Official Detour",
+        }] if request.detour_route_ids else [])
+        route_groups = []
+        for group in requested_groups:
+            edge_ids = [eid for eid in group.get("edge_ids", []) if eid in known_edge_ids]
+            if edge_ids:
+                route_groups.append({
+                    **group,
+                    "edge_ids": edge_ids,
+                    "allocation": min(1.0, max(0.0, float(group.get("allocation", 1.0)))),
+                })
+        deployed_edge_ids = list(dict.fromkeys(
+            eid for group in route_groups for eid in group["edge_ids"]
+        ))
+
         coords: List[List[float]] = []
-        for eid in request.detour_route_ids:
+        for eid in deployed_edge_ids:
             edge = self.routing_service.edges.get(eid)
             if edge and edge.path_coordinates:
                 if coords and coords[-1] == edge.path_coordinates[0]:
@@ -234,7 +265,8 @@ class PredictiveIncidentEngine:
             edge_name=request.edge_name or "Corridor",
             scenario_id=request.scenario_id,
             scenario_name=request.scenario_name,
-            detour_route_ids=request.detour_route_ids,
+            detour_route_ids=deployed_edge_ids,
+            detour_routes=route_groups,
             detour_name=request.detour_name or "Official Detour",
             detour_path_coordinates=coords,
             displaced_demand_pcu_hr=request.displaced_demand_pcu_hr,

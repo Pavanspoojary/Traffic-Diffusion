@@ -56,6 +56,8 @@ async def create_traffic_incident(request: IncidentCreateRequest):
         estimated_duration_min=request.estimated_duration_min or 45.0,
         description=request.description,
         provenance=request.provenance,
+        lat=request.lat,
+        lng=request.lng,
     )
     return incident
 
@@ -328,7 +330,9 @@ async def trigger_incident_from_public(payload: dict):
             road_segment_id=edge_id,
             category=cat,
             description=desc,
-            lanes_affected=lanes
+            lanes_affected=lanes,
+            lat=payload.get("lat"),
+            lng=payload.get("lng"),
         )
     )
 

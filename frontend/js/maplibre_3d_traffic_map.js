@@ -834,30 +834,108 @@ class MapLibre3DTrafficMap {
   }
 
   // Render Confirmed Police Diversion on Public 3D Map
-  renderPoliceDiversion(diversionRecord) {
+  renderPoliceDiversion(diversionRecord, selectedRouteIndex = 0) {
     if (!this.map || !this.isLoaded) return;
 
-    if (!diversionRecord || !diversionRecord.detour_path_coordinates || !diversionRecord.detour_path_coordinates.length) {
+    if (!diversionRecord) {
       if (this.map.getSource('police-diversion-source')) {
         this.map.getSource('police-diversion-source').setData({ type: 'FeatureCollection', features: [] });
       }
       return;
     }
 
-    const lineCoords = diversionRecord.detour_path_coordinates.map(pt => {
-      return pt[0] < pt[1] ? [pt[1], pt[0]] : [pt[0], pt[1]];
+    const palette = ['#0284c7', '#9333ea', '#10b981'];
+    const groups = Array.isArray(diversionRecord.detour_routes) && diversionRecord.detour_routes.length
+      ? diversionRecord.detour_routes
+      : [{ edge_ids: diversionRecord.detour_route_ids || [], name: diversionRecord.detour_name || 'Official Police Detour', allocation: 1 }];
+    const routeIndex = Math.min(Math.max(0, selectedRouteIndex), groups.length - 1);
+    const selectedGroup = groups[routeIndex];
+    const routeFeatures = [];
+    const fitPoints = [];
+    const routeCoordinates = [];
+    let previousTargetId = null;
+    let routeIsConnected = true;
+    const gapMeters = (a, b) => {
+      const meanLat = ((a[1] + b[1]) / 2) * Math.PI / 180;
+      return Math.hypot(
+        (a[0] - b[0]) * 111320 * Math.cos(meanLat),
+        (a[1] - b[1]) * 111320
+      );
+    };
+
+    (selectedGroup?.edge_ids || []).forEach(edgeId => {
+      if (!routeIsConnected) return;
+      const edge = (this.edges || []).find(item => item.id === edgeId);
+      const sourceNode = edge && this.nodeMap.get(edge.source);
+      const targetNode = edge && this.nodeMap.get(edge.target);
+      if (!edge || !sourceNode || !targetNode || !Array.isArray(edge.path_coordinates) || edge.path_coordinates.length < 2) {
+        routeIsConnected = false;
+        return;
+      }
+      if (previousTargetId && edge.source !== previousTargetId) {
+        routeIsConnected = false;
+        return;
+      }
+
+      let coordinates = edge.path_coordinates.map(point => [point[1], point[0]]);
+      const sourcePoint = [sourceNode.lng, sourceNode.lat];
+      const targetPoint = [targetNode.lng, targetNode.lat];
+      const forwardGap = gapMeters(sourcePoint, coordinates[0]) + gapMeters(targetPoint, coordinates[coordinates.length - 1]);
+      const reverseGap = gapMeters(sourcePoint, coordinates[coordinates.length - 1]) + gapMeters(targetPoint, coordinates[0]);
+      if (reverseGap < forwardGap) coordinates = coordinates.reverse();
+      if (gapMeters(sourcePoint, coordinates[0]) > 90 || gapMeters(targetPoint, coordinates[coordinates.length - 1]) > 90) {
+        routeIsConnected = false;
+        return;
+      }
+
+      // Anchor each road shape at its known junctions so neighboring segments
+      // meet exactly, while preserving the surveyed road geometry between them.
+      coordinates[0] = sourcePoint;
+      coordinates[coordinates.length - 1] = targetPoint;
+      const hasBadJump = coordinates.some((point, index) => index > 0 && gapMeters(coordinates[index - 1], point) > 250);
+      if (hasBadJump) {
+        routeIsConnected = false;
+        return;
+      }
+      if (!routeCoordinates.length) routeCoordinates.push(...coordinates);
+      else if (gapMeters(routeCoordinates[routeCoordinates.length - 1], coordinates[0]) <= 1) {
+        routeCoordinates.push(...coordinates.slice(1));
+      } else {
+        routeIsConnected = false;
+        return;
+      }
+      previousTargetId = edge.target;
     });
 
-    const geojsonData = {
-      type: 'Feature',
-      geometry: {
-        type: 'LineString',
-        coordinates: lineCoords
-      },
-      properties: {
-        title: diversionRecord.detour_name || 'Official Police Detour'
+    if (routeIsConnected && routeCoordinates.length > 1) {
+      routeCoordinates.forEach(point => fitPoints.push(point));
+      routeFeatures.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: routeCoordinates },
+        properties: {
+          title: selectedGroup.name || diversionRecord.detour_name || 'Official Police Detour',
+          routeColor: selectedGroup.color || palette[routeIndex % palette.length],
+          routeIndex,
+          allocation: Number(selectedGroup.allocation) || 0
+        }
+      });
+    }
+
+    // Compatibility with records created before route groups were stored.
+    const hasNetworkRouteIds = groups.some(group => Array.isArray(group.edge_ids) && group.edge_ids.length);
+    if (!routeFeatures.length && !hasNetworkRouteIds && Array.isArray(diversionRecord.detour_path_coordinates)) {
+      const coordinates = diversionRecord.detour_path_coordinates.map(pt => pt[0] < pt[1] ? [pt[1], pt[0]] : [pt[0], pt[1]]);
+      if (coordinates.length > 1) {
+        coordinates.forEach(point => fitPoints.push(point));
+        routeFeatures.push({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates },
+          properties: { title: diversionRecord.detour_name || 'Official Police Detour', routeColor: '#10b981', routeIndex: 0 }
+        });
       }
-    };
+    }
+
+    const geojsonData = { type: 'FeatureCollection', features: routeFeatures };
 
     if (this.map.getSource('police-diversion-source')) {
       this.map.getSource('police-diversion-source').setData(geojsonData);
@@ -885,16 +963,16 @@ class MapLibre3DTrafficMap {
         source: 'police-diversion-source',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#10b981',
+          'line-color': ['get', 'routeColor'],
           'line-width': 5.5,
           'line-opacity': 0.98
         }
       });
     }
 
-    if (lineCoords.length > 1 && typeof maplibregl !== 'undefined') {
+    if (fitPoints.length > 1 && typeof maplibregl !== 'undefined') {
       const bounds = new maplibregl.LngLatBounds();
-      lineCoords.forEach(c => bounds.extend(c));
+      fitPoints.forEach(c => bounds.extend(c));
       this.map.fitBounds(bounds, { padding: 90, maxZoom: 15.2, duration: 1200 });
     }
   }

@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Public Traffic Map - Traffic Diffusion</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="/css/public.css">
+  <link rel="stylesheet" href="/css/style.css?v=21.0">
+  <link rel="stylesheet" href="/css/public.css?v=2.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -76,6 +76,7 @@
             <span id="advisorySavings" class="advisory-badge-savings">Saves ~520 veh-hrs</span>
           </div>
           <div id="advisoryMessageText" class="advisory-headline">NH-66 Highway Southbound is blocked. Official Diversion Active via Bejai Green Bypass and Kadri Road.</div>
+          <div id="publicDiversionRouteControls" class="public-diversion-route-controls" aria-label="Published detour routes" hidden></div>
         </div>
         <button type="button" id="btnFocusAdvisoryMap" class="btn-advisory-action">View Detour</button>
       </div>
@@ -771,7 +772,7 @@
     </div>
 
   <!-- MapLibre 3D Vector Map & Citizen Controller Scripts -->
-  <script src="/js/maplibre_3d_traffic_map.js"></script>
-  <script src="/js/public.js?v=6.0"></script>
+  <script src="/js/maplibre_3d_traffic_map.js?v=4.0"></script>
+  <script src="/js/public.js?v=9.0"></script>
 </body>
 </html>

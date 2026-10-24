@@ -143,6 +143,8 @@ class DispatchAndPlanningService:
             contact_number=req.contact_number,
             road_segment_id=req.road_segment_id,
             road_name=road_name,
+            lat=req.lat,
+            lng=req.lng,
             category=req.category,
             description=req.description,
             lanes_affected=req.lanes_affected,
@@ -170,6 +172,8 @@ class DispatchAndPlanningService:
                 estimated_duration_min=45.0,
                 description=f"Verified Citizen Report ({report.report_id}): {report.description}",
                 provenance=EventProvenance.OBSERVED,
+                lat=report.lat,
+                lng=report.lng,
             )
             report.verified_incident_id = incident.incident_id
         else:

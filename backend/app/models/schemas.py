@@ -117,6 +117,8 @@ class TrafficIncident(BaseModel):
     incident_id: str
     category: IncidentCategory = IncidentCategory.COLLISION
     affected_edge_id: str
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
     road_name: Optional[str] = None
     start_timestamp: Optional[str] = None
     severity: IncidentSeverity = IncidentSeverity.HIGH
@@ -133,6 +135,8 @@ class TrafficIncident(BaseModel):
 class IncidentCreateRequest(BaseModel):
     category: IncidentCategory = IncidentCategory.COLLISION
     affected_edge_id: str
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
     severity: IncidentSeverity = IncidentSeverity.HIGH
     blocked_lanes: Optional[int] = 1
     capacity_reduction_pct: Optional[float] = 0.60
@@ -306,6 +310,7 @@ class InterventionEvaluationResponse(BaseModel):
     effective_capacity_veh_hr: Optional[float] = 0.0
     displaced_demand_veh_hr: Optional[float] = 0.0
     viable_detours_count: int = 0
+    routes_evaluated_count: int = 0
     candidate_detours: List[Dict[str, Any]] = []
     baseline_scenario: InterventionScenario
     candidate_scenarios: List[InterventionScenario]
@@ -367,6 +372,8 @@ class CitizenReport(BaseModel):
     contact_number: Optional[str] = None
     road_segment_id: str
     road_name: str
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
     category: IncidentCategory
     description: str
     lanes_affected: int = 1
@@ -378,6 +385,8 @@ class CitizenReportCreate(BaseModel):
     reporter_name: Optional[str] = "Citizen Commuter"
     contact_number: Optional[str] = None
     road_segment_id: str
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
     category: IncidentCategory = IncidentCategory.COLLISION
     description: str
     lanes_affected: int = 1
@@ -617,6 +626,7 @@ class DiversionDeploymentRequest(BaseModel):
     scenario_id: str
     scenario_name: str
     detour_route_ids: List[str] = []
+    detour_routes: List[Dict[str, Any]] = []
     detour_name: Optional[str] = "Official Detour Route"
     displaced_demand_pcu_hr: float = 0.0
     delay_saved_veh_hours: float = 0.0
@@ -631,6 +641,7 @@ class ActiveDiversionRecord(BaseModel):
     scenario_id: str
     scenario_name: str
     detour_route_ids: List[str]
+    detour_routes: List[Dict[str, Any]] = []
     detour_name: str
     detour_path_coordinates: List[List[float]] = []
     displaced_demand_pcu_hr: float

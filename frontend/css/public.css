@@ -2288,6 +2288,49 @@
   text-overflow: ellipsis;
 }
 
+.public-diversion-route-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.public-diversion-route-controls[hidden] {
+  display: none;
+}
+
+.public-diversion-route-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.72);
+  font: 600 10px 'JetBrains Mono', monospace;
+  cursor: pointer;
+}
+
+.public-diversion-route-button::before {
+  width: 13px;
+  height: 3px;
+  border-radius: 3px;
+  background: #38bdf8;
+  content: '';
+}
+
+.public-diversion-route-button[aria-pressed="true"] {
+  color: #f8fafc;
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.28);
+}
+
+.public-diversion-route-button:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
 .btn-advisory-action {
   flex-shrink: 0;
   padding: 6px 14px;

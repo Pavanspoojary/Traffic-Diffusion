@@ -1,4 +1,5 @@
 import time
+import math
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple, Any
 import networkx as nx
@@ -41,10 +42,54 @@ class WhatIfInterventionPlanner:
         """Estimated baseline hourly demand based on calibrated road density score."""
         return float(edge.lanes) * 650.0 * (0.3 + (0.7 * float(edge.density_score)))
 
+    def _compute_edge_length_km(self, edge) -> float:
+        """Measure routed road length from its mapped polyline, falling back to seed length."""
+        coordinates = getattr(edge, "path_coordinates", None) or []
+        if len(coordinates) < 2:
+            return max(0.0, float(edge.length_km))
+
+        length_m = 0.0
+        for start, end in zip(coordinates, coordinates[1:]):
+            try:
+                lat1, lon1 = math.radians(float(start[0])), math.radians(float(start[1]))
+                lat2, lon2 = math.radians(float(end[0])), math.radians(float(end[1]))
+            except (TypeError, ValueError, IndexError):
+                continue
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            haversine = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+            length_m += 6_371_000.0 * 2.0 * math.asin(min(1.0, math.sqrt(haversine)))
+        return length_m / 1000.0 if length_m > 0 else max(0.0, float(edge.length_km))
+
+    def _edge_geometry_matches_junctions(self, edge, tolerance_m: float = 90.0) -> bool:
+        """Only route through mapped road shapes whose endpoints match their graph nodes."""
+        points = getattr(edge, "path_coordinates", None) or []
+        nodes = self.routing_service.nodes
+        source = nodes.get(edge.source)
+        target = nodes.get(edge.target)
+        if len(points) < 2 or not source or not target:
+            return False
+
+        source_point = (float(source.lat), float(source.lng))
+        target_point = (float(target.lat), float(target.lng))
+
+        def gap_m(point_a, point_b):
+            lat1, lon1 = math.radians(float(point_a[0])), math.radians(float(point_a[1]))
+            lat2, lon2 = math.radians(float(point_b[0])), math.radians(float(point_b[1]))
+            dlat, dlon = lat2 - lat1, lon2 - lon1
+            haversine = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+            return 6_371_000.0 * 2.0 * math.asin(min(1.0, math.sqrt(haversine)))
+
+        first, last = points[0], points[-1]
+        forward = (gap_m(first, source_point), gap_m(last, target_point))
+        reverse = (gap_m(last, source_point), gap_m(first, target_point))
+        best = forward if max(forward) <= max(reverse) else reverse
+        return max(best) <= tolerance_m
+
     def _compute_free_flow_time(self, edge) -> float:
         """Free-flow travel time in minutes."""
         effective_speed = max(15.0, float(edge.base_speed_kmh))
-        return (float(edge.length_km) / effective_speed) * 60.0
+        return (self._compute_edge_length_km(edge) / effective_speed) * 60.0
 
     def _compute_bpr_travel_time(self, edge, volume: float, capacity: float) -> float:
         """
@@ -72,7 +117,9 @@ class WhatIfInterventionPlanner:
         source_node_id: str,
         target_node_id: str,
         blocked_edge_id: str,
-        max_candidates: int = 3
+        max_candidates: int = 3,
+        displaced_demand_pcu_hr: float = 0.0,
+        search_metrics: Optional[Dict[str, int]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Discovers multiple distinct, viable simple detour paths in the directed graph
@@ -95,6 +142,19 @@ class WhatIfInterventionPlanner:
         elif subgraph.has_edge(source_node_id, target_node_id):
             subgraph.remove_edge(source_node_id, target_node_id)
 
+        # A topologically connected edge is not routable if its mapped line ends
+        # far from its declared junction. Keeping these stale shapes created
+        # long map jumps that were then mistaken for valid detours.
+        excluded_geometry_edges = 0
+        for edge in edges_map.values():
+            if self._edge_geometry_matches_junctions(edge):
+                continue
+            if subgraph.has_edge(edge.source, edge.target):
+                subgraph.remove_edge(edge.source, edge.target)
+                excluded_geometry_edges += 1
+        if search_metrics is not None:
+            search_metrics["edges_excluded_for_bad_geometry"] = excluded_geometry_edges
+
         # Remove any other confirmed impassable edges or total road blocks from active incidents
         for inc in self.prediction_service.list_incidents():
             if inc.affected_edge_id != blocked_edge_id and inc.capacity_reduction_pct >= 0.90:
@@ -105,63 +165,23 @@ class WhatIfInterventionPlanner:
         viable_routes: List[Dict[str, Any]] = []
 
         if not nx.has_path(subgraph, source_node_id, target_node_id):
+            if search_metrics is not None:
+                search_metrics["routes_evaluated_count"] = 0
             return []
 
-        # Annotate subgraph edges with multi-criteria impedance considering width, lanes, capacity and saturation
-        for u, v, data in subgraph.edges(data=True):
-            edge_id = data.get("edge_id")
-            edge_obj = edges_map.get(edge_id)
-            if edge_obj:
-                t0 = self._compute_free_flow_time(edge_obj)
-                # Road width & lane capacity: 4+ lane bypasses get priority incentive; 2-lane get penalty
-                lane_mult = 0.75 if edge_obj.lanes >= 4 else (1.0 if edge_obj.lanes == 3 else 1.25)
-                # Headroom and current congestion saturation penalty
-                nom_flow = self._compute_edge_nominal_flow(edge_obj)
-                cap = self._compute_edge_capacity(edge_obj)
-                vc = nom_flow / max(cap, 100.0)
-                vc_penalty = 1.0 + 1.2 * (vc ** 2)
-                signals_delay = (edge_obj.traffic_signals or 0) * 0.35
-                data["diversion_impedance"] = (t0 * lane_mult * vc_penalty) + signals_delay
-            else:
-                data["diversion_impedance"] = data.get("distance_km", 1.0)
-
         try:
-            # Query candidate simple paths using multi-criteria impedance (width, lanes, headroom) and distance
-            impedance_paths = []
-            try:
-                gen1 = nx.shortest_simple_paths(subgraph, source=source_node_id, target=target_node_id, weight="diversion_impedance")
-                for _ in range(max_candidates * 2):
-                    p = next(gen1, None)
-                    if not p:
-                        break
-                    impedance_paths.append(p)
-            except Exception:
-                pass
-
-            distance_paths = []
-            try:
-                gen2 = nx.shortest_simple_paths(subgraph, source=source_node_id, target=target_node_id, weight="distance_km")
-                for _ in range(max_candidates * 2):
-                    p = next(gen2, None)
-                    if not p:
-                        break
-                    distance_paths.append(p)
-            except Exception:
-                pass
-
-            # Combine and deduplicate candidate node paths
-            candidate_node_paths = []
-            seen_tuples = set()
-            for p in (impedance_paths + distance_paths):
-                tup = tuple(p)
-                if tup not in seen_tuples:
-                    seen_tuples.add(tup)
-                    candidate_node_paths.append(p)
-
-            for path_idx, node_path in enumerate(candidate_node_paths):
-                if len(viable_routes) >= max_candidates:
-                    break
-
+            # Evaluate every loopless route in the current Mangaluru graph.
+            # The curated network has 17 junctions, so exhaustive simple-path
+            # enumeration is tractable and prevents an arbitrary K limit from
+            # hiding a shorter viable alternative.
+            candidate_node_paths = nx.all_simple_paths(
+                subgraph,
+                source=source_node_id,
+                target=target_node_id,
+                cutoff=max(0, len(subgraph.nodes) - 1),
+            )
+            scored_routes = []
+            for node_path in candidate_node_paths:
                 # Reconstruct constituent directed edges
                 route_edges = []
                 route_edge_ids = []
@@ -186,7 +206,7 @@ class WhatIfInterventionPlanner:
                 if not is_valid or not route_edges:
                     continue
 
-                total_length_km = round(sum(e.length_km for e in route_edges), 2)
+                total_length_km = round(sum(self._compute_edge_length_km(e) for e in route_edges), 2)
                 free_flow_min = round(sum(self._compute_free_flow_time(e) for e in route_edges), 2)
                 baseline_travel_min = round(
                     sum(self._compute_bpr_travel_time(e, self._compute_edge_nominal_flow(e), self._compute_edge_capacity(e)) for e in route_edges),
@@ -200,16 +220,40 @@ class WhatIfInterventionPlanner:
                 min_lanes = min(e.lanes for e in route_edges)
                 road_width_desc = f"{min_lanes}-Lane Arterial" if min_lanes < 4 else "4-Lane High Capacity Bypass"
 
+                # Compare each candidate under the same displaced-flow load.
+                # This favors routes with spare capacity, not just short distance.
+                loaded_time_min = sum(
+                    self._compute_bpr_travel_time(
+                        edge,
+                        self._compute_edge_nominal_flow(edge) + max(0.0, displaced_demand_pcu_hr),
+                        self._compute_edge_capacity(edge),
+                    ) + (edge.traffic_signals or 0) * 0.35
+                    for edge in route_edges
+                )
+                route_capacity = min(self._compute_edge_capacity(edge) for edge in route_edges)
+                max_loaded_vc = max(
+                    (self._compute_edge_nominal_flow(edge) + max(0.0, displaced_demand_pcu_hr))
+                    / max(1.0, self._compute_edge_capacity(edge))
+                    for edge in route_edges
+                )
+                # Rank on the route's predicted loaded travel time, with an
+                # explicit penalty only when the diversion pushes a segment
+                # close to or beyond its capacity. Baseline V/C alone used to
+                # bias the result toward longer roads even when those roads
+                # were not better after the incident flow was added.
+                capacity_penalty = max(0.0, max_loaded_vc - 0.85) ** 2 * 20.0
+                loaded_cost = loaded_time_min + capacity_penalty
+
                 # Generate clean human-readable route title
                 via_names = [e.name for e in route_edges if e.name not in ["Connector", "Link Road"]]
                 if via_names:
                     primary_corridor = via_names[0]
-                    route_title = f"Detour {len(viable_routes) + 1} via {primary_corridor}"
+                    route_title = f"Detour {len(scored_routes) + 1} via {primary_corridor}"
                 else:
-                    route_title = f"Detour {len(viable_routes) + 1}"
+                    route_title = f"Detour {len(scored_routes) + 1}"
 
-                viable_routes.append({
-                    "detour_index": len(viable_routes) + 1,
+                scored_routes.append((loaded_cost, {
+                    "detour_index": len(scored_routes) + 1,
                     "title": route_title,
                     "node_path": node_path,
                     "edge_ids": route_edge_ids,
@@ -221,7 +265,58 @@ class WhatIfInterventionPlanner:
                     "max_baseline_vc": max_baseline_vc,
                     "min_lanes": min_lanes,
                     "road_width_desc": road_width_desc,
-                })
+                    "loaded_travel_time_min": round(loaded_time_min, 2),
+                    "loaded_capacity_pcu_hr": round(route_capacity, 1),
+                    "max_loaded_vc": round(max_loaded_vc, 2),
+                }))
+
+            if search_metrics is not None:
+                search_metrics["routes_evaluated_count"] = len(scored_routes)
+
+            # A citywide loop is not a useful local diversion around one
+            # blocked segment. Keep the exhaustive graph search, but only
+            # offer alternatives within three times the affected road length.
+            # If the curated road graph has no route inside that bound, let the
+            # planner recommend traffic gating instead of pretending a long
+            # bypass is a practical local detour.
+            blocked_length_km = self._compute_edge_length_km(target_edge_obj) if target_edge_obj else 0.0
+            practical_detour_limit_km = blocked_length_km * 3.0
+            before_practical_filter = len(scored_routes)
+            scored_routes = [
+                item for item in scored_routes
+                if item[1]["total_length_km"] <= practical_detour_limit_km
+            ]
+            if search_metrics is not None:
+                search_metrics["routes_excluded_as_overlong"] = before_practical_filter - len(scored_routes)
+
+            # Keep the three lowest loaded-cost routes while preferring distinct
+            # alignments, so the operator gets meaningful alternatives.
+            scored_routes.sort(key=lambda item: (
+                item[0], item[1]["loaded_travel_time_min"],
+                item[1]["total_length_km"], item[1]["edge_ids"]
+            ))
+            selected_routes = []
+            selected_edge_sets = []
+            for _, route in scored_routes:
+                route_edges = set(route["edge_ids"])
+                if selected_edge_sets and any(
+                    len(route_edges & chosen) / max(1, min(len(route_edges), len(chosen))) >= 0.85
+                    for chosen in selected_edge_sets
+                ):
+                    continue
+                route["detour_index"] = len(selected_routes) + 1
+                named_corridors = [name for name in route["edge_names"] if name not in ["Connector", "Link Road"]]
+                title_parts = list(dict.fromkeys(
+                    [named_corridors[index] for index in ([0, 2, -1] if len(named_corridors) > 3 else range(len(named_corridors)))]
+                ))
+                route_label = " → ".join(title_parts)
+                route["title"] = f"Detour {route['detour_index']} via {route_label}" if route_label else f"Detour {route['detour_index']}"
+                selected_routes.append(route)
+                selected_edge_sets.append(route_edges)
+                if len(selected_routes) >= max_candidates:
+                    break
+
+            viable_routes.extend(selected_routes)
 
         except Exception as e:
             # Fallback if path search fails
@@ -280,11 +375,14 @@ class WhatIfInterventionPlanner:
         remaining_flow_on_blocked = max(0.0, nominal_flow - displaced_demand)
 
         # 2. Find Viable Alternative Routes in Directed Road Graph
+        search_metrics: Dict[str, int] = {}
         viable_detours = self.find_viable_detours(
             source_node_id=target_source,
             target_node_id=target_target,
             blocked_edge_id=target_edge_id,
-            max_candidates=3
+            max_candidates=3,
+            displaced_demand_pcu_hr=displaced_demand,
+            search_metrics=search_metrics,
         )
 
         # Define Affected Edge Subsystem (blocked edge + all candidate route edges + direct feeders)
@@ -846,6 +944,9 @@ class WhatIfInterventionPlanner:
             "Detour link travel times calculated via Bureau of Public Roads (BPR) volume-delay curves: t = t0 * [1 + 0.15*(V/C)^4].",
             "Total delay and delay saved are measured in vehicle-hours over a standardized 1-hour operational analysis horizon (Flow in PCU/hr, Delay in (t_bpr - t0)/60 hours).",
             "Initial network conditions are strictly isolated and identical across all candidate scenarios.",
+            f"Local detours longer than 3× the mapped affected road ({self._compute_edge_length_km(target_edge) * 3.0:.1f} km) are excluded; if none remain, traffic gating is recommended instead.",
+            f"Evaluated {search_metrics.get('routes_evaluated_count', 0)} graph paths; excluded {search_metrics.get('routes_excluded_as_overlong', 0)} overlong detours.",
+            f"Excluded {search_metrics.get('edges_excluded_for_bad_geometry', 0)} road links whose mapped geometry does not meet its junctions.",
             "Provenance: ESTIMATED FROM ROAD GRAPH TOPOLOGY & MACROSCOPIC FLOW LAWS.",
         ]
 
@@ -860,6 +961,7 @@ class WhatIfInterventionPlanner:
             effective_capacity_veh_hr=round(effective_capacity, 1),
             displaced_demand_veh_hr=round(displaced_demand, 1),
             viable_detours_count=len(viable_detours),
+            routes_evaluated_count=search_metrics.get("routes_evaluated_count", 0),
             candidate_detours=viable_detours,
             baseline_scenario=baseline_scenario,
             candidate_scenarios=candidate_scenarios,
