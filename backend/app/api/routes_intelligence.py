@@ -59,21 +59,11 @@ async def create_traffic_incident(request: IncidentCreateRequest):
 
 @router.get("/incidents", response_model=List[TrafficIncident])
 async def list_active_incidents():
-    """Lists all active traffic disruptions under analysis."""
+    """Lists all active traffic disruptions and reported accidents under analysis."""
     incidents = prediction_service.list_incidents()
     if not incidents:
-        # Create a deterministic default incident if store is fresh
-        default_inc = prediction_service.create_incident(
-            affected_edge_id="corridor_cctv_07",
-            category=IncidentCategory.COLLISION,
-            severity=IncidentSeverity.CRITICAL,
-            blocked_lanes=2,
-            capacity_reduction_pct=0.85,
-            estimated_duration_min=60.0,
-            description="Multi-axle commercial freight collision blocking Nanthoor arterial approaches",
-            provenance=EventProvenance.SIMULATED,
-        )
-        return [default_inc]
+        prediction_service._seed_default_incidents()
+        incidents = prediction_service.list_incidents()
     return incidents
 
 @router.get("/incidents/{incident_id}", response_model=TrafficIncident)

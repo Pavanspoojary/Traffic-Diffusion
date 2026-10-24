@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activeMarkers = [];
   let currentCorridorsData = [];
   let currentNodesMap = new Map();
+  let availableIncidents = [];
+  let activeIncidentId = 'INC-MNG-401';
 
   let activeCorridorId = 'corridor_cctv_07';
   let activeBlockagePct = 80;
@@ -54,6 +56,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   Object.defineProperty(window, '__isMapReady', { get: () => isMapReady });
   Object.defineProperty(window, '__latestEvaluation', { get: () => latestEvaluation });
   Object.defineProperty(window, '__currentCorridorsData', { get: () => currentCorridorsData });
+  Object.defineProperty(window, '__availableIncidents', { get: () => availableIncidents });
+  window.__selectIncident = (id) => selectIncident(id);
   window.__renderScenarioOnMap = (sc) => renderScenarioOnMap(sc);
   window.__renderNetworkOnMap = () => renderNetworkOnMap();
   window.__getEdgeCoords = (id) => getEdgeCoords(id);
@@ -129,9 +133,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     mapInstance.on('load', onMapReady);
 
-    // Concurrently load network data and initial diversion evaluation
+    // Concurrently load network data, reported incidents, and initial diversion evaluation
     loadMangaluruNetwork().then(() => {
-      triggerDiversionEvaluation();
+      loadReportedIncidents();
     });
   }
 
@@ -318,7 +322,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       mapInstance.on('click', 'corridors-core', (e) => {
         if (!e.features || !e.features.length) return;
         const prop = e.features[0].properties;
-        setIncidentState(prop.id, activeBlockagePct, null, true);
+        const match = availableIncidents.find(i => i.affected_edge_id === prop.id);
+        if (match) {
+          selectIncident(match.incident_id, true);
+        } else {
+          setIncidentState(prop.id, activeBlockagePct, null, true);
+        }
       });
 
       mapInstance.on('mouseenter', 'corridors-core', () => {
@@ -594,15 +603,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const recTradeoff = document.getElementById('recTradeoff');
       const recRouteAllocations = document.getElementById('recRouteAllocations');
 
-      if (recTitle) recTitle.textContent = `Optimal: ${recScen.scenario_name.split(':')[0]}`;
+      if (recTitle) recTitle.textContent = `Action Plan: ${recScen.scenario_name.split(':')[0]}`;
       if (recDesc) {
-        recDesc.textContent = `Recommended Strategy: '${recScen.scenario_name}' achieves optimal network relief, saving ${recScen.delay_saved_veh_hours.toFixed(1)} vehicle-hours (-${recScen.delay_reduction_pct.toFixed(0)}% vs baseline) with peak arterial V/C at ${recScen.max_vc_ratio.toFixed(2)}.`;
+        recDesc.innerHTML = `<strong>Immediate Operational Action:</strong> Execute '${recScen.scenario_name}' to disperse incident queue. Saves <strong>${recScen.delay_saved_veh_hours.toFixed(1)} vehicle-hours</strong> (-${recScen.delay_reduction_pct.toFixed(0)}% delay) with peak arterial V/C bounded at <strong>${recScen.max_vc_ratio.toFixed(2)}</strong>.`;
       }
       if (recTradeoff) {
         const botText = recScen.downstream_bottlenecks.length === 0
-          ? "Creates zero new saturated bottlenecks."
-          : `Creates ${recScen.downstream_bottlenecks.length} secondary bottleneck(s): ${recScen.downstream_bottlenecks.join(', ')}.`;
-        recTradeoff.textContent = `Trade-off Analysis: ${botText} Requires 2 field units (Multi-Junction VMS Signage & Dynamic Guidance).`;
+          ? "Anti-Jam Verified: Zero secondary bottlenecks created."
+          : `Secondary Bottlenecks Alert: ${recScen.downstream_bottlenecks.length} constrained link(s): ${recScen.downstream_bottlenecks.join(', ')}.`;
+        recTradeoff.textContent = `Operational Impact: ${botText} Dispatch Order: Deploy field wardens to meter inbound arterial traffic and adjust junction green phase.`;
       }
 
       if (recRouteAllocations) {
@@ -975,6 +984,127 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (lblDisp) lblDisp.textContent = `${Math.round(dispDemand)} PCU/hr`;
   }
 
+  async function loadReportedIncidents() {
+    try {
+      const res = await fetch('/api/v1/intelligence/incidents');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data || !data.length) return;
+
+      availableIncidents = data;
+
+      // 1. Populate Left Dropdown
+      const selectInc = document.getElementById('selectActiveIncident');
+      if (selectInc) {
+        selectInc.innerHTML = '';
+        data.forEach(inc => {
+          const opt = document.createElement('option');
+          opt.value = inc.incident_id;
+          const shortBlock = Math.round((inc.capacity_reduction_pct || 0.8) * 100);
+          opt.textContent = `${inc.incident_id.replace('INC-MNG-', 'INC-')}: ${inc.road_name.split(' (')[0]} (${shortBlock}%)`;
+          if (inc.incident_id === activeIncidentId) opt.selected = true;
+          selectInc.appendChild(opt);
+        });
+      }
+
+      // 2. Populate Right Queue Panel
+      const queueList = document.getElementById('incidentQueueList');
+      if (queueList) {
+        queueList.innerHTML = '';
+        data.forEach((inc, index) => {
+          const card = document.createElement('div');
+          card.className = `incident-card ${inc.incident_id === activeIncidentId ? 'active' : ''}`;
+          card.dataset.incidentId = inc.incident_id;
+
+          const sev = (inc.severity || 'HIGH').toUpperCase();
+          const sevClass = sev === 'CRITICAL' ? 'sev-critical' : (sev === 'HIGH' ? 'sev-high' : 'sev-moderate');
+          const blockPct = Math.round((inc.capacity_reduction_pct || 0.8) * 100);
+          const timeAgo = ['3m ago', '8m ago', '14m ago', '22m ago', '29m ago', '38m ago', '45m ago'][index % 7];
+
+          // Compute nominal flow
+          const edge = currentCorridorsData.find(e => e.id === inc.affected_edge_id);
+          const lanes = edge ? (edge.lanes || 2) : 2;
+          const nominalCap = lanes * 900.0;
+          const baseFlow = (edge && edge.baseline_flow_veh_hr) ? edge.baseline_flow_veh_hr : (nominalCap * 0.7);
+          const dispDemand = Math.round(Math.max(0, baseFlow - (nominalCap * (1 - blockPct/100))));
+
+          card.innerHTML = `
+            <div class="incident-card-top">
+              <span class="inc-badge-id">${inc.incident_id.replace('INC-MNG-', 'INC-')}</span>
+              <span class="inc-badge-sev ${sevClass}">${sev} &bull; ${blockPct}% Blocked</span>
+              <span class="inc-card-time">${timeAgo}</span>
+            </div>
+            <div class="incident-card-title">${inc.road_name.split(' (')[0]}</div>
+            <div class="incident-card-cause">${inc.description || 'Arterial blockage obstructing vehicle flow.'}</div>
+            <div class="incident-card-bottom">
+              <span class="incident-card-stats">${Math.round(baseFlow)} Inflow &bull; ~${dispDemand} Displaced</span>
+              <button type="button" class="btn-card-action">
+                ${inc.incident_id === activeIncidentId ? 'Simulating' : 'Simulate Action'}
+              </button>
+            </div>
+          `;
+
+          card.addEventListener('click', () => {
+            selectIncident(inc.incident_id, true);
+          });
+
+          queueList.appendChild(card);
+        });
+      }
+
+      // 3. Initialize default incident
+      const currentInc = data.find(i => i.incident_id === activeIncidentId) || data[0];
+      if (currentInc) {
+        selectIncident(currentInc.incident_id, true);
+      }
+
+    } catch (err) {
+      console.error('Failed to load reported incidents:', err);
+    }
+  }
+
+  function selectIncident(incidentId, shouldTriggerEval = true) {
+    activeIncidentId = incidentId;
+    const inc = availableIncidents.find(i => i.incident_id === incidentId);
+    if (!inc) return;
+
+    // 1. Sync Left Dropdown
+    const selectInc = document.getElementById('selectActiveIncident');
+    if (selectInc && selectInc.value !== incidentId) {
+      selectInc.value = incidentId;
+    }
+
+    // 2. Sync Left Context Card
+    const lblRoad = document.getElementById('lblActiveRoadName');
+    const lblEdge = document.getElementById('lblActiveEdgeId');
+    const lblCause = document.getElementById('lblActiveCauseText');
+    const lblStatusBadge = document.getElementById('lblIncidentStatusBadge');
+
+    if (lblRoad) lblRoad.textContent = inc.road_name.split(' (')[0];
+    if (lblEdge) lblEdge.textContent = inc.affected_edge_id;
+    if (lblCause) lblCause.textContent = inc.description || 'Active traffic obstruction.';
+    if (lblStatusBadge) lblStatusBadge.textContent = `${inc.severity} INCIDENT`;
+
+    // 3. Highlight Card in Right Queue
+    const cards = document.querySelectorAll('.incident-card');
+    cards.forEach(c => {
+      const isThis = (c.dataset.incidentId === incidentId);
+      c.classList.toggle('active', isThis);
+      const btn = c.querySelector('.btn-card-action');
+      if (btn) btn.textContent = isThis ? 'Simulating' : 'Simulate Action';
+    });
+
+    // 4. Update Blockage & Horizon
+    const blockPct = Math.round((inc.capacity_reduction_pct || 0.8) * 100);
+    const horizonMin = Math.round(inc.estimated_duration_min || 60);
+
+    const selectHoriz = document.getElementById('selectHorizon');
+    if (selectHoriz) selectHoriz.value = String(horizonMin);
+
+    // Call unified incident state updater
+    setIncidentState(inc.affected_edge_id, blockPct, null, shouldTriggerEval);
+  }
+
   function setIncidentState(newCorridorId, newBlockagePct, newDemand = null, shouldTriggerEval = true) {
     const corridorChanged = (newCorridorId && newCorridorId !== activeCorridorId);
     if (newCorridorId) activeCorridorId = newCorridorId;
@@ -982,10 +1112,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       activeBlockagePct = parseInt(newBlockagePct, 10);
     }
 
-    // 1. Sync corridor dropdown
-    const select = document.getElementById('selectCorridor');
-    if (select && select.value !== activeCorridorId) {
-      select.value = activeCorridorId;
+    // 1. Sync matching incident metadata if applicable
+    const match = availableIncidents.find(i => i.affected_edge_id === activeCorridorId);
+    if (match) {
+      activeIncidentId = match.incident_id;
+      const selectInc = document.getElementById('selectActiveIncident');
+      if (selectInc && selectInc.value !== match.incident_id) {
+        selectInc.value = match.incident_id;
+      }
+      const lblRoad = document.getElementById('lblActiveRoadName');
+      const lblEdge = document.getElementById('lblActiveEdgeId');
+      const lblCause = document.getElementById('lblActiveCauseText');
+      const lblStatusBadge = document.getElementById('lblIncidentStatusBadge');
+      if (lblRoad) lblRoad.textContent = match.road_name.split(' (')[0];
+      if (lblEdge) lblEdge.textContent = match.affected_edge_id;
+      if (lblCause) lblCause.textContent = match.description || '';
+      if (lblStatusBadge) lblStatusBadge.textContent = `${match.severity} INCIDENT`;
+
+      const cards = document.querySelectorAll('.incident-card');
+      cards.forEach(c => {
+        const isThis = (c.dataset.incidentId === match.incident_id);
+        c.classList.toggle('active', isThis);
+        const btn = c.querySelector('.btn-card-action');
+        if (btn) btn.textContent = isThis ? 'Simulating' : 'Simulate Action';
+      });
     }
 
     // 2. Sync demand input: if corridor changed and no manual override passed, reset to nominal baseline
@@ -1035,11 +1185,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Corridor Select dropdown change
-  const selectCorridor = document.getElementById('selectCorridor');
-  if (selectCorridor) {
-    selectCorridor.addEventListener('change', (e) => {
-      setIncidentState(e.target.value, activeBlockagePct, null, true);
+  // Active Incident Select dropdown change
+  const selectActiveIncident = document.getElementById('selectActiveIncident');
+  if (selectActiveIncident) {
+    selectActiveIncident.addEventListener('change', (e) => {
+      selectIncident(e.target.value, true);
     });
   }
 

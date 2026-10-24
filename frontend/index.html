@@ -80,7 +80,7 @@
       <!-- STAGE 1: Incident Setup (Detect) & Live Network Map -->
       <section class="workspace-grid">
 
-        <!-- Left Column: Incident Setup (Detect) -->
+        <!-- Left Column: Incident Setup & Simulation Parameters -->
         <div class="panel incident-panel">
           <div class="panel-header">
             <div class="header-with-icon">
@@ -93,82 +93,30 @@
           </div>
 
           <div class="panel-body">
-            <!-- Road Segment Selector -->
+            <!-- Reported Incident / Accident Selector -->
             <div class="control-group">
               <div class="label-with-tip">
-                <label for="selectCorridor" class="control-label">Target Road Corridor</label>
-                <span class="control-tip">or click road on map</span>
+                <label for="selectActiveIncident" class="control-label">Reported Accident</label>
+                <span class="control-tip" id="lblIncidentStatusBadge">CONFIRMED INCIDENT</span>
               </div>
-              <select id="selectCorridor" class="control-select">
-                <optgroup label="Major Arterials">
-                  <option value="corridor_cctv_07" selected>Circuit House - Nanthoor Road (corridor_cctv_07)</option>
-                  <option value="corridor_cctv_07_rev">Nanthoor to Circuit House (corridor_cctv_07_rev)</option>
-                  <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
-                  <option value="corridor_cctv_05_rev">Bunts Hostel Avenue SB (corridor_cctv_05_rev)</option>
-                  <option value="corridor_cctv_06">Kadri Road Corridor (corridor_cctv_06)</option>
-                  <option value="corridor_cctv_06_rev">Kadri Road Corridor WB (corridor_cctv_06_rev)</option>
-                  <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
-                  <option value="corridor_cctv_10_rev">Mahatma Gandhi (MG) Road SB (corridor_cctv_10_rev)</option>
-                  <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
-                  <option value="corridor_cctv_01_rev">K.S. Rao Road SB (corridor_cctv_01_rev)</option>
-                  <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial (corridor_cctv_13)</option>
-                  <option value="corridor_cctv_13_rev">Balmatta - Bendorewell NB (corridor_cctv_13_rev)</option>
-                  <option value="corridor_cctv_20">Falnir - Kankanady Arterial Road (corridor_cctv_20)</option>
-                  <option value="corridor_cctv_20_rev">Falnir - Kankanady WB (corridor_cctv_20_rev)</option>
-                </optgroup>
-                <optgroup label="Highways &amp; Bypasses">
-                  <option value="corridor_cctv_08">NH-66 Kuntikan to Nanthoor (corridor_cctv_08)</option>
-                  <option value="corridor_cctv_08_rev">NH-66 Nanthoor to Kuntikan (corridor_cctv_08_rev)</option>
-                  <option value="corridor_cctv_16">NH-66 Pumpwell to Nanthoor Bypass (corridor_cctv_16)</option>
-                  <option value="corridor_cctv_16_rev">NH-66 Nanthoor to Pumpwell Bypass (corridor_cctv_16_rev)</option>
-                  <option value="corridor_cctv_11">Bejai Green Bypass Expressway (corridor_cctv_11)</option>
-                  <option value="corridor_cctv_11_rev">Bejai Green Bypass SB (corridor_cctv_11_rev)</option>
-                  <option value="corridor_cctv_15">Kankanady - Pumpwell Connector (corridor_cctv_15)</option>
-                  <option value="corridor_cctv_15_rev">Pumpwell - Kankanady Connector (corridor_cctv_15_rev)</option>
-                </optgroup>
-                <optgroup label="City Links &amp; Commercial">
-                  <option value="corridor_cctv_03">Light House Hill Road (corridor_cctv_03)</option>
-                  <option value="corridor_cctv_03_rev">Light House Hill Road WB (corridor_cctv_03_rev)</option>
-                  <option value="corridor_cctv_09">Navabharath Circle Link (corridor_cctv_09)</option>
-                  <option value="corridor_cctv_09_rev">Navabharath Circle Link EB (corridor_cctv_09_rev)</option>
-                  <option value="corridor_cctv_18">MG Road - Shri Devi College Road (corridor_cctv_18)</option>
-                  <option value="corridor_cctv_18_rev">Shri Devi College to MG Road (corridor_cctv_18_rev)</option>
-                  <option value="corridor_cctv_19">Ballalbagh Link Road (corridor_cctv_19)</option>
-                  <option value="corridor_cctv_19_rev">Ballalbagh Link SB (corridor_cctv_19_rev)</option>
-                  <option value="corridor_cctv_21">GHS Road - Car Street Link (corridor_cctv_21)</option>
-                  <option value="corridor_cctv_21_rev">Car Street - GHS Road SB (corridor_cctv_21_rev)</option>
-                  <option value="corridor_cctv_22">Port Road - Bunder Commercial Link (corridor_cctv_22)</option>
-                  <option value="corridor_cctv_22_rev">Bunder to Port Road SB (corridor_cctv_22_rev)</option>
-                </optgroup>
-                <optgroup label="Hospital &amp; Emergency Access">
-                  <option value="corridor_cctv_02">Wenlock Emergency Access Way (corridor_cctv_02)</option>
-                  <option value="corridor_cctv_02_rev">Wenlock Exit Way (corridor_cctv_02_rev)</option>
-                  <option value="corridor_cctv_04">Ambedkar Circle Hospital Intake (corridor_cctv_04)</option>
-                  <option value="corridor_cctv_04_rev">Ambedkar Circle Exit (corridor_cctv_04_rev)</option>
-                  <option value="corridor_cctv_12">A.J. Trauma Center Access Flyover (corridor_cctv_12)</option>
-                  <option value="corridor_cctv_12_rev">A.J. Trauma Center Exit (corridor_cctv_12_rev)</option>
-                  <option value="corridor_cctv_14">Father Muller Emergency Gate (corridor_cctv_14)</option>
-                  <option value="corridor_cctv_14_rev">Father Muller Exit Gate (corridor_cctv_14_rev)</option>
-                  <option value="corridor_cctv_17">Kadri Hills Dispatch Link (corridor_cctv_17)</option>
-                  <option value="corridor_cctv_17_rev">Kadri Hills Fire Base Access (corridor_cctv_17_rev)</option>
-                </optgroup>
+              <select id="selectActiveIncident" class="control-select">
+                <option value="INC-MNG-401" selected>INC-401: Nanthoor Fuel Tanker Rollover (80%)</option>
+                <option value="INC-MNG-402">INC-402: Bunts Hostel Bus Crash &amp; Flooding (50%)</option>
+                <option value="INC-MNG-403">INC-403: NH-66 Kuntikan Container Breakdown (75%)</option>
+                <option value="INC-MNG-404">INC-404: K.S. Rao Main Cavity Closure (100%)</option>
+                <option value="INC-MNG-405">INC-405: M.G. Road Lalbagh Bus Collision (60%)</option>
+                <option value="INC-MNG-406">INC-406: Falnir Tree Fall &amp; Wire Hazard (65%)</option>
+                <option value="INC-MNG-407">INC-407: Port Road Freight Jackknife (70%)</option>
               </select>
             </div>
 
-            <!-- Incident Category Selector -->
-            <div class="control-group">
-              <div class="label-with-tip">
-                <label for="selectIncidentType" class="control-label">Incident Category</label>
-                <span class="control-tip" id="lblSeverityTag">CRITICAL IMPACT</span>
+            <!-- Active Incident Context Card with Why / Cause -->
+            <div class="incident-context-card">
+              <div class="ctx-header">
+                <span class="ctx-road-name" id="lblActiveRoadName">Circuit House - Nanthoor Road</span>
+                <span class="ctx-edge-id" id="lblActiveEdgeId">corridor_cctv_07</span>
               </div>
-              <select id="selectIncidentType" class="control-select">
-                <option value="COLLISION" selected>Vehicle Collision / Overturned Tanker</option>
-                <option value="BREAKDOWN">Heavy Vehicle Breakdown / Stalled Bus</option>
-                <option value="WATERLOGGING">Monsoon Flooding / Waterlogging</option>
-                <option value="ROADWORK">Emergency Road Excavation / Trenching</option>
-                <option value="VIP_MOVEMENT">VIP Escort / Procession Diversion</option>
-                <option value="SURGE">Sudden Inflow Surge / Chokepoint Gridlock</option>
-              </select>
+              <p class="ctx-cause-text" id="lblActiveCauseText">Overturned chemical fuel tanker with hazardous spill blocking both eastbound lanes. HAZMAT emergency response active.</p>
             </div>
 
             <!-- Manual Baseline Demand Entry -->
@@ -240,7 +188,7 @@
           </div>
         </div>
 
-        <!-- Right Column: Live Network Map with Real Physical Route Overlays -->
+        <!-- Center Column: Live Network Map with Real Physical Route Overlays -->
         <div class="panel map-panel">
           <div class="panel-header">
             <div class="map-title-row">
@@ -255,6 +203,31 @@
               <span class="legend-item"><span class="legend-dot dot-detour-b"></span>Detour B / Split</span>
             </div>
           </div>
+
+          <div class="map-canvas-container">
+            <div id="liveTrafficMap" class="maplibre-container"></div>
+          </div>
+        </div>
+
+        <!-- Right Column: Reported Accidents & Incidents List (Live Queue) -->
+        <div class="panel incident-queue-panel">
+          <div class="panel-header">
+            <div class="header-with-icon">
+              <span class="icon-header icon-amber">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              </span>
+              <div>
+                <h2 class="panel-title">Reported Accidents</h2>
+                <span class="panel-meta">Live Incident Feed &bull; 7 Active</span>
+              </div>
+            </div>
+            <span class="badge-live-pulse" id="lblLivePulse">LIVE QUEUE</span>
+          </div>
+
+          <div class="incident-queue-scroll" id="incidentQueueList">
+            <!-- Populated dynamically by app.js with incidents and reasons -->
+          </div>
+        </div>
 
           <div class="map-canvas-container">
             <div id="liveTrafficMap" class="maplibre-container"></div>
