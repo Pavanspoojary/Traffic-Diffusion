@@ -101,6 +101,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     return Math.hypot(dx, dy);
   }
 
+  function scenarioHasMappedDiversion(scenario, evaluation) {
+    if (!scenario || !evaluation) return false;
+    const routeActions = (scenario.actions || []).filter(action =>
+      Array.isArray(action.diversion_route_ids) && action.diversion_route_ids.length > 0
+    );
+    return routeActions.some(action => evaluation.candidate_detours?.some(detour =>
+      Array.isArray(detour.edge_ids) && detour.path_coordinates?.length > 1 &&
+      detour.edge_ids.length === action.diversion_route_ids.length &&
+      detour.edge_ids.every(edgeId => action.diversion_route_ids.includes(edgeId))
+    ));
+  }
+
+  function getDefaultScenario(evaluation) {
+    if (!evaluation) return null;
+    const scenarios = [...(evaluation.candidate_scenarios || [])]
+      .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
+    const recommended = scenarios.find(scenario =>
+      scenario.scenario_id === evaluation.recommended_scenario_id
+    );
+    // Some response plans (for example, rapid tow clearance) do not divert
+    // traffic and therefore have no path to draw. In that case start on the
+    // best ranked scenario that has a real, mapped detour.
+    return (scenarioHasMappedDiversion(recommended, evaluation) ? recommended : null)
+      || scenarios.find(scenario => scenarioHasMappedDiversion(scenario, evaluation))
+      || recommended
+      || scenarios[0]
+      || evaluation.baseline_scenario
+      || null;
+  }
+
   function snapIncidentToRoad(coords, lat, lng, maxDistanceMeters = 80) {
     if (!coords || coords.length < 2 || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
     const metersPerDegree = 111320;
@@ -576,6 +606,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       latestEvaluation = await res.json();
+      activeSelectedScenarioId = null;
       renderEvaluationResults(latestEvaluation);
       setSimulationResultsVisible(true);
       renderIncidentPinsOnMap();
@@ -592,12 +623,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         simulationHint.textContent = `Simulation complete. Found ${practicalRoutes} ${routeWord} from ${searchedRoutes} connected paths across ${routeSource}. The map shows one selected route at a time.`;
       }
       // Select recommended scenario by default
-      const topScenarios = [...(latestEvaluation.candidate_scenarios || [])]
-        .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
-        .slice(0, 3);
-      const recScenario = topScenarios.find(s => s.scenario_id === latestEvaluation.recommended_scenario_id)
-        || topScenarios[0]
-        || latestEvaluation.baseline_scenario;
+      const recScenario = getDefaultScenario(latestEvaluation);
 
       if (recScenario) {
         activeSelectedScenarioId = recScenario.scenario_id;
@@ -640,6 +666,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Render Side-by-Side Comparison Table
     const tbody = document.getElementById('matrixTableBody');
+    const defaultScenario = getDefaultScenario(data);
+    const defaultScenarioId = defaultScenario?.scenario_id;
     if (tbody) {
       tbody.innerHTML = '';
 
@@ -648,7 +676,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
         .slice(0, 3);
       topScenarios.forEach(sc => {
-        const isRec = (sc.scenario_id === data.recommended_scenario_id);
+        const isRec = (sc.scenario_id === defaultScenarioId);
         const vcClass = sc.max_vc_ratio >= 1.0 ? 'vc-warning' : 'vc-normal';
         const tr = document.createElement('tr');
         tr.dataset.scenarioId = sc.scenario_id;
@@ -676,10 +704,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Recommendation Section
-    const topScenarios = [...(data.candidate_scenarios || [])]
-      .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
-      .slice(0, 3);
-    const recScen = topScenarios.find(s => s.scenario_id === data.recommended_scenario_id) || topScenarios[0];
+    const recScen = defaultScenario;
     if (recScen) {
       const recTitle = document.getElementById('recTitle');
       const recDesc = document.getElementById('recDesc');
@@ -730,7 +755,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Automatically select and render the recommended scenario onto the 3D map & tables
-    const targetScenId = activeSelectedScenarioId || data.recommended_scenario_id;
+    const targetScenId = activeSelectedScenarioId || defaultScenarioId;
     if (targetScenId) {
       selectScenario(targetScenId);
     }
