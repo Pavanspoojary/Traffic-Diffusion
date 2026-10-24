@@ -7,6 +7,7 @@ import networkx as nx
 from backend.app.config import settings
 from backend.app.services.osrm_service import osrm_service
 from backend.app.services.corridor_service import corridor_service
+from backend.app.services.mangaluru_osm_router import MangaluruOSMRoadRouter
 from backend.app.models.schemas import (
     RoadNode,
     RoadEdge,
@@ -32,6 +33,7 @@ class RoutingService:
         self.active_incidents: Dict[str, IncidentRecord] = {}
         self.reroute_history: List[RouteChangeEvent] = []
         self.active_route_cache: Dict[str, Any] = {}
+        self.osm_router = MangaluruOSMRoadRouter()
         self.load_network()
 
     def load_network(self) -> None:
@@ -418,6 +420,127 @@ class RoutingService:
             turn_instructions=turn_instructions,
         )
 
+    def _build_osm_route_candidate(self, route: Dict[str, Any], route_id: str, label: str,
+                                  is_recommended: bool, reason: str, is_emergency: bool) -> RouteCandidate:
+        route_edges = [self.osm_router.edges[edge_id] for edge_id in route["edge_ids"]]
+        segments = []
+        instructions = []
+        previous_name = None
+        for edge in route_edges:
+            travel_time, _, _ = self.osm_router._bpr_time(edge, 0.0)
+            segments.append(RouteSegment(
+                edge_id=edge.id,
+                from_node=edge.source,
+                to_node=edge.target,
+                road_name=edge.name,
+                distance_km=edge.length_km,
+                estimated_time_min=round(travel_time, 2),
+                congestion_level=CongestionLevel.FREE_FLOW,
+                is_green_corridor=is_emergency,
+            ))
+            if edge.name != previous_name:
+                instructions.append({"street_name": edge.name, "type": "continue", "modifier": ""})
+                previous_name = edge.name
+
+        distinct_names = list(dict.fromkeys(edge.name for edge in route_edges))
+        generic_names = {
+            "Service", "Residential", "Living Street", "Tertiary", "Tertiary Link",
+            "Secondary", "Secondary Link", "Primary", "Primary Link", "Unclassified",
+            "Trunk", "Trunk Link", "Motorway", "Motorway Link",
+        }
+        main_name = next((name for name in distinct_names if name not in generic_names), distinct_names[0] if distinct_names else "Mangaluru roads")
+        return RouteCandidate(
+            route_id=route_id,
+            label=label,
+            is_recommended=is_recommended,
+            recommendation_reason=reason,
+            path_node_ids=route["node_path"],
+            path_coordinates=route["path_coordinates"],
+            segments=segments,
+            total_distance_km=route["total_length_km"],
+            estimated_travel_time_min=route["loaded_travel_time_min"],
+            congestion_points=[],
+            signals_count=0,
+            closures_encountered=[],
+            suspected_incidents_count=0,
+            data_confidence_score=0.82,
+            primary_road_name=f"via {main_name}",
+            turn_instructions=instructions,
+        )
+
+    def _calculate_osm_navigation_route(self, origin_node_id: str, destination_node_id: str,
+                                        is_emergency: bool, current_route_id: Optional[str]) -> RouteCalculationResponse:
+        origin = self.nodes[origin_node_id]
+        destination = self.nodes[destination_node_id]
+        blocked_lines = [
+            edge.path_coordinates for edge in self.edges.values()
+            if edge.path_coordinates and (edge.is_closed or edge.has_incident or edge.congestion_level == CongestionLevel.BLOCKED)
+        ]
+        routes = self.osm_router.find_alternatives(
+            origin_node_id, destination_node_id,
+            (origin.lat, origin.lng), (destination.lat, destination.lng),
+            "active-incidents", blocked_lines, 0.0, max_candidates=2,
+        )
+        if not routes:
+            raise ValueError(
+                f"NO_VIABLE_ROUTE: No connected OpenStreetMap driving route from '{origin.name}' "
+                f"to '{destination.name}' avoids the confirmed closures."
+            )
+
+        primary = self._build_osm_route_candidate(
+            routes[0], "route_primary_osm", "Primary OSM Road Route", True,
+            "Lowest estimated travel time on the connected Mangaluru driving-road graph", is_emergency,
+        )
+        alternatives = []
+        if len(routes) > 1:
+            alternative = self._build_osm_route_candidate(
+                routes[1], "route_alternative_osm", "Alternative OSM Road Route", False,
+                "Next distinct road-connected option ranked by estimated travel time", is_emergency,
+            )
+            delta = round(alternative.estimated_travel_time_min - primary.estimated_travel_time_min, 1)
+            alternative.recommendation_reason = (
+                f"Alternative is {abs(delta):.1f} min {'faster' if delta < 0 else 'slower'} than the primary route"
+                if delta else "Alternative has a comparable estimated travel time"
+            )
+            alternatives.append(alternative)
+
+        if blocked_lines:
+            baseline_routes = self.osm_router.find_alternatives(
+                origin_node_id, destination_node_id,
+                (origin.lat, origin.lng), (destination.lat, destination.lng),
+                "", [], 0.0, max_candidates=1,
+            )
+            baseline = baseline_routes[0]["loaded_travel_time_min"] if baseline_routes else primary.estimated_travel_time_min
+        else:
+            baseline = primary.estimated_travel_time_min
+        self.active_route_cache[primary.route_id] = {
+            "nodes": primary.path_node_ids,
+            "time_min": primary.estimated_travel_time_min,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+
+        return RouteCalculationResponse(
+            origin=origin,
+            destination=destination,
+            primary_route=primary,
+            alternative_routes=alternatives,
+            coordination_plan=None,
+            hospital_readiness=corridor_service.get_hospital_readiness(destination, primary.estimated_travel_time_min),
+            baseline_travel_time_min=round(baseline, 2),
+            time_saved_min=max(0.0, round(baseline - primary.estimated_travel_time_min, 2)),
+            recent_reroutes=self.reroute_history[-5:],
+            path_node_ids=primary.path_node_ids,
+            path_coordinates=primary.path_coordinates,
+            segments=primary.segments,
+            total_distance_km=primary.total_distance_km,
+            estimated_travel_time_min=primary.estimated_travel_time_min,
+            standard_travel_time_min=round(baseline, 2),
+            signals_preempted=primary.signals_count if is_emergency else 0,
+            is_green_corridor_active=is_emergency,
+            primary_road_name=primary.primary_road_name,
+            turn_instructions=primary.turn_instructions,
+        )
+
     def calculate_emergency_route(
         self,
         origin_node_id: str,
@@ -436,6 +559,11 @@ class RoutingService:
             origin_node_id = "EMS_STATE_BANK" if "EMS_STATE_BANK" in self.nodes else next(iter(self.nodes.keys()))
         if destination_node_id not in self.nodes:
             destination_node_id = "HOSPITAL_AJ_KUNTIKAN" if "HOSPITAL_AJ_KUNTIKAN" in self.nodes else list(self.nodes.keys())[-1]
+
+        if self.osm_router.graph:
+            return self._calculate_osm_navigation_route(
+                origin_node_id, destination_node_id, is_emergency, current_route_id
+            )
 
         # 1. Filter out confirmed impassable closures
         def is_edge_passable(u, v):

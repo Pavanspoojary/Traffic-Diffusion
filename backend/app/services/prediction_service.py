@@ -252,7 +252,9 @@ class PredictiveIncidentEngine:
         Deploys an approved incident diversion plan to the network and broadcasts
         it to the public app and citizen navigation routing engine.
         """
-        known_edge_ids = set(self.routing_service.edges)
+        known_edge_ids = set(self.routing_service.edges) | set(
+            getattr(getattr(self.routing_service, "osm_router", None), "edges", {})
+        )
         requested_groups = request.detour_routes or ([{
             "edge_ids": request.detour_route_ids,
             "allocation": 1.0,
@@ -272,13 +274,20 @@ class PredictiveIncidentEngine:
         ))
 
         coords: List[List[float]] = []
-        for eid in deployed_edge_ids:
-            edge = self.routing_service.edges.get(eid)
-            if edge and edge.path_coordinates:
-                if coords and coords[-1] == edge.path_coordinates[0]:
-                    coords.extend(edge.path_coordinates[1:])
-                else:
-                    coords.extend(edge.path_coordinates)
+        for group in route_groups:
+            group_coords = group.get("path_coordinates")
+            if isinstance(group_coords, list) and len(group_coords) > 1:
+                coords = group_coords
+                break
+        if not coords:
+            osm_edges = getattr(getattr(self.routing_service, "osm_router", None), "edges", {})
+            for eid in deployed_edge_ids:
+                edge = self.routing_service.edges.get(eid) or osm_edges.get(eid)
+                if edge and edge.path_coordinates:
+                    if coords and coords[-1] == edge.path_coordinates[0]:
+                        coords.extend(edge.path_coordinates[1:])
+                    else:
+                        coords.extend(edge.path_coordinates)
 
         div_id = f"DIV-{request.incident_id.replace('INC-MNG-', '').replace('INC-', '')}"
         advisory_msg = request.advisory_text or (

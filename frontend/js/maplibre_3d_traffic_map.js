@@ -860,7 +860,16 @@ class MapLibre3DTrafficMap {
       );
     };
 
-    (selectedGroup?.edge_ids || []).forEach(edgeId => {
+    if (Array.isArray(selectedGroup?.path_coordinates) && selectedGroup.path_coordinates.length > 1) {
+      const mappedCoordinates = selectedGroup.path_coordinates.map(point => [Number(point[1]), Number(point[0])]);
+      const hasBadJump = mappedCoordinates.some((point, index) => index > 0 && gapMeters(mappedCoordinates[index - 1], point) > 250);
+      if (hasBadJump) {
+        routeIsConnected = false;
+      } else {
+        routeCoordinates.push(...mappedCoordinates);
+      }
+    } else {
+      (selectedGroup?.edge_ids || []).forEach(edgeId => {
       if (!routeIsConnected) return;
       const edge = (this.edges || []).find(item => item.id === edgeId);
       const sourceNode = edge && this.nodeMap.get(edge.source);
@@ -902,7 +911,8 @@ class MapLibre3DTrafficMap {
         return;
       }
       previousTargetId = edge.target;
-    });
+      });
+    }
 
     if (routeIsConnected && routeCoordinates.length > 1) {
       routeCoordinates.forEach(point => fitPoints.push(point));

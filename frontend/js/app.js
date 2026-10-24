@@ -584,7 +584,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const searchedRoutes = Number(latestEvaluation.routes_evaluated_count) || 0;
         const practicalRoutes = Number(latestEvaluation.viable_detours_count) || 0;
         const routeWord = practicalRoutes === 1 ? 'practical route' : 'practical routes';
-        simulationHint.textContent = `Simulation complete. Found ${practicalRoutes} ${routeWord} from ${searchedRoutes} network paths. The map shows one selected route at a time.`;
+        const usesOsm = latestEvaluation.candidate_detours?.some(route => route.source === 'OpenStreetMap')
+          || latestEvaluation.assumptions?.some(item => item.includes('offline OpenStreetMap snapshot'));
+        const routeSource = usesOsm
+          ? 'Mangaluru OpenStreetMap roads'
+          : 'the curated road graph';
+        simulationHint.textContent = `Simulation complete. Found ${practicalRoutes} ${routeWord} from ${searchedRoutes} connected paths across ${routeSource}. The map shows one selected route at a time.`;
       }
       // Select recommended scenario by default
       const topScenarios = [...(latestEvaluation.candidate_scenarios || [])]
@@ -828,7 +833,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           name: detour?.title || `Route ${String.fromCharCode(65 + index)}`,
           color: routeColors[index % routeColors.length],
           distance_km: detour?.total_length_km,
-          estimated_time_min: detour?.loaded_travel_time_min
+          estimated_time_min: detour?.loaded_travel_time_min,
+          path_coordinates: detour?.path_coordinates,
+          route_source: detour?.source || 'curated-network'
         };
       });
     if (!detourRoutes.length && Array.isArray(scen.route_edges) && scen.route_edges.length) {
@@ -1070,6 +1077,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (routeIndex !== selectedRouteIndex) return;
       const routeColor = routeColors[routeIndex % routeColors.length];
       const routeIds = action.diversion_route_ids;
+      const detour = latestEvaluation.candidate_detours?.find(candidate =>
+        candidate.edge_ids?.length === routeIds.length &&
+        candidate.edge_ids.every(edgeId => routeIds.includes(edgeId))
+      );
+      if (Array.isArray(detour?.path_coordinates) && detour.path_coordinates.length > 1) {
+        const roadCoordinates = toGeoJSONCoords(detour.path_coordinates);
+        const hasBadJump = roadCoordinates.some((point, index) => index > 0
+          && geoPointGapMeters(roadCoordinates[index - 1], point) > 250);
+        if (hasBadJump) {
+          routeGeometryIssue = 'Mapped road route contains a disconnected segment';
+          return;
+        }
+        roadCoordinates.forEach(point => fitPoints.push(point));
+        features.push({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: roadCoordinates },
+          properties: { routeIndex, routeColor, allocation: Number(action.diversion_percentage) || 0 }
+        });
+        return;
+      }
       const routeCoordinates = [];
       let previousTargetId = null;
       routeIds.forEach(edgeId => {

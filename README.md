@@ -40,9 +40,11 @@ When an incident occurs on an urban road network—such as an overturned fuel ta
 ## 2. Road Network Topology & Mathematical Foundations
 
 ### Network Topology
-The system models the **Mangaluru Metropolitan Sector (NH-66 / NH-73 corridors)** as a calibrated, directed multigraph $G = (V, E)$:
-- **17 Junction Nodes ($V$)**: Strategic intersections including Nanthoor Junction, Bunts Hostel, Mallikatte, Jyothi Circle, Kuntikan, Lalbagh, Hampankatta, State Bank, and Pumpwell.
-- **44 Directed Arterial Edges ($E$)**: Directional road links including major arterials (K.S. Rao, Bunts Hostel, MG Road, Kadri Road, Balmatta, Falnir - Kankanady), bypass expressways (NH-66 Kuntikan - Nanthoor, Pumpwell Bypass, Bejai Green Expressway), commercial links (GHS Road, Port Road - Bunder), and emergency hospital corridors (Wenlock Emergency, AJ Trauma, Father Muller).
+The application keeps the calibrated 17-junction / 44-link strategic graph for its existing capacity and incident model, and uses a separate directed OpenStreetMap street graph for road-following route search and map geometry. The local snapshot in `data/mangaluru_osm_routing.json` covers Mangaluru at approximately `[12.78, 74.77, 12.96, 74.93]` and contains 12,437 routable junctions and 28,332 directed road segments, built from 7,614 drivable ways. It preserves mapped road geometry, directionality, road names, road class, lane tags, and posted speed tags where available. Diversion and emergency routes are snapped to this graph, avoid active full closures, and are ranked by estimated loaded travel time with a separate physical-distance search so short local alternatives remain discoverable under high demand.
+
+The snapshot is sourced from OpenStreetMap contributors via Overpass API (snapshot timestamp `2026-10-24T05:48:21Z`) and is provided under the Open Database License (ODbL). Map/data attribution: © OpenStreetMap contributors. Road classes, speeds, capacities, and congestion costs are model inputs or estimates where OSM does not contain those values; this is not live traffic data. The project does not use Google Maps route data. Exact Google Maps route results would require a configured Google Routes API key and its applicable billing/account setup.
+
+The strategic graph remains the **Mangaluru Metropolitan Sector (NH-66 / NH-73 corridors)**, with 17 strategic intersections and 44 calibrated arterial edges, including Nanthoor Junction, Bunts Hostel, Mallikatte, Jyothi Circle, Kuntikan, Lalbagh, Hampankatta, State Bank, and Pumpwell. It continues to provide the existing capacity/demand reference values, while mapped route polylines come from the street graph above.
 
 ### Macroscopic Traffic Flow Formulation
 All calculations adhere to Indian Road Congress (IRC) traffic engineering standards:
@@ -146,7 +148,7 @@ The dashboard is structured into three connected workspaces in the top section, 
 
 | Method | Endpoint | Description |
 |:---|:---|:---|
-| `GET` | `/network` | Retrieves the full Mangaluru road graph (17 nodes, 44 edges, lane counts, speed limits, density scores, and coordinates). |
+| `GET` | `/network` | Retrieves the calibrated strategic Mangaluru capacity graph (17 nodes and 44 edges). Road-following navigation and diversion polylines use the separate local OpenStreetMap street graph. |
 | `POST` | `/simulate-incident` | Simulates or clears a blockage on a specific edge and updates graph properties. |
 | `POST` | `/reset` | Restores network to clean nominal baseline state. |
 

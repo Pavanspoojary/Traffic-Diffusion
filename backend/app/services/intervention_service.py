@@ -119,7 +119,7 @@ class WhatIfInterventionPlanner:
         blocked_edge_id: str,
         max_candidates: int = 3,
         displaced_demand_pcu_hr: float = 0.0,
-        search_metrics: Optional[Dict[str, int]] = None,
+        search_metrics: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Discovers multiple distinct, viable simple detour paths in the directed graph
@@ -127,7 +127,10 @@ class WhatIfInterventionPlanner:
         or traversing any confirmed impassable segments.
         """
         graph = self.routing_service.graph
-        edges_map = self.routing_service.edges
+        edges_map = {
+            **self.routing_service.edges,
+            **getattr(getattr(self.routing_service, "osm_router", None), "edges", {}),
+        }
 
         if not graph.has_node(source_node_id) or not graph.has_node(target_node_id):
             return []
@@ -137,6 +140,39 @@ class WhatIfInterventionPlanner:
 
         # Remove the target blocked edge from the subgraph
         target_edge_obj = edges_map.get(blocked_edge_id)
+        osm_router = getattr(self.routing_service, "osm_router", None)
+        if osm_router and target_edge_obj and target_edge_obj.path_coordinates:
+            source_node = self.routing_service.nodes.get(target_edge_obj.source)
+            target_node = self.routing_service.nodes.get(target_edge_obj.target)
+            if source_node and target_node:
+                blocked_lines = [target_edge_obj.path_coordinates]
+                for incident in self.prediction_service.list_incidents():
+                    if incident.affected_edge_id == blocked_edge_id or incident.capacity_reduction_pct < 0.90:
+                        continue
+                    incident_edge = self.routing_service.edges.get(incident.affected_edge_id)
+                    if incident_edge and incident_edge.path_coordinates:
+                        blocked_lines.append(incident_edge.path_coordinates)
+                routes = osm_router.find_alternatives(
+                    source_node_id,
+                    target_node_id,
+                    (source_node.lat, source_node.lng),
+                    (target_node.lat, target_node.lng),
+                    blocked_edge_id,
+                    blocked_lines,
+                    displaced_demand_pcu_hr,
+                    max_candidates=max_candidates,
+                )
+                if search_metrics is not None:
+                    search_metrics["routes_evaluated_count"] = routes[0].get("routes_evaluated_count", len(routes)) if routes else 0
+                    search_metrics["routes_excluded_as_overlong"] = routes[0].get("routes_excluded_as_overlong", 0) if routes else 0
+                    search_metrics["routing_source"] = "OpenStreetMap"
+                    search_metrics["osm_road_nodes"] = len(osm_router.graph.nodes)
+                    search_metrics["osm_road_segments"] = len(osm_router.graph.edges)
+                # Never fall back to a sparse schematic graph when live OSM
+                # routing is available; that was the source of invented-looking
+                # routes that skipped the real street network.
+                return routes
+
         if target_edge_obj and subgraph.has_edge(target_edge_obj.source, target_edge_obj.target):
             subgraph.remove_edge(target_edge_obj.source, target_edge_obj.target)
         elif subgraph.has_edge(source_node_id, target_node_id):
@@ -341,7 +377,10 @@ class WhatIfInterventionPlanner:
         Executes capacity-aware traffic assignment across candidate diversion routes.
         Guarantees isolated scenario calculations without modifying global state.
         """
-        edges_map = self.routing_service.edges
+        edges_map = {
+            **self.routing_service.edges,
+            **getattr(getattr(self.routing_service, "osm_router", None), "edges", {}),
+        }
         target_edge_id = incident.affected_edge_id
         target_edge = edges_map.get(target_edge_id)
 
@@ -375,7 +414,7 @@ class WhatIfInterventionPlanner:
         remaining_flow_on_blocked = max(0.0, nominal_flow - displaced_demand)
 
         # 2. Find Viable Alternative Routes in Directed Road Graph
-        search_metrics: Dict[str, int] = {}
+        search_metrics: Dict[str, Any] = {}
         viable_detours = self.find_viable_detours(
             source_node_id=target_source,
             target_node_id=target_target,
@@ -1125,9 +1164,14 @@ class WhatIfInterventionPlanner:
             "Detour link travel times calculated via Bureau of Public Roads (BPR) volume-delay curves: t = t0 * [1 + 0.15*(V/C)^4].",
             "Total delay and delay saved are measured in vehicle-hours over a standardized 1-hour operational analysis horizon (Flow in PCU/hr, Delay in (t_bpr - t0)/60 hours).",
             "Initial network conditions are strictly isolated and identical across all candidate scenarios.",
-            f"Local detours longer than 3× the mapped affected road ({self._compute_edge_length_km(target_edge) * 3.0:.1f} km) are excluded; if none remain, traffic gating is recommended instead.",
-            f"Evaluated {search_metrics.get('routes_evaluated_count', 0)} graph paths; excluded {search_metrics.get('routes_excluded_as_overlong', 0)} overlong detours.",
+            f"Local detours longer than the larger of 3× the affected mapped road or that road plus 2 km ({max(self._compute_edge_length_km(target_edge) * 3.0, self._compute_edge_length_km(target_edge) + 2.0):.1f} km) are excluded; if none remain, traffic gating is recommended instead.",
+            f"Evaluated {search_metrics.get('routes_evaluated_count', 0)} connected road paths; excluded {search_metrics.get('routes_excluded_as_overlong', 0)} overlong detours.",
             f"Excluded {search_metrics.get('edges_excluded_for_bad_geometry', 0)} road links whose mapped geometry does not meet its junctions.",
+            (
+                f"Detour routing uses an offline OpenStreetMap snapshot ({getattr(getattr(self.routing_service, 'osm_router', None), 'source_timestamp', 'unknown')}) with {search_metrics.get('osm_road_nodes', 0):,} routable junctions and {search_metrics.get('osm_road_segments', 0):,} directed road segments."
+                if search_metrics.get('routing_source') == 'OpenStreetMap' else
+                "Detour routing uses the curated Mangaluru road graph because no external road snapshot is available."
+            ),
             "Provenance: ESTIMATED FROM ROAD GRAPH TOPOLOGY & MACROSCOPIC FLOW LAWS.",
         ]
 
