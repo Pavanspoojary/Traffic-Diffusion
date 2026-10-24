@@ -101,45 +101,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     const mapContainer = document.getElementById('liveTrafficMap');
     if (!mapContainer || typeof maplibregl === 'undefined') return;
 
-    mapInstance = new maplibregl.Map({
-      container: 'liveTrafficMap',
-      style: 'https://tiles.openfreemap.org/styles/bright',
-      center: MANGALURU_CENTER,
-      zoom: 14.3,
-      pitch: 45,
-      bearing: -15,
-      canvasContextAttributes: { antialias: true }
-    });
+    try {
+      mapInstance = new maplibregl.Map({
+        container: 'liveTrafficMap',
+        style: 'https://tiles.openfreemap.org/styles/bright',
+        center: [74.858, 12.876],
+        zoom: 14.6,
+        pitch: 52,
+        bearing: -17.6,
+        canvasContextAttributes: { antialias: true }
+      });
 
-    mapInstance.addControl(
-      new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),
-      'top-left'
-    );
+      mapInstance.addControl(
+        new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),
+        'top-left'
+      );
 
-    function onMapReady() {
-      if (isMapReady) return;
-      isMapReady = true;
-      try { setup3DBuildings(); } catch (e) { console.warn('3d buildings error:', e); }
-      if (currentCorridorsData.length) {
-        renderNetworkOnMap();
-        setupJunctionMarkers();
+      function onMapReady() {
+        if (isMapReady) return;
+        isMapReady = true;
+        try { setup3DBuildings(); } catch (e) { console.warn('3d buildings error:', e); }
+        if (currentCorridorsData.length) {
+          renderNetworkOnMap();
+          renderIncidentPinsOnMap();
+        }
+        const sc = pendingScenarioToRender || getActiveOrRecommendedScenario();
+        if (sc) {
+          renderScenarioOnMap(sc);
+          pendingScenarioToRender = null;
+        }
       }
-      const sc = pendingScenarioToRender || getActiveOrRecommendedScenario();
-      if (sc) {
-        renderScenarioOnMap(sc);
-        pendingScenarioToRender = null;
-      }
+
+      mapInstance.on('load', onMapReady);
+    } catch (e) {
+      console.warn('MapLibre WebGL initialization failed (fallback to data view):', e);
     }
-
-    mapInstance.on('load', onMapReady);
-
-    // Concurrently load network data, reported incidents, and initial diversion evaluation
-    loadMangaluruNetwork().then(() => {
-      loadReportedIncidents();
-    });
   }
 
-  // 3D Buildings Extrusion
+  // 3D Buildings Extrusion (per https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
   function setup3DBuildings() {
     try {
       const layers = mapInstance.getStyle().layers || [];
@@ -151,13 +150,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
 
-      const existingSource = mapInstance.getSource('openmaptiles') ? 'openmaptiles' : (mapInstance.getSource('openfreemap') ? 'openfreemap' : null);
-      if (!existingSource) {
-        mapInstance.addSource('openfreemap', {
-          url: 'https://tiles.openfreemap.org/planet',
-          type: 'vector'
-        });
-      }
       const actualSource = mapInstance.getSource('openmaptiles') ? 'openmaptiles' : 'openfreemap';
 
       if (!mapInstance.getLayer('3d-buildings')) {
@@ -167,31 +159,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             source: actualSource,
             'source-layer': 'building',
             type: 'fill-extrusion',
-            minzoom: 13,
-            filter: ['!=', ['get', 'hide_3d'], true],
+            minzoom: 13.5,
             paint: {
-              'fill-extrusion-color': [
-                'interpolate',
-                ['linear'],
-                ['get', 'render_height'],
-                0, '#d1d5db',
-                40, '#94a3b8',
-                120, '#60a5fa',
-                250, '#2563eb'
-              ],
+              'fill-extrusion-color': '#cbd5e1',
               'fill-extrusion-height': [
                 'interpolate',
                 ['linear'],
                 ['zoom'],
-                13, 0,
-                15.5, ['get', 'render_height']
+                13.5, 0,
+                14.5, ['get', 'render_height']
               ],
               'fill-extrusion-base': [
                 'interpolate',
                 ['linear'],
                 ['zoom'],
-                13, 0,
-                15.5, ['get', 'render_min_height']
+                13.5, 0,
+                14.5, ['get', 'render_min_height']
               ],
               'fill-extrusion-opacity': 0.72
             }
@@ -250,38 +233,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderNetworkOnMap() {
     if (!mapInstance || !isMapReady || !currentCorridorsData.length) return;
 
+    // Minimal Map: Do NOT show colorful lines on all roads by default.
+    // Only highlight the target incident road when an incident is active!
     const features = [];
-    currentCorridorsData.forEach(edge => {
-      const coords = getEdgeCoords(edge.id);
-      if (!coords || coords.length < 2) return;
-
-      const isTarget = (edge.id === activeCorridorId);
-      let color = '#10b981'; // Green: Free Flow
-      if (isTarget) {
-        color = '#ef4444'; // Red: Target Incident Road
-      } else if (edge.congestion_level === 'HEAVY') {
-        color = '#f97316'; // Orange: Heavy Congestion
-      } else if (edge.congestion_level === 'MODERATE') {
-        color = '#f59e0b'; // Amber: Moderate
-      } else if (edge.congestion_level === 'BLOCKED') {
-        color = '#ef4444'; // Red: Blocked
+    const targetEdge = currentCorridorsData.find(e => e.id === activeCorridorId);
+    if (targetEdge) {
+      const coords = getEdgeCoords(targetEdge.id);
+      if (coords && coords.length > 1) {
+        features.push({
+          type: 'Feature',
+          properties: {
+            id: targetEdge.id,
+            name: targetEdge.name,
+            color: '#ef4444',
+            isTarget: true,
+            lanes: targetEdge.lanes
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: coords
+          }
+        });
       }
-
-      features.push({
-        type: 'Feature',
-        properties: {
-          id: edge.id,
-          name: edge.name,
-          color: color,
-          isTarget: isTarget,
-          lanes: edge.lanes
-        },
-        geometry: {
-          type: 'LineString',
-          coordinates: coords
-        }
-      });
-    });
+    }
 
     const geojson = { type: 'FeatureCollection', features };
 
@@ -293,15 +267,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         data: geojson
       });
 
-      // Background casing for corridors
+      // Background casing for incident corridor
       mapInstance.addLayer({
         id: 'corridors-casing',
         type: 'line',
         source: 'mng-corridors',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['case', ['get', 'isTarget'], '#fee2e2', '#0f172a'],
-          'line-width': ['case', ['get', 'isTarget'], 10, 4.5],
+          'line-color': '#fee2e2',
+          'line-width': 10,
           'line-opacity': 0.85
         }
       });
@@ -313,54 +287,103 @@ document.addEventListener('DOMContentLoaded', async () => {
         source: 'mng-corridors',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'isTarget'], 6, 2.8],
-          'line-opacity': 0.95
+          'line-color': '#ef4444',
+          'line-width': 6.5,
+          'line-opacity': 0.98
         }
-      });
-
-      mapInstance.on('click', 'corridors-core', (e) => {
-        if (!e.features || !e.features.length) return;
-        const prop = e.features[0].properties;
-        const match = availableIncidents.find(i => i.affected_edge_id === prop.id);
-        if (match) {
-          selectIncident(match.incident_id, true);
-        } else {
-          setIncidentState(prop.id, activeBlockagePct, null, true);
-        }
-      });
-
-      mapInstance.on('mouseenter', 'corridors-core', () => {
-        mapInstance.getCanvas().style.cursor = 'pointer';
-      });
-      mapInstance.on('mouseleave', 'corridors-core', () => {
-        mapInstance.getCanvas().style.cursor = '';
       });
     }
   }
 
-  function setupJunctionMarkers() {
-    if (!mapInstance || !isMapReady || !mapInstance.isStyleLoaded()) return;
+  // Interactive Incident Pins & Popups on 3D Map
+  let activeIncidentPins = [];
 
-    activeMarkers.forEach(m => m.remove());
-    activeMarkers = [];
+  function renderIncidentPinsOnMap() {
+    if (!mapInstance || !isMapReady || !availableIncidents.length) return;
 
-    const keyJunctions = ['INT_NANTHOOR', 'INT_BUNTS_HOSTEL', 'INT_MALLIKATTE', 'INT_JYOTHI_CIRCLE', 'INT_KUNTIKAN', 'INT_PUMPWELL'];
-    keyJunctions.forEach(jid => {
-      const node = currentNodesMap.get(jid);
-      if (!node) return;
+    activeIncidentPins.forEach(m => m.remove());
+    activeIncidentPins = [];
+
+    availableIncidents.forEach((inc) => {
+      const edge = currentCorridorsData.find(e => e.id === inc.affected_edge_id);
+      if (!edge) return;
+      const coords = getEdgeCoords(edge.id);
+      if (!coords || !coords.length) return;
+
+      const midIdx = Math.floor(coords.length / 2);
+      const midCoord = coords[midIdx];
+      if (!midCoord) return;
+
+      const isSelected = (inc.incident_id === activeIncidentId);
+      const isDeployed = activeDeployedDiversions.has(inc.incident_id);
+
+      const sev = (inc.severity || 'HIGH').toUpperCase();
+      const sevClass = sev === 'CRITICAL' ? 'sev-critical' : (sev === 'HIGH' ? 'sev-high' : 'sev-moderate');
+      const blockPct = Math.round((inc.capacity_reduction_pct || 0.8) * 100);
+
+      const lanes = edge.lanes || 2;
+      const nominalCap = lanes * 900.0;
+      const baseFlow = edge.baseline_flow_veh_hr || (nominalCap * 0.7);
+      const dispDemand = Math.round(Math.max(0, baseFlow - (nominalCap * (1 - blockPct / 100))));
 
       const el = document.createElement('div');
-      el.className = 'junction-map-dot';
-      el.title = node.name;
+      el.className = `maplibre-incident-marker sev-${sev.toLowerCase()} ${isSelected ? 'selected' : ''}`;
+      el.title = `${inc.road_name}: ${inc.description || 'Active Incident'}`;
+      el.innerHTML = `
+        <span class="maplibre-incident-marker-pulse"></span>
+        <div class="maplibre-incident-marker-inner">!</div>
+      `;
+
+      const deployBadgeHtml = isDeployed ? `<div style="margin-top:6px; font-size:10px; font-weight:800; color:#34d399; background:rgba(16,185,129,0.15); padding:2px 6px; border-radius:3px; text-align:center;">DIVERSION ACTIVE ON PUBLIC MAP</div>` : '';
+
+      const popupHtml = `
+        <div class="incident-map-popup">
+          <div class="incident-map-popup-header">
+            <span class="incident-map-popup-badge ${sevClass}">${sev} &bull; ${blockPct}% BLOCKED</span>
+            <span class="incident-map-popup-id">${inc.incident_id.replace('INC-MNG-', 'INC-')}</span>
+          </div>
+          <div class="incident-map-popup-title">${inc.road_name.split(' (')[0]}</div>
+          <div class="incident-map-popup-cause">${inc.description || 'Arterial blockage obstructing vehicle flow.'}</div>
+          <div class="incident-map-popup-stats">${Math.round(baseFlow)} Inflow &bull; ~${dispDemand} Displaced</div>
+          <button type="button" class="btn-map-popup-simulate ${isSelected ? 'active' : ''}" onclick="window.__selectIncident('${inc.incident_id}')">
+            ${isSelected ? 'Currently Simulating' : 'Simulate Diversion'}
+          </button>
+          ${deployBadgeHtml}
+        </div>
+      `;
+
+      const popup = new maplibregl.Popup({
+        offset: [0, -14],
+        closeButton: true,
+        closeOnClick: false,
+        className: 'maplibre-dark-popup'
+      }).setHTML(popupHtml);
 
       const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([node.lng, node.lat])
-        .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(`<strong style="color:#0f172a; font-size:12px;">${node.name}</strong>`))
+        .setLngLat(midCoord)
+        .setPopup(popup)
         .addTo(mapInstance);
 
-      activeMarkers.push(marker);
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectIncident(inc.incident_id, true);
+      });
+
+      marker._incidentId = inc.incident_id;
+      activeIncidentPins.push(marker);
+
+      if (isSelected) {
+        setTimeout(() => {
+          if (!marker.getPopup().isOpen()) marker.togglePopup();
+        }, 200);
+      }
     });
+  }
+
+  function setupJunctionMarkers() {
+    // Kept minimal to avoid cluttering 3D map
+    activeMarkers.forEach(m => m.remove());
+    activeMarkers = [];
   }
 
   // =========================================================================
@@ -606,6 +629,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
       updateDeployButtonStatus();
+    }
+
+    // Automatically select and render the recommended scenario onto the 3D map & tables
+    const targetScenId = activeSelectedScenarioId || data.recommended_scenario_id;
+    if (targetScenId) {
+      selectScenario(targetScenId);
     }
   }
 
@@ -1149,7 +1178,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateIncidentQueueDeployedBadges();
       }
 
-      // 3. Initialize default incident
+      // 3. Render pins on 3D map
+      renderIncidentPinsOnMap();
+
+      // 4. Initialize default incident
       const currentInc = data.find(i => i.incident_id === activeIncidentId) || data[0];
       if (currentInc) {
         selectIncident(currentInc.incident_id, true);
@@ -1182,7 +1214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (lblCause) lblCause.textContent = inc.description || 'Active traffic obstruction.';
     if (lblStatusBadge) lblStatusBadge.textContent = `${inc.severity} INCIDENT`;
 
-    // 3. Highlight Card in Right Queue
+    // 3. Highlight Card in Right Queue (if present)
     const cards = document.querySelectorAll('.incident-card');
     cards.forEach(c => {
       const isThis = (c.dataset.incidentId === incidentId);
@@ -1191,7 +1223,47 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (btn) btn.textContent = isThis ? 'Simulating' : 'Simulate Action';
     });
 
-    // 4. Update Blockage & Horizon
+    // 4. Sync Interactive Pins & Popups on 3D Map
+    if (activeIncidentPins && activeIncidentPins.length) {
+      activeIncidentPins.forEach(marker => {
+        const isTarget = (marker._incidentId === incidentId);
+        const markerEl = marker.getElement();
+        if (markerEl) markerEl.classList.toggle('selected', isTarget);
+
+        const popup = marker.getPopup();
+        if (isTarget) {
+          if (popup && !popup.isOpen()) {
+            marker.togglePopup();
+          }
+          const popBtn = popup?.getElement()?.querySelector('.btn-map-popup-simulate');
+          if (popBtn) {
+            popBtn.classList.add('active');
+            popBtn.textContent = 'Currently Simulating';
+          }
+          if (mapInstance) {
+            mapInstance.flyTo({
+              center: marker.getLngLat(),
+              zoom: Math.max(mapInstance.getZoom(), 14.4),
+              pitch: 52,
+              bearing: -17.6,
+              duration: 750
+            });
+          }
+        } else {
+          // Close other popups to avoid overlapping cards
+          if (popup && popup.isOpen()) {
+            marker.togglePopup();
+          }
+          const popBtn = popup?.getElement()?.querySelector('.btn-map-popup-simulate');
+          if (popBtn) {
+            popBtn.classList.remove('active');
+            popBtn.textContent = 'Simulate Diversion';
+          }
+        }
+      });
+    }
+
+    // 5. Update Blockage & Horizon
     const blockPct = Math.round((inc.capacity_reduction_pct || 0.8) * 100);
     const horizonMin = Math.round(inc.estimated_duration_min || 60);
 
@@ -1402,5 +1474,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Initialize Map
   initMapLibre();
+
+  // Concurrently load network data, reported incidents, and initial diversion evaluation
+  loadMangaluruNetwork().then(() => {
+    loadReportedIncidents();
+  });
 
 });

@@ -165,44 +165,24 @@
           </div>
         </div>
 
-        <!-- Center Column: Live Network Map with Real Physical Route Overlays -->
+        <!-- Center Column: Live 3D Network Map with Real-Time Incident Markers -->
         <div class="panel map-panel">
           <div class="panel-header">
             <div class="map-title-row">
-              <h2 class="panel-title" id="mapCardTitle">Mangaluru Arterial Network</h2>
-              <span class="panel-meta">Geo-Physical Corridor Simulation</span>
+              <h2 class="panel-title" id="mapCardTitle">Mangaluru Arterial 3D Network</h2>
+              <span class="panel-meta" id="mapCardMeta">Photorealistic 3D Model &bull; Click any incident pin on map</span>
             </div>
             <div class="map-legend">
-              <span class="legend-item"><span class="legend-dot dot-freeflow"></span>Free Flow</span>
-              <span class="legend-item"><span class="legend-dot dot-moderate"></span>Moderate</span>
               <span class="legend-item"><span class="legend-dot dot-heavy"></span>Incident</span>
               <span class="legend-item"><span class="legend-dot dot-detour-a"></span>Detour A</span>
-              <span class="legend-item"><span class="legend-dot dot-detour-b"></span>Detour B / Split</span>
+              <span class="legend-item"><span class="legend-dot dot-detour-b"></span>Detour B</span>
+              <span class="legend-item"><span class="legend-dot dot-split"></span>Capacity Split</span>
+              <span class="badge-live-pulse" id="lblLivePulse" style="margin-left: 8px;">LIVE PINS</span>
             </div>
           </div>
 
           <div class="map-canvas-container">
             <div id="liveTrafficMap" class="maplibre-container"></div>
-          </div>
-        </div>
-
-        <!-- Right Column: Reported Accidents & Incidents List (Live Queue) -->
-        <div class="panel incident-queue-panel">
-          <div class="panel-header">
-            <div class="header-with-icon">
-              <span class="icon-header icon-amber">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-              </span>
-              <div>
-                <h2 class="panel-title">Reported Accidents</h2>
-                <span class="panel-meta">Live Incident Feed &bull; 7 Active</span>
-              </div>
-            </div>
-            <span class="badge-live-pulse" id="lblLivePulse">LIVE QUEUE</span>
-          </div>
-
-          <div class="incident-queue-scroll" id="incidentQueueList">
-            <!-- Populated dynamically by app.js with incidents and reasons -->
           </div>
         </div>
 
