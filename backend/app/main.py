@@ -8,6 +8,7 @@ from backend.app.config import settings
 from backend.app.api.routes_intelligence import router as intelligence_router
 from backend.app.api.routes_cv import router as cv_router
 from backend.app.api.routes_navigation import router as navigation_router
+from backend.app.api.routes_brain import router as brain_router
 
 app = FastAPI(
     title="Traffic Diffusion — Predictive Traffic Intelligence & Intervention Planning Platform",
@@ -25,6 +26,7 @@ app.add_middleware(
 )
 
 # API Routers
+app.include_router(brain_router)
 app.include_router(intelligence_router)
 app.include_router(navigation_router)
 app.include_router(cv_router)
@@ -68,7 +70,14 @@ async def driver_page():
 @app.api_route("/operations.html", methods=["GET", "HEAD"])
 async def operations_page():
     """Secondary supporting view: CCTV & Legacy Operations Console."""
-    return FileResponse(settings.base_dir / "frontend" / "operations.html")
+    return FileResponse(
+        settings.base_dir / "frontend" / "operations.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 @app.api_route("/login", methods=["GET", "HEAD"])
 @app.api_route("/login.html", methods=["GET", "HEAD"])

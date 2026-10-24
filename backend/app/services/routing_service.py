@@ -62,7 +62,15 @@ class RoutingService:
         # Load edges
         for edge_data in data.get("edges", []):
             edge = RoadEdge(**edge_data)
+            edge.length_meters = round(edge.length_km * 1000.0, 1)
+            edge.nominal_capacity_veh_hr = max(500.0, float(edge.lanes) * 900.0)
+            edge.estimated_baseline_volume_veh_hr = round(float(edge.lanes) * 650.0 * (0.3 + 0.7 * float(edge.density_score)), 1)
+            edge.queue_storage_limit_pcu = round((edge.length_km * 1000.0 * float(edge.lanes)) / 7.5, 1)
+            eff_speed = max(edge.base_speed_kmh, 15.0)
+            edge.free_flow_travel_time_min = round((edge.length_km / eff_speed) * 60.0, 2)
             self._compute_edge_travel_time(edge)
+            edge.effective_travel_time_min = edge.estimated_travel_time_min
+            edge.is_closed = (edge.has_incident and edge.congestion_level == CongestionLevel.BLOCKED)
             self.edges[edge.id] = edge
             self._add_or_update_graph_edge(edge)
 
@@ -100,6 +108,7 @@ class RoutingService:
             multiplier = 1.0
 
         edge.estimated_travel_time_min = round(base_time_min * multiplier, 2)
+        edge.effective_travel_time_min = edge.estimated_travel_time_min
         return edge.estimated_travel_time_min
 
     def _add_or_update_graph_edge(self, edge: RoadEdge) -> None:
@@ -129,11 +138,17 @@ class RoutingService:
             corridor_id=edge.corridor_id,
             road_name=edge.name,
             distance_km=edge.length_km,
+            length_meters=edge.length_meters,
             emergency_weight=emergency_weight,
             standard_weight=standard_weight,
             travel_time_min=edge.estimated_travel_time_min,
+            free_flow_travel_time_min=edge.free_flow_travel_time_min,
+            nominal_capacity_veh_hr=edge.nominal_capacity_veh_hr,
+            estimated_baseline_volume_veh_hr=edge.estimated_baseline_volume_veh_hr,
+            queue_storage_limit_pcu=edge.queue_storage_limit_pcu,
             congestion_level=edge.congestion_level,
             has_incident=edge.has_incident,
+            is_closed=edge.is_closed,
             incident_status=edge.incident_status,
             traffic_signals=edge.traffic_signals,
             is_simulated=edge.is_simulated,
@@ -272,6 +287,37 @@ class RoutingService:
             for k in routing_keys:
                 del self.active_incidents[k]
 
+        return edge
+
+    def update_edge_blockage(self, edge_id: str, blockage_pct: float) -> Optional[RoadEdge]:
+        """
+        Updates capacity reduction / blockage on an edge and recomputes effective travel times.
+        Supports 100% full closure avoidance and partial blockage delay calculation.
+        """
+        if edge_id not in self.edges:
+            return None
+        edge = self.edges[edge_id]
+        blockage_pct = max(0.0, min(1.0, float(blockage_pct)))
+        edge.is_closed = (blockage_pct >= 1.0)
+        edge.has_incident = (blockage_pct > 0.0)
+        if blockage_pct >= 1.0:
+            edge.congestion_level = CongestionLevel.BLOCKED
+            edge.effective_travel_time_min = 999.0
+            edge.estimated_travel_time_min = 999.0
+        else:
+            eff_cap = max(100.0, edge.nominal_capacity_veh_hr * (1.0 - blockage_pct))
+            bpr_factor = 1.0 + 0.15 * ((edge.estimated_baseline_volume_veh_hr / eff_cap) ** 4.0)
+            edge.effective_travel_time_min = max(
+                edge.effective_travel_time_min * (1.0 + blockage_pct),
+                edge.free_flow_travel_time_min * bpr_factor
+            )
+            edge.estimated_travel_time_min = edge.effective_travel_time_min
+            if blockage_pct >= 0.75:
+                edge.congestion_level = CongestionLevel.HEAVY
+            elif blockage_pct >= 0.35:
+                edge.congestion_level = CongestionLevel.MODERATE
+
+        self._add_or_update_graph_edge(edge)
         return edge
 
     def _build_route_candidate(
