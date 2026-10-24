@@ -39,11 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
       timeAgo: "15 mins ago",
       subject: "Heavy Commercial Freight Rollover",
       category: "COLLISION",
-      location: "Circuit House - Nanthoor Road (GPS: 12.87850° N, 74.86200° E)",
-      lat: 12.87850,
-      lng: 74.86200,
+      corridor_id: "corridor_cctv_07",
+      location: "Circuit House - Nanthoor Road (GPS: 12.88307° N, 74.86340° E)",
+      lat: 12.88307,
+      lng: 74.86340,
       severity: "CRITICAL",
-      description: "Overturned multi-axle freight truck blocking both arterial lanes towards Nanthoor circle approach.",
+      description: "Overturned multi-axle freight truck blocking arterial lanes towards Nanthoor circle approach.",
       reporter: "Citizen Commuter",
       reporterAddress: "Hampankatta",
       verified: true,
@@ -55,9 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
       timeAgo: "32 mins ago",
       subject: "Severe Monsoon Flash Flooding",
       category: "WEATHER_WATERLOGGING",
-      location: "Bunts Hostel - Kadri Road (GPS: 12.87350° N, 74.85400° E)",
-      lat: 12.87350,
-      lng: 74.85400,
+      corridor_id: "corridor_cctv_06",
+      location: "Bunts Hostel - Kadri Road (GPS: 12.87967° N, 74.85544° E)",
+      lat: 12.87967,
+      lng: 74.85544,
       severity: "HIGH",
       description: "Severe stormwater accumulation inundating left and central lanes; traffic crawling at 5 km/h.",
       reporter: "Auto Rickshaw Driver",
@@ -71,9 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
       timeAgo: "58 mins ago",
       subject: "Disabled Intercity Transit Bus",
       category: "VEHICLE_BREAKDOWN",
-      location: "M.G. Road near Lalbagh (GPS: 12.87900° N, 74.84600° E)",
-      lat: 12.87900,
-      lng: 74.84600,
+      corridor_id: "corridor_cctv_10",
+      location: "M.G. Road near Lalbagh (GPS: 12.88336° N, 74.84532° E)",
+      lat: 12.88336,
+      lng: 74.84532,
       severity: "MODERATE",
       description: "Stalled intercity bus blocking right two lanes near Lalbagh junction, causing feeder congestion.",
       reporter: "Local Commuter",
@@ -93,8 +96,22 @@ document.addEventListener('DOMContentLoaded', () => {
     console.warn('Could not read stored incident history:', e);
   }
 
-  // Ensure minimum realistic seed history
-  if (!incidentHistory || incidentHistory.length === 0) {
+  // Ensure minimum realistic seed history & migrate old off-road coordinates to road corridor geometry
+  if (incidentHistory && incidentHistory.length > 0) {
+    incidentHistory = incidentHistory.map(inc => {
+      if (inc.id === 'CIT-MNG-101' && (inc.lat < 12.880 || inc.lat > 12.885)) {
+        return { ...inc, lat: 12.88307, lng: 74.86340, corridor_id: 'corridor_cctv_07', location: 'Circuit House - Nanthoor Road (GPS: 12.88307° N, 74.86340° E)' };
+      }
+      if (inc.id === 'CIT-MNG-102' && (inc.lat < 12.875 || inc.lat > 12.882)) {
+        return { ...inc, lat: 12.87967, lng: 74.85544, corridor_id: 'corridor_cctv_06', location: 'Bunts Hostel - Kadri Road (GPS: 12.87967° N, 74.85544° E)' };
+      }
+      if (inc.id === 'CIT-MNG-103' && (inc.lat < 12.880 || inc.lat > 12.886)) {
+        return { ...inc, lat: 12.88336, lng: 74.84532, corridor_id: 'corridor_cctv_10', location: 'M.G. Road near Lalbagh (GPS: 12.88336° N, 74.84532° E)' };
+      }
+      return inc;
+    });
+    saveIncidentHistory();
+  } else {
     incidentHistory = SEED_INCIDENTS;
     saveIncidentHistory();
   }
@@ -549,17 +566,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const fullDetails = `${subject} (${location}) ${description ? '— ' + description : ''}`.trim();
 
-      // Parse or generate realistic coordinates near Mangaluru
+      // Snap coordinates to selected corridor polyline or extract verified GPS
       let incLat = currentCoordinates.lat;
       let incLng = currentCoordinates.lng;
-      const match = location.match(/GPS:\s*([\d\.]+)°\s*N,\s*([\d\.]+)°\s*E/i);
-      if (match) {
-        incLat = parseFloat(match[1]);
-        incLng = parseFloat(match[2]);
+
+      const selectedEdge = networkEdges.find(e => e.id === corridorId || e.corridor_id === corridorId);
+      if (selectedEdge && Array.isArray(selectedEdge.path_coordinates) && selectedEdge.path_coordinates.length > 0) {
+        const midIdx = Math.floor(selectedEdge.path_coordinates.length / 2);
+        incLat = selectedEdge.path_coordinates[midIdx][0];
+        incLng = selectedEdge.path_coordinates[midIdx][1];
       } else {
-        // Random offset near city center
-        incLat = 12.8750 + (Math.random() - 0.5) * 0.015;
-        incLng = 74.8550 + (Math.random() - 0.5) * 0.015;
+        const match = location.match(/GPS:\s*([\d\.]+)°\s*N,\s*([\d\.]+)°\s*E/i);
+        if (match) {
+          incLat = parseFloat(match[1]);
+          incLng = parseFloat(match[2]);
+        }
       }
 
       // Create new incident record
@@ -569,7 +590,8 @@ document.addEventListener('DOMContentLoaded', () => {
         timeAgo: 'Just now',
         subject: subject,
         category: category,
-        location: location,
+        corridor_id: corridorId,
+        location: `${corridorName} (GPS: ${incLat.toFixed(5)}° N, ${incLng.toFixed(5)}° E)`,
         lat: incLat,
         lng: incLng,
         severity: severity,
@@ -1757,7 +1779,14 @@ document.addEventListener('DOMContentLoaded', () => {
       let originCoords = [12.8685, 74.8430]; // Default central Mangaluru GPS
       let originName = 'Your Current GPS Location';
 
-      if (originId !== 'CURRENT_GPS') {
+      if (originId.startsWith('INCIDENT_')) {
+        const incId = originId.replace('INCIDENT_', '');
+        const inc = incidentHistory.find(i => i.id === incId) || window._activeIncidentRouteOrigin;
+        if (inc && inc.lat && inc.lng) {
+          originCoords = [inc.lat, inc.lng];
+          originName = `Hazard: ${inc.subject || 'Incident'}`;
+        }
+      } else if (originId !== 'CURRENT_GPS') {
         const place = MANGALURU_PLACES.find(p => p.id === originId) || networkNodes.find(n => n.id === originId);
         if (place) {
           originCoords = [place.lat, place.lng];
@@ -1769,10 +1798,19 @@ document.addEventListener('DOMContentLoaded', () => {
       let destCoords = [12.8745, 74.8690]; // Default Nanthoor
       let destName = 'Destination';
 
-      const destPlace = MANGALURU_PLACES.find(p => p.id === destId) || networkNodes.find(n => n.id === destId);
-      if (destPlace) {
-        destCoords = [destPlace.lat, destPlace.lng];
-        destName = destPlace.name;
+      if (destId.startsWith('INCIDENT_')) {
+        const incId = destId.replace('INCIDENT_', '');
+        const inc = incidentHistory.find(i => i.id === incId) || window._activeIncidentRouteTarget;
+        if (inc && inc.lat && inc.lng) {
+          destCoords = [inc.lat, inc.lng];
+          destName = `Hazard: ${inc.subject || 'Incident'}`;
+        }
+      } else {
+        const destPlace = MANGALURU_PLACES.find(p => p.id === destId) || networkNodes.find(n => n.id === destId);
+        if (destPlace) {
+          destCoords = [destPlace.lat, destPlace.lng];
+          destName = destPlace.name;
+        }
       }
 
       showToast(`Connecting ${originName.split('(')[0].trim()} ➔ ${destName.split('(')[0].trim()}...`);
@@ -2260,7 +2298,16 @@ document.addEventListener('DOMContentLoaded', () => {
           placeCard.style.display = 'none';
           openDirectionsPanel();
           if (destinationSelect) {
-            destinationSelect.value = 'INT_NANTHOOR';
+            const optVal = `INCIDENT_${inc.id}`;
+            let opt = destinationSelect.querySelector(`option[value="${optVal}"]`);
+            if (!opt) {
+              opt = document.createElement('option');
+              opt.value = optVal;
+              opt.textContent = `⚠️ Hazard: ${inc.subject || 'Road Incident'}`;
+              destinationSelect.insertBefore(opt, destinationSelect.firstChild);
+            }
+            destinationSelect.value = optVal;
+            window._activeIncidentRouteTarget = inc;
           }
           calculateRouteAction();
         };
@@ -2271,7 +2318,16 @@ document.addEventListener('DOMContentLoaded', () => {
           placeCard.style.display = 'none';
           openDirectionsPanel();
           if (originSelect) {
-            originSelect.value = 'INT_NANTHOOR';
+            const optVal = `INCIDENT_${inc.id}`;
+            let opt = originSelect.querySelector(`option[value="${optVal}"]`);
+            if (!opt) {
+              opt = document.createElement('option');
+              opt.value = optVal;
+              opt.textContent = `⚠️ Hazard: ${inc.subject || 'Road Incident'}`;
+              originSelect.insertBefore(opt, originSelect.firstChild);
+            }
+            originSelect.value = optVal;
+            window._activeIncidentRouteOrigin = inc;
           }
         };
       }

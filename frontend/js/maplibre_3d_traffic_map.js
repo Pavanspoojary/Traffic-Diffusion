@@ -459,6 +459,10 @@ class MapLibre3DTrafficMap {
         features: junctionFeatures
       });
     }
+    this.edges = edges;
+    if (this.lastIncidents && this.lastIncidents.length > 0) {
+      this.renderIncidents(this.lastIncidents);
+    }
   }
 
   _getEdgeColor(edge) {
@@ -471,8 +475,55 @@ class MapLibre3DTrafficMap {
     return '#3b82f6';
   }
 
-  // Render Incident SOS Pins on 3D Map
+  // Snap any coordinate directly onto the closest point of the actual road corridor polyline
+  _snapToCorridor(lat, lng, corridorId = null, locationText = '') {
+    const edges = this.edges || this.pendingEdges || [];
+    if (!edges || edges.length === 0) return [lng, lat];
+
+    let candidates = edges;
+    if (corridorId) {
+      const match = edges.filter(e => e.id === corridorId || e.corridor_id === corridorId);
+      if (match.length > 0) candidates = match;
+    } else if (locationText) {
+      const lower = locationText.toLowerCase();
+      const match = edges.filter(e => {
+        if (!e.name) return false;
+        const eLower = e.name.toLowerCase();
+        const words = eLower.split(/\s+/).filter(w => w.length > 3);
+        return words.some(w => lower.includes(w));
+      });
+      if (match.length > 0) candidates = match;
+    }
+
+    let bestDistSq = Infinity;
+    let bestCoord = [lng, lat]; // [lng, lat] for MapLibre
+
+    for (const edge of candidates) {
+      if (!edge.path_coordinates || !Array.isArray(edge.path_coordinates)) continue;
+      for (const pt of edge.path_coordinates) {
+        // pt is [lat, lng]
+        const dLat = pt[0] - lat;
+        const dLng = pt[1] - lng;
+        const distSq = dLat * dLat + dLng * dLng;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          bestCoord = [pt[1], pt[0]]; // [lng, lat]
+        }
+      }
+    }
+
+    // If within ~3km (distSq < 0.0009), snap directly onto the road polyline
+    if (bestDistSq < 0.0009) {
+      return bestCoord;
+    }
+
+    return [lng, lat];
+  }
+
+  // Render Incident SOS Pins on 3D Map (Snapped Directly Onto Road Corridors)
   renderIncidents(incidents) {
+    this.lastIncidents = incidents;
+
     if (!this.isLoaded) {
       this.pendingIncidents = incidents;
       return;
@@ -485,6 +536,16 @@ class MapLibre3DTrafficMap {
     incidents.forEach(inc => {
       if (!inc.lat || !inc.lng) return;
 
+      // Ensure coordinate is snapped directly onto the actual road corridor polyline
+      const snapped = this._snapToCorridor(
+        inc.lat, 
+        inc.lng, 
+        inc.corridor_id || inc.corridorId, 
+        inc.location || inc.subject
+      );
+      const incLng = snapped[0];
+      const incLat = snapped[1];
+
       // Safe Marker Anchor (MapLibre controls transform here without CSS conflict)
       const anchor = document.createElement('div');
       anchor.className = 'maplibre-marker-anchor';
@@ -496,7 +557,9 @@ class MapLibre3DTrafficMap {
       anchor.appendChild(innerPin);
 
       anchor.addEventListener('click', (e) => {
-        window.dispatchEvent(new CustomEvent('gmaps:incident-clicked', { detail: inc }));
+        window.dispatchEvent(new CustomEvent('gmaps:incident-clicked', { 
+          detail: { ...inc, lat: incLat, lng: incLng } 
+        }));
       });
 
       const photoHtml = inc.photo
@@ -519,7 +582,7 @@ class MapLibre3DTrafficMap {
       `;
 
       const marker = new maplibregl.Marker({ element: anchor, anchor: 'center' })
-        .setLngLat([inc.lng, inc.lat])
+        .setLngLat([incLng, incLat])
         .setPopup(
           new maplibregl.Popup({ offset: 14, className: 'maplibre-dark-popup' })
             .setHTML(popupContent)
@@ -534,8 +597,13 @@ class MapLibre3DTrafficMap {
   focusLocation(lat, lng, label = 'Selected Location', zoomLevel = 16) {
     if (!this.map) return;
 
+    // Snap focus target to corridor if near road
+    const snapped = this._snapToCorridor(lat, lng, null, label);
+    const targetLng = snapped[0];
+    const targetLat = snapped[1];
+
     this.map.flyTo({
-      center: [lng, lat],
+      center: [targetLng, targetLat],
       zoom: zoomLevel,
       pitch: 58,
       bearing: -20,
@@ -555,13 +623,13 @@ class MapLibre3DTrafficMap {
     anchor.appendChild(beacon);
 
     this.userGpsMarker = new maplibregl.Marker({ element: anchor, anchor: 'center' })
-      .setLngLat([lng, lat])
+      .setLngLat([targetLng, targetLat])
       .setPopup(
         new maplibregl.Popup({ offset: 14, className: 'maplibre-dark-popup' })
           .setHTML(`
             <div style="font-family: sans-serif; font-size: 12px; padding: 2px;">
               <div style="font-weight: 800; font-size: 13px; color: #f8fafc;">${label}</div>
-              <div style="color: #60a5fa; font-size: 10px; margin-top: 2px;">GPS: ${lat.toFixed(5)}° N, ${lng.toFixed(5)}° E</div>
+              <div style="color: #60a5fa; font-size: 10px; margin-top: 2px;">GPS: ${targetLat.toFixed(5)}° N, ${targetLng.toFixed(5)}° E</div>
             </div>
           `)
       )
