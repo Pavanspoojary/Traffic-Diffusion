@@ -990,10 +990,116 @@ body {
 }
 
 .icon-green { background: #132d20; }
-.dot-blocked { background: #ef4444; }
-.dot-detour-a { background: #38bdf8; }
-.dot-detour-b { background: #a855f7; }
-.dot-chokepoint { background: #f97316; }
+
+/* Exactly 3 Route/Incident Colours Legend Symbols */
+.chip-symbol {
+  display: inline-block;
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.symbol-red-solid {
+  background: #dc2626;
+  height: 4px;
+}
+.symbol-red-dashed {
+  background: repeating-linear-gradient(90deg, #dc2626, #dc2626 3px, transparent 3px, transparent 6px);
+  height: 3.5px;
+}
+.symbol-blue-solid {
+  background: #2563eb;
+  height: 4px;
+}
+.symbol-orange-solid {
+  background: #f97316;
+  height: 4px;
+}
+
+/* Verification State Toggle Chip */
+.verification-toggle-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.4px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.verification-toggle-chip.badge-confirmed {
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid #b91c1c;
+}
+.verification-toggle-chip.badge-confirmed:hover {
+  background: #b91c1c;
+}
+.verification-toggle-chip.badge-suspected {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border: 1.5px dashed #dc2626;
+}
+.verification-toggle-chip.badge-suspected:hover {
+  background: rgba(220, 38, 38, 0.18);
+}
+
+/* 3-Colour Detour Badges */
+.badge-route-recommended {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+.badge-route-alternative {
+  background: #f97316 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+/* On-Map HTML Markers */
+.blocked-map-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.blocked-map-badge.badge-confirmed {
+  background: #dc2626;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+}
+.blocked-map-badge.badge-suspected {
+  background: #ffffff;
+  color: #dc2626;
+  border: 2px dashed #dc2626;
+}
+
+.route-map-badge {
+  padding: 2px 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.route-badge-blue {
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+}
+.route-badge-orange {
+  background: #f97316;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+}
 
 /* Incident Controller Panel */
 .incident-controller-card {
@@ -1411,12 +1517,12 @@ body {
 }
 
 .junction-map-dot {
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: #38bdf8;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+  background: #64748b;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 

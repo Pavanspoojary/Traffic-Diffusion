@@ -47,6 +47,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activeHorizon = 30; // 15, 30, or 60 min
   let latestImpactData = null;
   let latestRiskSegments = [];
+  let isIncidentConfirmed = true; // true = Confirmed Closure (solid red), false = Suspected Blockage (dashed red)
+  let blockedSegmentMarker = null;
+  let routeMarkers = [];
 
   // Presets mapping
   const PRESETS = {
@@ -197,40 +200,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Coordinate order normalizer for MapLibre GL JS: ensure [lng, lat]
+  function normalizeToLngLat(coords) {
+    if (!coords || !Array.isArray(coords)) return [];
+    return coords.map(pt => {
+      if (!Array.isArray(pt) || pt.length < 2) return pt;
+      // In Mangaluru: lat is ~12.8-13.0, lng is ~74.8-75.0
+      // If pt[0] is lat (< 45) and pt[1] is lng (> 45), flip to [lng, lat]
+      if (pt[0] < 45.0 && pt[1] > 45.0) {
+        return [pt[1], pt[0]];
+      }
+      return pt;
+    });
+  }
+
   function renderNetworkOnMap() {
     if (!mapInstance || !currentCorridorsData.length) return;
 
-    const isBaseline = (currentMapMode === 'BASELINE');
     const features = [];
     currentCorridorsData.forEach(edge => {
       const s = currentNodesMap.get(edge.source);
       const t = currentNodesMap.get(edge.target);
       if (!s || !t) return;
 
-      const isTarget = (!isBaseline && edge.id === activeCorridorId);
-      let color = '#22c55e'; // Normal
-      if (isTarget) {
-        color = '#ef4444'; // Blocked in Scenario Mode
-      } else if (edge.congestion_level === 'HEAVY') {
-        color = '#fbbf24';
-      } else if (edge.congestion_level === 'MODERATE') {
-        color = '#38bdf8';
-      }
+      const isTarget = (edge.id === activeCorridorId);
+      const rawCoords = (edge.path_coordinates && edge.path_coordinates.length > 1)
+        ? edge.path_coordinates
+        : [[s.lat, s.lng], [t.lat, t.lng]];
 
       features.push({
         type: 'Feature',
         properties: {
           id: edge.id,
           name: edge.name,
-          color: color,
           isTarget: isTarget,
           lanes: edge.lanes
         },
         geometry: {
           type: 'LineString',
-          coordinates: (edge.path_coordinates && edge.path_coordinates.length > 1)
-            ? edge.path_coordinates
-            : [[s.lng, s.lat], [t.lng, t.lat]]
+          coordinates: normalizeToLngLat(rawCoords)
         }
       });
     });
@@ -245,28 +253,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         data: geojson
       });
 
-      // Background casing for corridors on light map
-      mapInstance.addLayer({
-        id: 'corridors-glow',
-        type: 'line',
-        source: 'mng-corridors',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': ['case', ['get', 'isTarget'], '#fee2e2', '#ffffff'],
-          'line-width': ['case', ['get', 'isTarget'], 10, 6],
-          'line-opacity': 0.85
-        }
-      });
-
-      // Foreground sharp corridor line
+      // Transparent interactive corridor layer so default vector basemap styling shows through,
+      // while preserving click-to-select corridor capability
       mapInstance.addLayer({
         id: 'corridors-core',
         type: 'line',
         source: 'mng-corridors',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'isTarget'], 5, 3]
+          'line-color': 'rgba(0, 0, 0, 0)',
+          'line-width': 14,
+          'line-opacity': 0.0
         }
       });
 
@@ -282,6 +279,118 @@ document.addEventListener('DOMContentLoaded', async () => {
       mapInstance.on('mouseleave', 'corridors-core', () => {
         mapInstance.getCanvas().style.cursor = '';
       });
+    }
+
+    renderBlockedSegmentOnMap();
+  }
+
+  // =========================================================================
+  // 4b. Render Blocked Road Segment (Solid Red if Confirmed, Dashed Red if Suspected)
+  // Layer precedence: white halo casing (13px) + red core (8px) drawn above route layers
+  // =========================================================================
+  function renderBlockedSegmentOnMap() {
+    if (!mapInstance || !currentCorridorsData.length) return;
+
+    const targetEdge = currentCorridorsData.find(e => e.id === activeCorridorId);
+    let coords = null;
+    if (targetEdge) {
+      if (targetEdge.path_coordinates && targetEdge.path_coordinates.length > 1) {
+        coords = normalizeToLngLat(targetEdge.path_coordinates);
+      } else {
+        const u = currentNodesMap.get(targetEdge.source);
+        const v = currentNodesMap.get(targetEdge.target);
+        if (u && v) coords = [[u.lng, u.lat], [v.lng, v.lat]];
+      }
+    }
+
+    const blockedGeoJSON = {
+      type: 'FeatureCollection',
+      features: (targetEdge && coords) ? [{
+        type: 'Feature',
+        properties: {
+          id: targetEdge.id,
+          name: targetEdge.name,
+          isConfirmed: isIncidentConfirmed
+        },
+        geometry: { type: 'LineString', coordinates: coords }
+      }] : []
+    };
+
+    if (mapInstance.getSource('active-blocked-segment')) {
+      mapInstance.getSource('active-blocked-segment').setData(blockedGeoJSON);
+      if (mapInstance.getLayer('blocked-core-layer')) {
+        mapInstance.setPaintProperty('blocked-core-layer', 'line-color', '#dc2626');
+        mapInstance.setPaintProperty('blocked-core-layer', 'line-width', isIncidentConfirmed ? 8.5 : 7.5);
+        if (isIncidentConfirmed) {
+          mapInstance.setPaintProperty('blocked-core-layer', 'line-dasharray', [1, 0]);
+        } else {
+          mapInstance.setPaintProperty('blocked-core-layer', 'line-dasharray', [3, 2]);
+        }
+      }
+    } else {
+      mapInstance.addSource('active-blocked-segment', {
+        type: 'geojson',
+        data: blockedGeoJSON
+      });
+
+      // White halo casing layer ensuring visibility even over overlapping routes
+      mapInstance.addLayer({
+        id: 'blocked-casing-layer',
+        type: 'line',
+        source: 'active-blocked-segment',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 13.0,
+          'line-opacity': 0.98
+        }
+      });
+
+      // Red core line: Solid for confirmed closure, dashed for suspected blockage
+      mapInstance.addLayer({
+        id: 'blocked-core-layer',
+        type: 'line',
+        source: 'active-blocked-segment',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#dc2626',
+          'line-width': isIncidentConfirmed ? 8.5 : 7.5,
+          'line-dasharray': isIncidentConfirmed ? [1, 0] : [3, 2],
+          'line-opacity': 1.0
+        }
+      });
+    }
+
+    // Ensure blocked segment layers are moved to the top of all map layers
+    try {
+      if (mapInstance.getLayer('blocked-casing-layer')) {
+        mapInstance.moveLayer('blocked-casing-layer');
+      }
+      if (mapInstance.getLayer('blocked-core-layer')) {
+        mapInstance.moveLayer('blocked-core-layer');
+      }
+    } catch (e) {
+      console.warn('Blocked segment layer ordering notice:', e);
+    }
+
+    // Midpoint marker badge
+    if (blockedSegmentMarker) {
+      blockedSegmentMarker.remove();
+      blockedSegmentMarker = null;
+    }
+
+    if (coords && coords.length > 0) {
+      const midIdx = Math.floor(coords.length / 2);
+      const midCoord = coords[midIdx];
+      const badgeEl = document.createElement('div');
+      badgeEl.className = `blocked-map-badge ${isIncidentConfirmed ? 'badge-confirmed' : 'badge-suspected'}`;
+      badgeEl.innerHTML = isIncidentConfirmed
+        ? `<span>⛔ CONFIRMED CLOSURE</span>`
+        : `<span>⚠️ SUSPECTED BLOCKAGE</span>`;
+
+      blockedSegmentMarker = new maplibregl.Marker({ element: badgeEl, anchor: 'center' })
+        .setLngLat(midCoord)
+        .addTo(mapInstance);
     }
   }
 
@@ -344,7 +453,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       latestEvaluation = await res.json();
       renderEvaluationResults(latestEvaluation);
-      renderDetoursOnMap(latestEvaluation);
       showToast('Graph Diversion Scenarios calculated');
 
     } catch (err) {
@@ -412,10 +520,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
       } else {
         data.candidate_detours.forEach((d, idx) => {
-          const badgeClass = idx === 0 ? 'badge-route-a' : 'badge-route-b';
-          const badgeLabel = idx === 0 ? 'Route A' : (idx === 1 ? 'Route B' : `Route ${idx+1}`);
+          const isRec = (data.recommended_scenario_id === 'scenario_detour_2' ? idx === 1 : idx === 0);
+          const badgeClass = isRec ? 'badge-route-recommended' : 'badge-route-alternative';
+          const badgeLabel = isRec ? '★ Recommended Route (Blue)' : `⌥ Alternative Route ${idx === 0 ? 'A' : 'B'} (Orange)`;
           const div = document.createElement('div');
-          div.className = `detour-item ${idx === 0 ? 'active-detour' : ''}`;
+          div.className = `detour-item ${isRec ? 'active-detour' : ''}`;
           div.innerHTML = `
             <div class="detour-header">
               <span class="detour-badge ${badgeClass}">${badgeLabel}</span>
@@ -634,17 +743,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderScenarioOnMap(scenario) {
     if (!mapInstance) return;
 
-    // Refresh base corridors
+    // Refresh base corridors (which are transparent so default basemap shines through)
     renderNetworkOnMap();
+
+    // Clear previous route markers
+    routeMarkers.forEach(m => m.remove());
+    routeMarkers = [];
 
     if (currentMapMode === 'BASELINE') {
       if (mapInstance.getSource('active-detours')) {
         mapInstance.getSource('active-detours').setData({ type: 'FeatureCollection', features: [] });
       }
+      renderBlockedSegmentOnMap();
       return;
     }
 
-    if (!latestEvaluation) return;
+    if (!latestEvaluation) {
+      renderBlockedSegmentOnMap();
+      return;
+    }
 
     const detourFeatures = [];
 
@@ -652,7 +769,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const edge = currentCorridorsData.find(e => e.id === eid);
       if (!edge) return null;
       if (edge.path_coordinates && edge.path_coordinates.length > 1) {
-        return edge.path_coordinates;
+        return normalizeToLngLat(edge.path_coordinates);
       }
       const u = currentNodesMap.get(edge.source);
       const v = currentNodesMap.get(edge.target);
@@ -660,77 +777,75 @@ document.addEventListener('DOMContentLoaded', async () => {
       return null;
     }
 
-    if (scenario.scenario_id === 'scenario_baseline') {
-      // Baseline: unmitigated, no detour lines active
-    } else if (scenario.scenario_id === 'scenario_detour_1') {
-      // Route A only (Cyan)
-      if (latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 1) {
-        const d1 = latestEvaluation.candidate_detours[0];
-        if (d1.edge_ids) {
-          d1.edge_ids.forEach(eid => {
-            const coords = getEdgeCoords(eid);
-            if (coords) {
-              detourFeatures.push({
-                type: 'Feature',
-                properties: { route: 'ROUTE_A', color: '#38bdf8' },
-                geometry: { type: 'LineString', coordinates: coords }
-              });
-            }
+    const candidateDetours = latestEvaluation.candidate_detours || [];
+    const isDetour2Rec = (latestEvaluation.recommended_scenario_id === 'scenario_detour_2');
+
+    // Helper to add a route feature and badge marker
+    function addRouteGeometry(detourObj, isRecommended, isSecondaryAlternative = false) {
+      if (!detourObj || !detourObj.edge_ids) return;
+      const color = isRecommended ? '#2563eb' : '#f97316';
+      const width = isRecommended ? 6.5 : (isSecondaryAlternative ? 5.0 : 5.8);
+
+      let allRouteCoords = [];
+      detourObj.edge_ids.forEach(eid => {
+        const coords = getEdgeCoords(eid);
+        if (coords) {
+          allRouteCoords.push(...coords);
+          detourFeatures.push({
+            type: 'Feature',
+            properties: {
+              route: isRecommended ? 'RECOMMENDED' : 'ALTERNATIVE',
+              color: color,
+              width: width
+            },
+            geometry: { type: 'LineString', coordinates: coords }
           });
         }
-      }
-    } else if (scenario.scenario_id === 'scenario_detour_2') {
-      // Route B only (Purple)
-      if (latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 2) {
-        const d2 = latestEvaluation.candidate_detours[1];
-        if (d2.edge_ids) {
-          d2.edge_ids.forEach(eid => {
-            const coords = getEdgeCoords(eid);
-            if (coords) {
-              detourFeatures.push({
-                type: 'Feature',
-                properties: { route: 'ROUTE_B', color: '#a855f7' },
-                geometry: { type: 'LineString', coordinates: coords }
-              });
-            }
-          });
-        }
-      }
-    } else {
-      // Multi-Corridor Split or other: render Route A (Cyan) and Route B (Purple)
-      if (latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 1) {
-        const d1 = latestEvaluation.candidate_detours[0];
-        if (d1.edge_ids) {
-          d1.edge_ids.forEach(eid => {
-            const coords = getEdgeCoords(eid);
-            if (coords) {
-              detourFeatures.push({
-                type: 'Feature',
-                properties: { route: 'ROUTE_A', color: '#38bdf8' },
-                geometry: { type: 'LineString', coordinates: coords }
-              });
-            }
-          });
-        }
-      }
-      if (latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 2) {
-        const d2 = latestEvaluation.candidate_detours[1];
-        if (d2.edge_ids) {
-          d2.edge_ids.forEach(eid => {
-            const coords = getEdgeCoords(eid);
-            if (coords) {
-              detourFeatures.push({
-                type: 'Feature',
-                properties: { route: 'ROUTE_B', color: '#a855f7' },
-                geometry: { type: 'LineString', coordinates: coords }
-              });
-            }
-          });
-        }
+      });
+
+      // Place midpoint badge marker along the route
+      if (allRouteCoords.length > 2) {
+        const midIdx = Math.floor(allRouteCoords.length / 2);
+        const midCoord = allRouteCoords[midIdx];
+        const el = document.createElement('div');
+        el.className = `route-map-badge ${isRecommended ? 'route-badge-blue' : 'route-badge-orange'}`;
+        el.innerHTML = isRecommended
+          ? `★ RECOMMENDED ROUTE (BLUE)`
+          : `⌥ ALTERNATIVE ROUTE (ORANGE)`;
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(midCoord)
+          .addTo(mapInstance);
+        routeMarkers.push(marker);
       }
     }
 
-    // Highlight any secondary downstream bottlenecks created under this scenario in amber
+    if (scenario.scenario_id === 'scenario_baseline') {
+      // Baseline: unmitigated, no detour route lines active
+    } else if (scenario.scenario_id === 'scenario_detour_1') {
+      if (candidateDetours.length >= 1) {
+        const isRec = !isDetour2Rec;
+        addRouteGeometry(candidateDetours[0], isRec);
+      }
+    } else if (scenario.scenario_id === 'scenario_detour_2') {
+      if (candidateDetours.length >= 2) {
+        const isRec = isDetour2Rec;
+        addRouteGeometry(candidateDetours[1], isRec);
+      }
+    } else {
+      // Multi-Corridor Split or combined plan:
+      // Primary recommended detour is rendered in Blue
+      // Secondary alternative detour is rendered in Orange
+      if (candidateDetours.length >= 1) {
+        const d1IsRec = !isDetour2Rec;
+        addRouteGeometry(candidateDetours[0], d1IsRec, !d1IsRec);
+      }
+      if (candidateDetours.length >= 2) {
+        const d2IsRec = isDetour2Rec;
+        addRouteGeometry(candidateDetours[1], d2IsRec, !d2IsRec);
+      }
+    }
+
+    // Downstream Bottlenecks: Strictly rendered in Orange (#f97316) with warning markers (NO 4th colour!)
     if (scenario.downstream_bottlenecks && scenario.downstream_bottlenecks.length) {
       scenario.downstream_bottlenecks.forEach(botName => {
         const botEdge = currentCorridorsData.find(e => e.name === botName);
@@ -739,9 +854,22 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (coords) {
             detourFeatures.push({
               type: 'Feature',
-              properties: { route: 'BOTTLENECK', color: '#f59e0b' },
+              properties: {
+                route: 'BOTTLENECK',
+                color: '#f97316',
+                width: 7.0
+              },
               geometry: { type: 'LineString', coordinates: coords }
             });
+
+            const midCoord = coords[Math.floor(coords.length / 2)];
+            const bEl = document.createElement('div');
+            bEl.className = 'route-map-badge route-badge-orange';
+            bEl.innerHTML = `⚠️ BOTTLENECK (V/C &gt; 1.0)`;
+            const bMarker = new maplibregl.Marker({ element: bEl, anchor: 'top' })
+              .setLngLat(midCoord)
+              .addTo(mapInstance);
+            routeMarkers.push(bMarker);
           }
         }
       });
@@ -764,7 +892,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': '#ffffff',
-          'line-width': 8.5,
+          'line-width': 9.5,
           'line-opacity': 0.95
         }
       });
@@ -776,11 +904,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': 5.5,
+          'line-width': ['get', 'width'],
           'line-opacity': 0.95
         }
       });
     }
+
+    // Now render the Red blocked segment and ensure it is moved to the top layer
+    renderBlockedSegmentOnMap();
 
     // Smoothly pan and frame the affected corridor
     const targetEdge = currentCorridorsData.find(e => e.id === activeCorridorId);
@@ -885,6 +1016,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnSimulate) {
     btnSimulate.addEventListener('click', () => {
       triggerDiversionEvaluation();
+    });
+  }
+
+  // Interactive Verification State Toggle (Confirmed Closure vs Suspected Blockage)
+  const incDetailStatus = document.getElementById('incDetailStatus');
+  if (incDetailStatus) {
+    incDetailStatus.addEventListener('click', () => {
+      isIncidentConfirmed = !isIncidentConfirmed;
+      if (isIncidentConfirmed) {
+        incDetailStatus.textContent = 'CONFIRMED CLOSURE';
+        incDetailStatus.className = 'verification-toggle-chip badge-confirmed';
+        showToast('Closure state: CONFIRMED closure (Solid Red)');
+      } else {
+        incDetailStatus.textContent = '⚠️ SUSPECTED BLOCKAGE';
+        incDetailStatus.className = 'verification-toggle-chip badge-suspected';
+        showToast('Closure state: SUSPECTED blockage (Dashed Red)');
+      }
+      renderBlockedSegmentOnMap();
     });
   }
 
@@ -1130,7 +1279,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const edgeName = edge ? edge.name : activeCorridorId;
 
     if (title) title.textContent = `Active Incident: ${edgeName}`;
-    if (status) status.textContent = (data.incident && data.incident.verification_status) || 'VERIFIED';
+    if (status) {
+      if (isIncidentConfirmed) {
+        status.textContent = 'CONFIRMED CLOSURE';
+        status.className = 'verification-toggle-chip badge-confirmed';
+      } else {
+        status.textContent = '⚠️ SUSPECTED BLOCKAGE';
+        status.className = 'verification-toggle-chip badge-suspected';
+      }
+    }
     if (dur) dur.textContent = `${activeHorizon} min forecast`;
     if (method) method.textContent = 'BPR & Discrete Queue Model';
     if (limit && data.model_assumptions && data.model_assumptions.length) {

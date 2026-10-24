@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Traffic-Diffusion — Traffic Diversion Intelligence for Control Rooms</title>
   <link rel="stylesheet" href="/css/maplibre-gl.css">
-  <link rel="stylesheet" href="/css/style.css?v=6.1">
+  <link rel="stylesheet" href="/css/style.css?v=7.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -206,12 +206,23 @@
                 </svg>
                 <h2 class="panel-title" id="mapCardTitle">Mangaluru Metropolitan Arterials (3D Map)</h2>
               </div>
-              <div class="map-legend-row">
-                <span class="legend-chip"><span class="chip-dot dot-smooth"></span>Normal Flow</span>
-                <span class="legend-chip"><span class="chip-dot dot-blocked"></span>Incident Blockage</span>
-                <span class="legend-chip"><span class="chip-dot dot-detour-a"></span>Detour Route A</span>
-                <span class="legend-chip"><span class="chip-dot dot-detour-b"></span>Detour Route B</span>
-                <span class="legend-chip"><span class="chip-dot dot-chokepoint"></span>Bottleneck Risk</span>
+              <div class="map-legend-row" id="mapCompactLegend">
+                <span class="legend-chip" title="Confirmed blocked road segment (Solid Red)">
+                  <span class="chip-symbol symbol-red-solid"></span>
+                  <span class="legend-chip-label"><strong>Red:</strong> Confirmed Blockage</span>
+                </span>
+                <span class="legend-chip" title="Suspected blockage distinguished by dashed line pattern and warning label">
+                  <span class="chip-symbol symbol-red-dashed"></span>
+                  <span class="legend-chip-label"><strong>Red (Dashed):</strong> Suspected Blockage</span>
+                </span>
+                <span class="legend-chip" title="Recommended diversion route (Blue)">
+                  <span class="chip-symbol symbol-blue-solid"></span>
+                  <span class="legend-chip-label"><strong>Blue:</strong> Recommended Route</span>
+                </span>
+                <span class="legend-chip" title="Alternative candidate route (Orange)">
+                  <span class="chip-symbol symbol-orange-solid"></span>
+                  <span class="legend-chip-label"><strong>Orange:</strong> Alternative Route</span>
+                </span>
               </div>
             </div>
 
@@ -319,7 +330,7 @@
               <div class="incident-detail-box" id="incidentDetailBox">
                 <div class="incident-detail-header">
                   <strong id="incDetailTitle">Active Incident: Nanthoor Rollover</strong>
-                  <span class="provenance-chip" id="incDetailStatus">VERIFIED</span>
+                  <span class="verification-toggle-chip badge-confirmed" id="incDetailStatus" title="Click to toggle between Confirmed Closure (Solid Red) and Suspected Blockage (Dashed Red)">CONFIRMED CLOSURE</span>
                 </div>
                 <div class="incident-detail-meta">
                   <span><strong>Type:</strong> <span id="incDetailType">Collision</span></span>
@@ -687,6 +698,6 @@
   </div>
 
   <script src="/js/maplibre-gl.js"></script>
-  <script src="/js/app.js?v=6.1"></script>
+  <script src="/js/app.js?v=7.1"></script>
 </body>
 </html>

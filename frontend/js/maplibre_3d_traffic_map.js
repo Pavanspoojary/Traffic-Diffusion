@@ -486,12 +486,9 @@ class MapLibre3DTrafficMap {
 
   _getEdgeColor(edge) {
     if (edge.has_incident || edge.congestion_level === 'BLOCKED' || edge.congestion_level === 'HEAVY') {
-      return '#ef4444';
+      return '#dc2626';
     }
-    if (edge.congestion_level === 'MODERATE') {
-      return '#f59e0b';
-    }
-    return '#3b82f6';
+    return 'rgba(0,0,0,0)';
   }
 
   // Snap any coordinate directly onto the closest point of the actual road corridor polyline
