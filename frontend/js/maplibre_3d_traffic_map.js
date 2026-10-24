@@ -438,19 +438,38 @@ class MapLibre3DTrafficMap {
       });
     }
 
-    // Update WebGL Junctions GeoJSON Source (locked to coordinates, zero lag, zero drifting)
-    const junctionFeatures = nodes.map(node => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [node.lng, node.lat]
-      },
-      properties: {
-        id: node.id,
-        name: node.name,
-        type: node.type || 'Key Intersection'
+    // Update WebGL Junctions GeoJSON Source (strictly road-snapped, zero drifting, zero off-road placement)
+    const junctionFeatures = nodes.map(node => {
+      let nodeLng = node.lng;
+      let nodeLat = node.lat;
+
+      // Snap blue dot directly onto the road corridor endpoint
+      const connectedEdge = edges.find(e => e.source === node.id || e.target === node.id);
+      if (connectedEdge && Array.isArray(connectedEdge.path_coordinates) && connectedEdge.path_coordinates.length > 0) {
+        if (connectedEdge.source === node.id) {
+          const pt = connectedEdge.path_coordinates[0];
+          nodeLat = pt[0];
+          nodeLng = pt[1];
+        } else {
+          const pt = connectedEdge.path_coordinates[connectedEdge.path_coordinates.length - 1];
+          nodeLat = pt[0];
+          nodeLng = pt[1];
+        }
       }
-    }));
+
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [nodeLng, nodeLat]
+        },
+        properties: {
+          id: node.id,
+          name: node.name,
+          type: node.type || 'Key Intersection'
+        }
+      };
+    });
 
     const junctionSource = this.map.getSource('traffic-junctions');
     if (junctionSource) {
