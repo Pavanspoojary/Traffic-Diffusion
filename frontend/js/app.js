@@ -367,29 +367,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 6. Stepper & Scenario Helpers
   // =========================================================================
   function updateWorkflowStepper(currentStage) {
-    const s1 = document.getElementById('stepDetect');
-    const s2 = document.getElementById('stepPredict');
-    const s3 = document.getElementById('stepCompare');
-    const s4 = document.getElementById('stepRecommend');
-    if (!s1 || !s2 || !s3 || !s4) return;
-
-    [s1, s2, s3, s4].forEach(s => s.classList.remove('active', 'completed'));
-
-    if (currentStage === 1) {
-      s1.classList.add('active');
-    } else if (currentStage === 2) {
-      s1.classList.add('completed');
-      s2.classList.add('active');
-    } else if (currentStage === 3) {
-      s1.classList.add('completed');
-      s2.classList.add('completed');
-      s3.classList.add('active');
-    } else if (currentStage === 4) {
-      s1.classList.add('completed');
-      s2.classList.add('completed');
-      s3.classList.add('completed');
-      s4.classList.add('active');
-    }
+    // Stepper removed for a cleaner minimal operations header
+    return;
   }
 
   function getActiveOrRecommendedScenario() {
