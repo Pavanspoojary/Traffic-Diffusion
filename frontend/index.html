@@ -29,10 +29,16 @@
       </div>
 
       <div class="header-right">
+        <!-- Prominent Simulation Badge -->
+        <div class="header-pill pill-simulated" id="badgeSimulatedScenario" title="Data Provenance: Deterministic Scenario Simulation">
+          <span class="chip-dot dot-blocked"></span>
+          <span>SIMULATED SCENARIO</span>
+        </div>
+
         <!-- Live Status Pill -->
         <div class="header-pill pill-live">
           <span class="live-dot-pulse"></span>
-          <span>Control Room Live</span>
+          <span>Control Room Active</span>
         </div>
 
         <!-- City Sector Badge (Unified Mangaluru Demonstration Sector) -->
@@ -41,17 +47,18 @@
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
             <circle cx="12" cy="10" r="3"></circle>
           </svg>
-          <span id="currentCityName">Mangaluru Metro (NH-66 / NH-73)</span>
+          <span id="currentCityName">Mangaluru Metro (17 Nodes / 38 Edges)</span>
         </div>
 
-        <!-- Live Clock Pill -->
-        <div class="header-pill pill-clock">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          <span id="headerLiveClock">Live Operational Clock</span>
-        </div>
+        <!-- Reset Demo Action -->
+        <button type="button" class="btn-topbar-action" id="btnResetDemo" title="Reset network graph and restore repeatable demo scenario">
+          Reset Demo
+        </button>
+
+        <!-- Create Incident Action -->
+        <button type="button" class="btn-topbar-action btn-topbar-primary" id="btnOpenCreateIncidentModal" title="Create or simulate custom traffic disruption">
+          + Create Incident
+        </button>
 
         <!-- Citizen Ingestion Queue Trigger -->
         <button type="button" class="btn-citizen-feed-toggle" id="btnOpenCitizenFeed" title="Open Citizen Ingestion Queue">
@@ -204,7 +211,26 @@
                 <span class="legend-chip"><span class="chip-dot dot-blocked"></span>Incident Blockage</span>
                 <span class="legend-chip"><span class="chip-dot dot-detour-a"></span>Detour Route A</span>
                 <span class="legend-chip"><span class="chip-dot dot-detour-b"></span>Detour Route B</span>
-                <span class="legend-chip"><span class="chip-dot dot-chokepoint"></span>Downstream Bottleneck</span>
+                <span class="legend-chip"><span class="chip-dot dot-chokepoint"></span>Bottleneck Risk</span>
+              </div>
+            </div>
+
+            <!-- Analytical Map Controls Toolbar -->
+            <div class="map-toolbar-row">
+              <div class="view-toggle-group">
+                <button type="button" class="btn-toggle active" id="btnMapStateScenario">Forecast / Scenario</button>
+                <button type="button" class="btn-toggle" id="btnMapStateBaseline">Baseline View</button>
+              </div>
+
+              <div class="horizon-selector-group">
+                <span class="horizon-label">Forecast Horizon:</span>
+                <button type="button" class="btn-horizon" data-horizon="15" id="btnHorizon15">15 min</button>
+                <button type="button" class="btn-horizon active" data-horizon="30" id="btnHorizon30">30 min</button>
+                <button type="button" class="btn-horizon" data-horizon="60" id="btnHorizon60">60 min</button>
+              </div>
+
+              <div class="map-freshness-info" id="mapFreshnessInfo">
+                Network: Mangaluru Arterials (17 Nodes, 38 Edges) &bull; Macroscopic Simulation
               </div>
             </div>
 
@@ -281,8 +307,33 @@
                 <input type="range" id="sliderBlockage" min="0" max="100" step="5" value="80" class="control-range">
               </div>
 
+              <!-- Full Closure Switch -->
+              <div class="form-row" style="margin-top: -4px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #cbd5e1; cursor: pointer;">
+                  <input type="checkbox" id="chkFullClosure">
+                  <span>Enforce Complete Road Closure (100% capacity lost)</span>
+                </label>
+              </div>
+
+              <!-- Incident Detail Panel -->
+              <div class="incident-detail-box" id="incidentDetailBox">
+                <div class="incident-detail-header">
+                  <strong id="incDetailTitle">Active Incident: Nanthoor Rollover</strong>
+                  <span class="provenance-chip" id="incDetailStatus">VERIFIED</span>
+                </div>
+                <div class="incident-detail-meta">
+                  <span><strong>Type:</strong> <span id="incDetailType">Collision</span></span>
+                  <span><strong>Source:</strong> <span id="incDetailSource">Traffic Control HQ</span></span>
+                  <span><strong>Duration:</strong> <span id="incDetailDuration">45 min</span></span>
+                  <span><strong>Method:</strong> <span id="incDetailMethod">BPR Queue Model</span></span>
+                </div>
+                <div style="font-size: 10.5px; color: #64748b; margin-top: 4px;">
+                  <strong>Limitations:</strong> <span id="incDetailLimitations">Conditional simulation grounded in link capacities</span>
+                </div>
+              </div>
+
               <!-- Computed Displaced Demand Inspection Strip -->
-              <div class="computed-demand-strip">
+              <div class="computed-demand-strip" style="margin-top: 10px;">
                 <div class="demand-stat">
                   <span class="d-label">Baseline Demand</span>
                   <span class="d-val" id="lblNominalFlow">1,255 PCU/hr</span>
@@ -297,13 +348,20 @@
                 </div>
               </div>
 
-              <!-- Primary Action Button -->
-              <button type="button" class="btn-primary-action" id="btnSimulateDiversion">
+              <!-- Two Distinct Primary Action Buttons -->
+              <button type="button" class="btn-secondary-action" id="btnRunImpactAnalysis">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                <span>Run Impact Analysis (15 / 30 / 60m)</span>
+              </button>
+
+              <button type="button" class="btn-primary-action" id="btnSimulateDiversion" style="margin-top: 8px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="10"></circle>
                   <polygon points="10 8 16 12 10 16 10 8"></polygon>
                 </svg>
-                <span>Run Impact Analysis &amp; Diversion Comparison</span>
+                <span>Compare Interventions (What-If)</span>
               </button>
             </div>
 
@@ -329,14 +387,26 @@
                     <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                     <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                   </svg>
-                  <h2 class="panel-title">Graph Detour Candidates &amp; Ripple Risks</h2>
+                  <h2 class="panel-title">Detour Candidates &amp; Risk Ranking</h2>
                 </div>
               </div>
               <span class="provenance-chip" id="provenanceBadge">ESTIMATED</span>
             </div>
 
+            <!-- Tabs: Detour Candidates vs Ranked Risk Segments -->
+            <div class="step2-tabs">
+              <button type="button" class="btn-step2-tab active" id="tabDetours">Detour Routes</button>
+              <button type="button" class="btn-step2-tab" id="tabRiskSegments">Ranked Risk Corridors</button>
+            </div>
+
+            <!-- Tab 1: Detours List -->
             <div class="detours-list" id="detoursContainer">
               <!-- Populated dynamically by app.js -->
+            </div>
+
+            <!-- Tab 2: Ranked Risk Segments List -->
+            <div class="risk-list-container hidden" id="riskSegmentsContainer">
+              <!-- Populated dynamically from /api/analysis/risk-segments -->
             </div>
 
             <!-- Downstream Ripple Summary Box -->
@@ -512,6 +582,101 @@
           <div id="citizenFeedList" class="citizen-feed">
             <div class="loading-placeholder">Loading citizen reports...</div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for Creating / Simulating Custom Incidents -->
+    <div id="createIncidentModal" class="app-modal hidden">
+      <div class="modal-window">
+        <div class="modal-top">
+          <div class="title-with-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <h3 class="modal-heading">Create / Simulate Road Incident</h3>
+          </div>
+          <button type="button" class="btn-modal-close" id="btnCloseCreateIncidentModal">&times;</button>
+        </div>
+        <div class="modal-scroll-area">
+          <form id="formCreateIncident" class="modal-form-grid">
+            <div>
+              <label class="modal-label" for="modalIncidentCategory">Incident Category</label>
+              <select id="modalIncidentCategory" class="modal-select">
+                <option value="COLLISION">Collision</option>
+                <option value="ROAD_BLOCKAGE">Road Blockage</option>
+                <option value="VEHICLE_BREAKDOWN">Vehicle Breakdown</option>
+                <option value="ROADWORKS">Roadworks / Construction</option>
+                <option value="LANE_CLOSURE">Lane Closure</option>
+                <option value="WEATHER_WATERLOGGING">Weather Waterlogging</option>
+                <option value="SIGNAL_MALFUNCTION">Signal Malfunction</option>
+                <option value="ABNORMAL_CONGESTION">Abnormal Congestion</option>
+                <option value="OTHER">Other Disruption</option>
+              </select>
+            </div>
+            <div>
+              <label class="modal-label" for="modalIncidentEdge">Target Road Segment</label>
+              <select id="modalIncidentEdge" class="modal-select">
+                <!-- Dynamically populated from network edges -->
+              </select>
+            </div>
+            <div>
+              <label class="modal-label" for="modalIncidentSeverity">Severity Level</label>
+              <select id="modalIncidentSeverity" class="modal-select">
+                <option value="LOW">Low (Minor Delay)</option>
+                <option value="MODERATE">Moderate (Partial Disruption)</option>
+                <option value="HIGH" selected>High (Significant Capacity Loss)</option>
+                <option value="CRITICAL">Critical (Severe Gridlock Risk)</option>
+              </select>
+            </div>
+            <div>
+              <label class="modal-label" for="modalBlockagePct">Capacity Reduction (%)</label>
+              <input type="number" id="modalBlockagePct" min="10" max="100" step="5" value="80" class="modal-input">
+            </div>
+            <div>
+              <label class="modal-label" for="modalBlockedLanes">Blocked Lanes</label>
+              <input type="number" id="modalBlockedLanes" min="1" max="4" value="2" class="modal-input">
+            </div>
+            <div>
+              <label class="modal-label" for="modalDurationMin">Estimated Duration (min)</label>
+              <input type="number" id="modalDurationMin" min="5" max="300" step="5" value="45" class="modal-input">
+            </div>
+            <div>
+              <label class="modal-label" for="modalVerificationStatus">Verification State</label>
+              <select id="modalVerificationStatus" class="modal-select">
+                <option value="VERIFIED" selected>Confirmed / Verified Closure</option>
+                <option value="UNVERIFIED">Unconfirmed Report (Flag Only)</option>
+              </select>
+            </div>
+            <div>
+              <label class="modal-label" for="modalProvenance">Data Provenance</label>
+              <select id="modalProvenance" class="modal-select">
+                <option value="SIMULATED" selected>Simulated Scenario</option>
+                <option value="MANUAL_ENTRY">Manual Operator Entry</option>
+                <option value="OBSERVED">Observed Field Incident</option>
+              </select>
+            </div>
+            <div class="modal-form-full">
+              <label class="modal-label" for="modalIncidentSource">Report Source</label>
+              <input type="text" id="modalIncidentSource" value="Control Room Operator Console" class="modal-input">
+            </div>
+            <div class="modal-form-full">
+              <label class="modal-label" for="modalIncidentDesc">Description / Limitations Notes</label>
+              <textarea id="modalIncidentDesc" class="modal-textarea" placeholder="Detail incident specifics and known constraints..."></textarea>
+            </div>
+            <div class="modal-form-full">
+              <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#f8fafc; cursor:pointer;">
+                <input type="checkbox" id="modalFullClosure">
+                <span>Enforce Complete Road Closure (Prohibits all routing across edge)</span>
+              </label>
+            </div>
+            <div class="modal-form-full modal-actions-row">
+              <button type="button" class="btn-topbar-action" id="btnCancelCreateIncident">Cancel</button>
+              <button type="submit" class="btn-topbar-action btn-topbar-primary" id="btnSubmitCreateIncident">Create Incident &amp; Analyze</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

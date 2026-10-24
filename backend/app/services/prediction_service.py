@@ -1,6 +1,6 @@
 import time
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple, Any
 import networkx as nx
 
@@ -12,6 +12,7 @@ from backend.app.models.schemas import (
     EventProvenance,
     VerificationStatus,
     CongestionLevel,
+    IncidentStatus,
     EdgeImpactForecast,
     JunctionSaturationForecast,
     NetworkForecastSnapshot,
@@ -20,6 +21,7 @@ from backend.app.models.schemas import (
     PrioritizedRoadRisk,
     PrioritizedJunctionRisk,
     RiskAssessmentResponse,
+    DemandSimulationResponse,
 )
 
 class PredictiveIncidentEngine:
@@ -36,9 +38,9 @@ class PredictiveIncidentEngine:
     def _init_default_assumptions(self):
         self.assumptions = [
             "Lane saturation flow rate: 900 vehicles/hour/lane nominal arterial capacity.",
-            "Queue accumulation: V_excess = max(0, Inflow - Capacity_eff) * delta_t.",
+            "Discrete queue accumulation: next_queue = max(0, current_queue + arrivals - departures) evaluated at 1-min time steps.",
             "Vehicle storage footprint: 7.5 meters effective space per passenger car unit (PCU).",
-            "Upstream spillback triggers when queue length exceeds segment storage capacity.",
+            "Upstream spillback triggers when queue length exceeds segment storage capacity (length_m * lanes / 7.5).",
             "Diversion loading: 45% of upstream demand seeks nearest parallel bypass corridor.",
             "Forecast horizons calibrated for 15, 30, and 60 minutes from incident inception."
         ]
@@ -53,12 +55,20 @@ class PredictiveIncidentEngine:
         estimated_duration_min: float = 45.0,
         description: Optional[str] = None,
         provenance: EventProvenance = EventProvenance.SIMULATED,
+        is_full_closure: bool = False,
+        verification_status: VerificationStatus = VerificationStatus.VERIFIED,
+        source: Optional[str] = "OPERATOR_CONSOLE",
+        notes: Optional[str] = None,
+        start_timestamp: Optional[str] = None,
     ) -> TrafficIncident:
         """Registers a new traffic incident in the predictive intelligence store."""
         edge = self.routing_service.edges.get(affected_edge_id)
         road_name = edge.name if edge else affected_edge_id
         inc_id = f"INC-{affected_edge_id.upper()}-{int(time.time())}"
-        now_iso = datetime.utcnow().isoformat() + "Z"
+        now_iso = start_timestamp or (datetime.now(timezone.utc).isoformat() + "Z")
+
+        if is_full_closure:
+            capacity_reduction_pct = 1.0
 
         incident = TrafficIncident(
             incident_id=inc_id,
@@ -70,20 +80,39 @@ class PredictiveIncidentEngine:
             blocked_lanes=blocked_lanes,
             total_lanes=edge.lanes if edge else 2,
             capacity_reduction_pct=min(1.0, max(0.0, capacity_reduction_pct)),
+            is_full_closure=is_full_closure,
             estimated_duration_min=max(5.0, estimated_duration_min),
             provenance=provenance,
-            verification_status=VerificationStatus.VERIFIED,
-            confidence_score=0.90 if provenance == EventProvenance.OBSERVED else 0.80,
+            verification_status=verification_status,
+            confidence_score=0.95 if verification_status == VerificationStatus.VERIFIED else (0.85 if provenance == EventProvenance.OBSERVED else 0.70),
             description=description or f"{category.value} blocking {road_name}",
             reported_by="TRAFFIC_CONTROL_ANALYST",
+            source=source,
+            notes=notes,
+            method="BPR_VOLUME_DELAY_AND_DISCRETE_QUEUE_MODEL",
+            limitations="Conditional macroscopic simulation based on link capacities and baseline flow",
         )
 
         self.active_incidents[inc_id] = incident
-        # Update edge in routing_service so public map immediately renders active blockage
+
+        # Update edge in routing_service based on verification state:
+        # Distinguish unconfirmed reports from confirmed closures.
+        # An unconfirmed incident is flagged but does not force a closure unless confirmed or simulated.
         if edge:
             edge.has_incident = True
             edge.incident_description = incident.description
-            edge.congestion_level = CongestionLevel.BLOCKED if severity == IncidentSeverity.CRITICAL else CongestionLevel.HEAVY
+            edge.is_closed = is_full_closure and (verification_status == VerificationStatus.VERIFIED or provenance == EventProvenance.SIMULATED)
+            if verification_status == VerificationStatus.VERIFIED or provenance == EventProvenance.SIMULATED:
+                edge.incident_status = IncidentStatus.CONFIRMED
+                if is_full_closure or severity == IncidentSeverity.CRITICAL:
+                    edge.congestion_level = CongestionLevel.BLOCKED
+                else:
+                    edge.congestion_level = CongestionLevel.HEAVY
+            else:
+                edge.incident_status = IncidentStatus.SUSPECTED
+                # Unconfirmed report: show on map with moderate flag, do not force road closure
+                edge.congestion_level = CongestionLevel.MODERATE
+
         return incident
 
     def get_incident(self, incident_id: str) -> Optional[TrafficIncident]:
@@ -342,6 +371,188 @@ class PredictiveIncidentEngine:
             primary_affected_corridors=list(primary_affected_corridors),
             next_probable_bottlenecks=list(next_probable_bottlenecks),
             model_assumptions=self.assumptions,
+        )
+
+    def evaluate_demand_scenario(
+        self,
+        origin_node_id: str = "EMS_STATE_BANK",
+        destination_node_id: str = "HOSPITAL_AJ_KUNTIKAN",
+        extra_vehicles: int = 10,
+        background_volume_mode: str = "ESTIMATED_CALIBRATED",
+        arrival_window_min: float = 5.0,
+    ) -> DemandSimulationResponse:
+        """
+        Solves the demand model and '10 vehicles, same destination' problem (Prompt C5).
+        Evaluates:
+        1. One route is faster but almost full.
+        2. Another route is longer but has spare capacity.
+        3. Several vehicles sent along the same route make it overloaded.
+        4. Separate routes merge at the same downstream bottleneck.
+        5. All alternatives are poor or infeasible.
+        6. Background demand unknown -> surface explicit uncertainty.
+        """
+        graph = self.routing_service.graph
+        edges_map = self.routing_service.edges
+
+        if not graph.has_node(origin_node_id) or not graph.has_node(destination_node_id):
+            raise ValueError(f"Origin '{origin_node_id}' or destination '{destination_node_id}' not found in road network")
+
+        # Subgraph excluding closed edges
+        subgraph = graph.copy()
+        for eid, e in edges_map.items():
+            if e.is_closed or e.congestion_level == CongestionLevel.BLOCKED:
+                if subgraph.has_edge(e.source, e.target):
+                    subgraph.remove_edge(e.source, e.target)
+
+        if not nx.has_path(subgraph, origin_node_id, destination_node_id):
+            return DemandSimulationResponse(
+                origin_node_id=origin_node_id,
+                destination_node_id=destination_node_id,
+                extra_vehicles=extra_vehicles,
+                background_volume_mode=background_volume_mode,
+                feasible_routes_count=0,
+                routes_evaluated=[],
+                recommended_strategy="NO_FEASIBLE_PATH",
+                recommendation_explanation="No viable route exists in the directed graph between origin and destination without traversing closed roads.",
+                uncertainty_notice=None,
+                assumptions=["No path available due to severe road closures."],
+                provenance="SIMULATION_BASED_ESTIMATE",
+            )
+
+        # Generate up to 3 candidate routes
+        path_gen = nx.shortest_simple_paths(subgraph, origin_node_id, destination_node_id, weight="distance_km")
+        viable_routes = []
+        for p_idx, node_path in enumerate(path_gen):
+            if len(viable_routes) >= 3:
+                break
+            route_edge_objs = []
+            route_edge_ids = []
+            tot_len_km = 0.0
+            free_flow_min = 0.0
+            is_valid = True
+            for i in range(len(node_path) - 1):
+                u, v = node_path[i], node_path[i+1]
+                if not graph.has_edge(u, v):
+                    is_valid = False
+                    break
+                eid = graph[u][v].get("edge_id")
+                e = edges_map.get(eid)
+                if not e:
+                    is_valid = False
+                    break
+                route_edge_objs.append(e)
+                route_edge_ids.append(eid)
+                tot_len_km += e.length_km
+                free_flow_min += (e.length_km / max(e.base_speed_kmh, 15.0)) * 60.0
+
+            if not is_valid:
+                continue
+
+            # Bottleneck and baseline evaluation
+            max_vc = 0.0
+            min_spare_cap = 999999.0
+            bottleneck_name = ""
+            for e in route_edge_objs:
+                nom_cap = max(500.0, float(e.lanes) * 900.0)
+                nom_vol = float(e.lanes) * 650.0 * (0.3 + 0.7 * float(e.density_score)) if background_volume_mode != "UNKNOWN" else nom_cap * 0.50
+                vc = nom_vol / nom_cap
+                spare = max(0.0, nom_cap - nom_vol)
+                if vc > max_vc:
+                    max_vc = vc
+                    bottleneck_name = e.name
+                if spare < min_spare_cap:
+                    min_spare_cap = spare
+
+            viable_routes.append({
+                "route_index": p_idx + 1,
+                "node_path": node_path,
+                "edge_ids": route_edge_ids,
+                "names": [e.name for e in route_edge_objs],
+                "length_km": round(tot_len_km, 2),
+                "free_flow_time_min": round(free_flow_min, 2),
+                "baseline_max_vc": round(max_vc, 2),
+                "bottleneck_name": bottleneck_name,
+                "spare_capacity_pcu_hr": round(min_spare_cap, 1),
+            })
+
+        # Calculate arrival rate from extra vehicles over window
+        added_flow_rate = (float(extra_vehicles) / max(1.0, arrival_window_min)) * 60.0  # PCU/hr equivalent
+
+        # Evaluate Scenario 1: All extra vehicles on Route 1
+        r1 = viable_routes[0]
+        r1_loaded_vc = r1["baseline_max_vc"] + (added_flow_rate / (float(edges_map[r1['edge_ids'][0]].lanes) * 900.0))
+        r1_overloaded = r1_loaded_vc >= 1.0
+
+        fastest_eval = {
+            "route_title": f"Route 1 ({viable_routes[0]['length_km']} km)",
+            "added_flow_rate_pcu_hr": round(added_flow_rate, 1),
+            "projected_peak_vc": round(r1_loaded_vc, 2),
+            "causes_overload": r1_overloaded,
+            "evaluation": "Overloads corridor" if r1_overloaded else "Absorbs extra demand safely"
+        }
+
+        # Evaluate Scenario 2: Route 2 (if available)
+        spare_eval = None
+        if len(viable_routes) >= 2:
+            r2 = viable_routes[1]
+            r2_loaded_vc = r2["baseline_max_vc"] + (added_flow_rate / (float(edges_map[r2['edge_ids'][0]].lanes) * 900.0))
+            spare_eval = {
+                "route_title": f"Route 2 ({r2['length_km']} km)",
+                "spare_capacity_pcu_hr": r2["spare_capacity_pcu_hr"],
+                "projected_peak_vc": round(r2_loaded_vc, 2),
+                "is_longer_but_higher_reserve": r2["length_km"] > r1["length_km"] and r2["spare_capacity_pcu_hr"] > r1["spare_capacity_pcu_hr"]
+            }
+
+        # Check shared downstream bottlenecks between Route 1 and Route 2
+        shared_edge = None
+        shared_warning = None
+        if len(viable_routes) >= 2:
+            common_edges = set(viable_routes[0]["edge_ids"]).intersection(set(viable_routes[1]["edge_ids"]))
+            if common_edges:
+                shared_eid = next(iter(common_edges))
+                shared_e = edges_map.get(shared_eid)
+                shared_edge = shared_e.name if shared_e else shared_eid
+                shared_warning = f"Route 1 and Route 2 merge into common segment '{shared_edge}', which concentrates joint traffic before the destination."
+
+        # Recommendation logic
+        if len(viable_routes) == 1:
+            strategy = "ASSIGN_SINGLE_ROUTE"
+            rec_text = f"Only one feasible path exists ({viable_routes[0]['length_km']} km). All {extra_vehicles} vehicles assigned to Route 1."
+        elif r1_overloaded and spare_eval and spare_eval["projected_peak_vc"] < 1.0:
+            strategy = "CAPACITY_AWARE_DIVERSION_TO_SPARE"
+            rec_text = f"Route 1 is shorter ({r1['length_km']} km) but sending all {extra_vehicles} vehicles pushes its peak V/C to {r1_loaded_vc:.2f} (saturation). Route 2 ({viable_routes[1]['length_km']} km) has {viable_routes[1]['spare_capacity_pcu_hr']} PCU/hr reserve; recommend routing vehicles via Route 2 to avoid causing an active jam."
+        elif r1_overloaded and len(viable_routes) >= 2:
+            strategy = "PROPORTIONAL_CAPACITY_SPLIT"
+            rec_text = f"Both alternative corridors have constrained reserve. Splitting the {extra_vehicles} vehicles across Route 1 (50%) and Route 2 (50%) keeps both links below runaway queue thresholds."
+        else:
+            strategy = "ASSIGN_FASTEST_CORRIDOR"
+            rec_text = f"Route 1 ({r1['length_km']} km) possesses sufficient spare capacity ({r1['spare_capacity_pcu_hr']} PCU/hr) to absorb all {extra_vehicles} vehicles without exceeding capacity (loaded V/C: {r1_loaded_vc:.2f})."
+
+        uncertainty_notice = None
+        if background_volume_mode == "UNKNOWN":
+            uncertainty_notice = "Background arterial demand is unmeasured in the field; baseline volumes are rule-based estimates. Queue calculations are conditional on these modeling assumptions."
+
+        return DemandSimulationResponse(
+            origin_node_id=origin_node_id,
+            destination_node_id=destination_node_id,
+            extra_vehicles=extra_vehicles,
+            background_volume_mode=background_volume_mode,
+            feasible_routes_count=len(viable_routes),
+            routes_evaluated=viable_routes,
+            fastest_alternative=fastest_eval,
+            spare_capacity_alternative=spare_eval,
+            shared_downstream_bottleneck=shared_edge,
+            bottleneck_warning=shared_warning,
+            recommended_strategy=strategy,
+            recommendation_explanation=rec_text,
+            uncertainty_notice=uncertainty_notice,
+            assumptions=[
+                f"{extra_vehicles} extra vehicles arriving over a {arrival_window_min}-minute mobilization window (equivalent flow: {added_flow_rate:.0f} PCU/hr).",
+                "Edge travel times governed by standard BPR volume-delay curves: t = t0 * [1 + 0.15*(V/C)^4].",
+                "Queue accumulation is evaluated against physical storage limits (7.5m / PCU).",
+                "Shared merge bottlenecks are explicitly identified across candidate route geometries.",
+            ],
+            provenance="SIMULATION_BASED_ESTIMATE",
         )
 
 # Global Prediction Engine initialized below

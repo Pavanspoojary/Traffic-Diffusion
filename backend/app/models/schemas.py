@@ -98,16 +98,24 @@ class RoadEdge(BaseModel):
     name: str
     corridor_id: str
     length_km: float
+    length_meters: float = 0.0
     base_speed_kmh: float
+    free_flow_travel_time_min: float = 0.0
+    effective_travel_time_min: float = 0.0
     lanes: int
+    nominal_capacity_veh_hr: float = 1800.0
+    estimated_baseline_volume_veh_hr: float = 800.0
+    queue_storage_limit_pcu: float = 200.0
     density_score: float = 0.25
     congestion_level: CongestionLevel = CongestionLevel.FREE_FLOW
     has_incident: bool = False
+    is_closed: bool = False
     incident_status: IncidentStatus = IncidentStatus.UNKNOWN
     incident_description: Optional[str] = None
     traffic_signals: int = 1
     estimated_travel_time_min: float = 0.0
     data_status: DataStatus = DataStatus.LIVE
+    provenance: EventProvenance = EventProvenance.ESTIMATED
     is_simulated: bool = False
     last_updated_at: Optional[str] = None
     path_coordinates: Optional[List[List[float]]] = None
@@ -123,12 +131,17 @@ class TrafficIncident(BaseModel):
     blocked_lanes: Optional[int] = 1
     total_lanes: Optional[int] = 2
     capacity_reduction_pct: float = Field(0.50, ge=0.0, le=1.0)
+    is_full_closure: bool = False
     estimated_duration_min: float = Field(45.0, ge=1.0)
     provenance: EventProvenance = EventProvenance.SIMULATED
     verification_status: VerificationStatus = VerificationStatus.VERIFIED
     confidence_score: float = Field(0.85, ge=0.0, le=1.0)
     description: Optional[str] = None
     reported_by: Optional[str] = "TRAFFIC_OPERATOR"
+    source: Optional[str] = "OPERATOR_CONSOLE"
+    notes: Optional[str] = None
+    method: Optional[str] = "BPR_QUEUE_SPILLBACK_MODEL"
+    limitations: Optional[str] = "Simulation estimate conditioned on baseline flow assumptions"
 
 class IncidentCreateRequest(BaseModel):
     category: IncidentCategory = IncidentCategory.COLLISION
@@ -136,9 +149,38 @@ class IncidentCreateRequest(BaseModel):
     severity: IncidentSeverity = IncidentSeverity.HIGH
     blocked_lanes: Optional[int] = 1
     capacity_reduction_pct: Optional[float] = 0.60
+    is_full_closure: Optional[bool] = False
     estimated_duration_min: Optional[float] = 45.0
+    start_timestamp: Optional[str] = None
     description: Optional[str] = "Traffic disruption causing arterial queue buildup"
     provenance: EventProvenance = EventProvenance.SIMULATED
+    verification_status: Optional[VerificationStatus] = VerificationStatus.VERIFIED
+    source: Optional[str] = "OPERATOR_MANUAL"
+    notes: Optional[str] = None
+
+class DemandSimulationRequest(BaseModel):
+    origin_node_id: str = "EMS_STATE_BANK"
+    destination_node_id: str = "HOSPITAL_AJ_KUNTIKAN"
+    extra_vehicles: int = 10
+    background_volume_mode: str = "ESTIMATED_CALIBRATED"  # "ESTIMATED_CALIBRATED" | "UNKNOWN"
+    arrival_window_min: float = 5.0
+
+class DemandSimulationResponse(BaseModel):
+    origin_node_id: str
+    destination_node_id: str
+    extra_vehicles: int
+    background_volume_mode: str
+    feasible_routes_count: int
+    routes_evaluated: List[Dict[str, Any]]
+    fastest_alternative: Optional[Dict[str, Any]] = None
+    spare_capacity_alternative: Optional[Dict[str, Any]] = None
+    shared_downstream_bottleneck: Optional[str] = None
+    bottleneck_warning: Optional[str] = None
+    recommended_strategy: str
+    recommendation_explanation: str
+    uncertainty_notice: Optional[str] = None
+    assumptions: List[str]
+    provenance: str = "SIMULATION_BASED_ESTIMATE"
 
 class IncidentRecord(BaseModel):
     incident_id: str

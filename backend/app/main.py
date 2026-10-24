@@ -8,6 +8,7 @@ from backend.app.config import settings
 from backend.app.api.routes_intelligence import router as intelligence_router
 from backend.app.api.routes_cv import router as cv_router
 from backend.app.api.routes_navigation import router as navigation_router
+from backend.app.api.routes_brain import router as brain_router
 
 app = FastAPI(
     title="Traffic Diffusion — Predictive Traffic Intelligence & Intervention Planning Platform",
@@ -25,6 +26,7 @@ app.add_middleware(
 )
 
 # API Routers
+app.include_router(brain_router)
 app.include_router(intelligence_router)
 app.include_router(navigation_router)
 app.include_router(cv_router)

@@ -43,6 +43,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activeBlockagePct = 80;
   let activeDisplacedDemand = 895.0;
   let latestEvaluation = null;
+  let currentMapMode = 'SCENARIO'; // 'SCENARIO' or 'BASELINE'
+  let activeHorizon = 30; // 15, 30, or 60 min
+  let latestImpactData = null;
+  let latestRiskSegments = [];
 
   // Presets mapping
   const PRESETS = {
@@ -78,6 +82,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       setup3DBuildings();
       await loadMangaluruNetwork();
       await triggerDiversionEvaluation();
+      await runImpactAnalysis();
     });
   }
 
@@ -172,6 +177,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       }
 
+      // Populate Incident Modal target edge select
+      const modalIncidentEdge = document.getElementById('modalIncidentEdge');
+      if (modalIncidentEdge && modalIncidentEdge.options.length === 0) {
+        data.edges.forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = `${e.name} (${e.id})`;
+          if (e.id === activeCorridorId) opt.selected = true;
+          modalIncidentEdge.appendChild(opt);
+        });
+      }
+
       renderNetworkOnMap();
       setupJunctionMarkers();
 
@@ -183,16 +200,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderNetworkOnMap() {
     if (!mapInstance || !currentCorridorsData.length) return;
 
+    const isBaseline = (currentMapMode === 'BASELINE');
     const features = [];
     currentCorridorsData.forEach(edge => {
       const s = currentNodesMap.get(edge.source);
       const t = currentNodesMap.get(edge.target);
       if (!s || !t) return;
 
-      const isTarget = (edge.id === activeCorridorId);
+      const isTarget = (!isBaseline && edge.id === activeCorridorId);
       let color = '#22c55e'; // Normal
       if (isTarget) {
-        color = '#ef4444'; // Blocked
+        color = '#ef4444'; // Blocked in Scenario Mode
       } else if (edge.congestion_level === 'HEAVY') {
         color = '#fbbf24';
       } else if (edge.congestion_level === 'MODERATE') {
@@ -614,10 +632,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 8. Render Scenario Specific Routes & Bottlenecks on 3D Map
   // =========================================================================
   function renderScenarioOnMap(scenario) {
-    if (!mapInstance || !latestEvaluation) return;
+    if (!mapInstance) return;
 
     // Refresh base corridors
     renderNetworkOnMap();
+
+    if (currentMapMode === 'BASELINE') {
+      if (mapInstance.getSource('active-detours')) {
+        mapInstance.getSource('active-detours').setData({ type: 'FeatureCollection', features: [] });
+      }
+      return;
+    }
+
+    if (!latestEvaluation) return;
 
     const detourFeatures = [];
 
@@ -967,6 +994,426 @@ document.addEventListener('DOMContentLoaded', async () => {
     toastTimer = setTimeout(() => {
       actionToast.classList.add('hidden');
     }, 3200);
+  }
+
+  // =========================================================================
+  // 11. Traffic Brain: Analytical Controls, Risk Ranking & Horizon Management
+  // =========================================================================
+
+  // Horizon Selection (15 / 30 / 60 min)
+  const horizonButtons = document.querySelectorAll('.btn-horizon');
+  horizonButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      horizonButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeHorizon = parseInt(btn.dataset.horizon, 10);
+      updateFreshnessBanner();
+      await runImpactAnalysis();
+    });
+  });
+
+  // Map View Mode Toggle (Baseline vs Forecast / Scenario)
+  const btnMapStateScenario = document.getElementById('btnMapStateScenario');
+  const btnMapStateBaseline = document.getElementById('btnMapStateBaseline');
+
+  if (btnMapStateScenario && btnMapStateBaseline) {
+    btnMapStateScenario.addEventListener('click', () => {
+      currentMapMode = 'SCENARIO';
+      btnMapStateScenario.classList.add('active');
+      btnMapStateBaseline.classList.remove('active');
+      updateFreshnessBanner();
+      if (latestEvaluation) {
+        const sc = (latestEvaluation.candidate_scenarios && latestEvaluation.candidate_scenarios.find(s => s.scenario_id === activeSelectedScenarioId))
+          || (latestEvaluation.candidate_scenarios && latestEvaluation.candidate_scenarios[0])
+          || latestEvaluation.baseline_scenario;
+        if (sc) renderScenarioOnMap(sc);
+      } else {
+        renderNetworkOnMap();
+      }
+    });
+
+    btnMapStateBaseline.addEventListener('click', () => {
+      currentMapMode = 'BASELINE';
+      btnMapStateBaseline.classList.add('active');
+      btnMapStateScenario.classList.remove('active');
+      updateFreshnessBanner();
+      renderNetworkOnMap();
+      if (mapInstance && mapInstance.getSource('active-detours')) {
+        mapInstance.getSource('active-detours').setData({ type: 'FeatureCollection', features: [] });
+      }
+    });
+  }
+
+  function updateFreshnessBanner() {
+    const banner = document.getElementById('mapFreshnessInfo');
+    if (!banner) return;
+    if (currentMapMode === 'BASELINE') {
+      banner.textContent = 'Network: Mangaluru Arterials (17 Nodes, 38 Edges) • Baseline Nominal State';
+    } else {
+      banner.textContent = `Network: Mangaluru Arterials (17 Nodes, 38 Edges) • Macroscopic Simulation (${activeHorizon}m Forecast)`;
+    }
+  }
+
+  // Action Button: Run Impact Analysis
+  const btnRunImpactAnalysis = document.getElementById('btnRunImpactAnalysis');
+  if (btnRunImpactAnalysis) {
+    btnRunImpactAnalysis.addEventListener('click', async () => {
+      await runImpactAnalysis();
+    });
+  }
+
+  async function runImpactAnalysis() {
+    const btn = document.getElementById('btnRunImpactAnalysis');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span>Analyzing Impact (${activeHorizon}m)...</span>`;
+    }
+
+    try {
+      const isFull = document.getElementById('chkFullClosure') ? document.getElementById('chkFullClosure').checked : (activeBlockagePct >= 100);
+      const payload = {
+        incident: {
+          incident_id: `INC-MNG-${activeCorridorId.toUpperCase()}`,
+          affected_edge_id: activeCorridorId,
+          capacity_reduction_pct: activeBlockagePct / 100.0,
+          severity: activeBlockagePct >= 80 ? 'CRITICAL' : (activeBlockagePct >= 50 ? 'HIGH' : 'MODERATE'),
+          estimated_duration_min: 45.0,
+          is_full_closure: isFull,
+          provenance: 'SIMULATED',
+          verification_status: 'VERIFIED',
+          description: `Spatiotemporal disruption on ${activeCorridorId}`
+        },
+        horizons: [activeHorizon]
+      };
+
+      const res = await fetch('/api/analysis/impact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        showToast('Impact analysis failed');
+        return;
+      }
+
+      latestImpactData = await res.json();
+      updateIncidentDetailBox(latestImpactData);
+      await fetchRiskSegments();
+      switchToRiskTab();
+      showToast(`Impact analysis completed for ${activeHorizon}m horizon`);
+
+    } catch (err) {
+      console.error('Impact analysis error:', err);
+      showToast('Error connecting to impact analysis engine');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+          <span>Run Impact Analysis (15 / 30 / 60m)</span>
+        `;
+      }
+    }
+  }
+
+  function updateIncidentDetailBox(data) {
+    const title = document.getElementById('incDetailTitle');
+    const status = document.getElementById('incDetailStatus');
+    const dur = document.getElementById('incDetailDuration');
+    const method = document.getElementById('incDetailMethod');
+    const limit = document.getElementById('incDetailLimitations');
+
+    const edge = currentCorridorsData.find(e => e.id === activeCorridorId);
+    const edgeName = edge ? edge.name : activeCorridorId;
+
+    if (title) title.textContent = `Active Incident: ${edgeName}`;
+    if (status) status.textContent = (data.incident && data.incident.verification_status) || 'VERIFIED';
+    if (dur) dur.textContent = `${activeHorizon} min forecast`;
+    if (method) method.textContent = 'BPR & Discrete Queue Model';
+    if (limit && data.model_assumptions && data.model_assumptions.length) {
+      limit.textContent = data.model_assumptions[0];
+    }
+  }
+
+  async function fetchRiskSegments() {
+    try {
+      const res = await fetch(`/api/analysis/risk-segments?horizon_minutes=${activeHorizon}`);
+      if (!res.ok) return;
+      const riskData = await res.json();
+      latestRiskSegments = riskData.high_risk_roads || [];
+      renderRiskSegments(latestRiskSegments);
+    } catch (err) {
+      console.warn('Failed to fetch risk segments:', err);
+    }
+  }
+
+  function renderRiskSegments(segments) {
+    const container = document.getElementById('riskSegmentsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!segments || !segments.length) {
+      container.innerHTML = '<div style="padding:16px; color:#94a3b8; text-align:center;">No high risk segments flagged for this horizon.</div>';
+      return;
+    }
+
+    segments.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'risk-segment-item';
+      
+      let badgeClass = 'risk-badge-moderate';
+      if (item.risk_level === 'CRITICAL') badgeClass = 'risk-badge-critical';
+      else if (item.risk_level === 'HIGH') badgeClass = 'risk-badge-high';
+
+      const reasonsHtml = (item.contributing_factors || []).map(f => `<li>${f}</li>`).join('');
+
+      div.innerHTML = `
+        <div class="risk-item-header">
+          <span class="risk-road-name">${item.road_name}</span>
+          <span class="risk-badge ${badgeClass}">${item.risk_level}</span>
+        </div>
+        <div class="risk-item-sub">${item.edge_id} &bull; Score: ${item.risk_score.toFixed(1)} / 100 &bull; Rank #${item.rank}</div>
+        <ul class="risk-reasons-list">
+          ${reasonsHtml}
+        </ul>
+        <div style="font-size:10.5px; color:#94a3b8; margin-top:4px;">
+          <em>Action: ${item.recommended_action}</em>
+        </div>
+      `;
+
+      // Click to fly to edge on map
+      div.addEventListener('click', () => {
+        const edge = currentCorridorsData.find(e => e.id === item.edge_id);
+        if (edge && mapInstance) {
+          const s = currentNodesMap.get(edge.source);
+          const t = currentNodesMap.get(edge.target);
+          if (s && t) {
+            mapInstance.flyTo({
+              center: [(s.lng + t.lng) / 2.0, (s.lat + t.lat) / 2.0],
+              zoom: 15.0,
+              pitch: 50,
+              essential: true
+            });
+          }
+        }
+      });
+
+      container.appendChild(div);
+    });
+  }
+
+  // Step 2 Tab Switchers
+  const tabDetours = document.getElementById('tabDetours');
+  const tabRiskSegments = document.getElementById('tabRiskSegments');
+
+  function switchToDetoursTab() {
+    if (tabDetours) tabDetours.classList.add('active');
+    if (tabRiskSegments) tabRiskSegments.classList.remove('active');
+    const cDet = document.getElementById('detoursContainer');
+    const cRisk = document.getElementById('riskSegmentsContainer');
+    if (cDet) cDet.classList.remove('hidden');
+    if (cRisk) cRisk.classList.add('hidden');
+  }
+
+  function switchToRiskTab() {
+    if (tabDetours) tabDetours.classList.remove('active');
+    if (tabRiskSegments) tabRiskSegments.classList.add('active');
+    const cDet = document.getElementById('detoursContainer');
+    const cRisk = document.getElementById('riskSegmentsContainer');
+    if (cDet) cDet.classList.add('hidden');
+    if (cRisk) cRisk.classList.remove('hidden');
+  }
+
+  if (tabDetours) tabDetours.addEventListener('click', switchToDetoursTab);
+  if (tabRiskSegments) {
+    tabRiskSegments.addEventListener('click', async () => {
+      switchToRiskTab();
+      if (!latestRiskSegments.length) {
+        await fetchRiskSegments();
+      }
+    });
+  }
+
+  // Enforce Complete Road Closure Checkbox
+  const chkFullClosure = document.getElementById('chkFullClosure');
+  if (chkFullClosure) {
+    chkFullClosure.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        activeBlockagePct = 100;
+        if (sliderBlockage) {
+          sliderBlockage.value = 100;
+          sliderBlockage.disabled = true;
+        }
+        if (lblBlockagePct) lblBlockagePct.textContent = '100% Blocked (FULL CLOSURE)';
+      } else {
+        activeBlockagePct = 80;
+        if (sliderBlockage) {
+          sliderBlockage.value = 80;
+          sliderBlockage.disabled = false;
+        }
+        if (lblBlockagePct) lblBlockagePct.textContent = '80% Blocked';
+      }
+      triggerDiversionEvaluation();
+    });
+  }
+
+  // Reset Demo Action Button
+  const btnResetDemo = document.getElementById('btnResetDemo');
+  if (btnResetDemo) {
+    btnResetDemo.addEventListener('click', async () => {
+      await resetDemoScenario();
+    });
+  }
+
+  async function resetDemoScenario() {
+    try {
+      const res = await fetch('/api/demo/reset', { method: 'POST' });
+      if (!res.ok) {
+        showToast('Demo reset failed');
+        return;
+      }
+      activeCorridorId = 'corridor_cctv_07';
+      activeBlockagePct = 80;
+      activeHorizon = 30;
+      currentMapMode = 'SCENARIO';
+
+      // Reset controls
+      if (sliderBlockage) {
+        sliderBlockage.value = 80;
+        sliderBlockage.disabled = false;
+      }
+      if (lblBlockagePct) lblBlockagePct.textContent = '80% Blocked';
+      if (selectCorridor) selectCorridor.value = activeCorridorId;
+      if (chkFullClosure) chkFullClosure.checked = false;
+
+      // Reset horizon buttons
+      horizonButtons.forEach(b => {
+        b.classList.toggle('active', b.dataset.horizon === '30');
+      });
+
+      // Reset view toggle
+      if (btnMapStateScenario) btnMapStateScenario.classList.add('active');
+      if (btnMapStateBaseline) btnMapStateBaseline.classList.remove('active');
+      updateFreshnessBanner();
+
+      // Reset presets
+      presetButtons.forEach(b => {
+        b.classList.toggle('active', b.dataset.corridor === 'corridor_cctv_07');
+      });
+
+      // Reload network & recalculate
+      await loadMangaluruNetwork();
+      await triggerDiversionEvaluation();
+      await runImpactAnalysis();
+      switchToDetoursTab();
+
+      showToast('Demo scenario reset to repeatable baseline fixture (Nanthoor Rollover 80%)');
+    } catch (err) {
+      console.error('Demo reset error:', err);
+      showToast('Error resetting demo scenario');
+    }
+  }
+
+  // Create Incident Modal Wiring
+  const createIncidentModal = document.getElementById('createIncidentModal');
+  const btnOpenCreateIncidentModal = document.getElementById('btnOpenCreateIncidentModal');
+  const btnCloseCreateIncidentModal = document.getElementById('btnCloseCreateIncidentModal');
+  const btnCancelCreateIncident = document.getElementById('btnCancelCreateIncident');
+  const formCreateIncident = document.getElementById('formCreateIncident');
+  const modalFullClosure = document.getElementById('modalFullClosure');
+  const modalBlockagePct = document.getElementById('modalBlockagePct');
+
+  if (btnOpenCreateIncidentModal) {
+    btnOpenCreateIncidentModal.addEventListener('click', () => {
+      if (createIncidentModal) createIncidentModal.classList.remove('hidden');
+    });
+  }
+
+  function closeCreateModal() {
+    if (createIncidentModal) createIncidentModal.classList.add('hidden');
+  }
+
+  if (btnCloseCreateIncidentModal) btnCloseCreateIncidentModal.addEventListener('click', closeCreateModal);
+  if (btnCancelCreateIncident) btnCancelCreateIncident.addEventListener('click', closeCreateModal);
+
+  if (modalFullClosure && modalBlockagePct) {
+    modalFullClosure.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        modalBlockagePct.value = 100;
+        modalBlockagePct.disabled = true;
+      } else {
+        modalBlockagePct.disabled = false;
+        modalBlockagePct.value = 80;
+      }
+    });
+  }
+
+  if (formCreateIncident) {
+    formCreateIncident.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const edgeId = document.getElementById('modalIncidentEdge').value;
+      const category = document.getElementById('modalIncidentCategory').value;
+      const severity = document.getElementById('modalIncidentSeverity').value;
+      const isFull = modalFullClosure ? modalFullClosure.checked : false;
+      const blockage = isFull ? 100 : parseInt(modalBlockagePct.value, 10);
+      const blockedLanes = parseInt(document.getElementById('modalBlockedLanes').value, 10);
+      const duration = parseFloat(document.getElementById('modalDurationMin').value);
+      const verif = document.getElementById('modalVerificationStatus').value;
+      const prov = document.getElementById('modalProvenance').value;
+      const source = document.getElementById('modalIncidentSource').value;
+      const notes = document.getElementById('modalIncidentDesc').value;
+
+      const payload = {
+        affected_edge_id: edgeId,
+        category: category,
+        severity: severity,
+        capacity_reduction_pct: blockage / 100.0,
+        is_full_closure: isFull,
+        blocked_lanes: blockedLanes,
+        estimated_duration_min: duration,
+        verification_status: verif,
+        provenance: prov,
+        source: source,
+        notes: notes
+      };
+
+      try {
+        const res = await fetch('/api/incidents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          showToast('Failed to create incident');
+          return;
+        }
+
+        const created = await res.json();
+        closeCreateModal();
+        showToast(`Incident created: ${created.incident_id} on ${created.affected_edge_id}`);
+
+        activeCorridorId = created.affected_edge_id;
+        activeBlockagePct = blockage;
+        if (selectCorridor) selectCorridor.value = activeCorridorId;
+        if (sliderBlockage) {
+          sliderBlockage.value = blockage;
+          sliderBlockage.disabled = isFull;
+        }
+        if (lblBlockagePct) lblBlockagePct.textContent = `${blockage}% Blocked`;
+        if (chkFullClosure) chkFullClosure.checked = isFull;
+
+        await triggerDiversionEvaluation();
+        await runImpactAnalysis();
+
+      } catch (err) {
+        console.error('Incident create error:', err);
+        showToast('Error submitting incident to server');
+      }
+    });
   }
 
   // Initialize Map

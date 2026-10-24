@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
 import networkx as nx
 
@@ -162,7 +162,7 @@ class RiskAnalysisService:
         highest_sector = high_risk_roads[0].road_name if high_risk_roads else "Central Arterial Grid"
 
         return RiskAssessmentResponse(
-            generated_at=datetime.utcnow().isoformat() + "Z",
+            generated_at=datetime.now(timezone.utc).isoformat() + "Z",
             forecast_horizon_minutes=snapshot.horizon_minutes,
             high_risk_roads=high_risk_roads[:8],
             critical_junctions=critical_junctions[:6],
