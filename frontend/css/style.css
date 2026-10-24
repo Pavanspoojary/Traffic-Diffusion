@@ -391,41 +391,75 @@ body {
   color: var(--text-dim);
 }
 
-/* Preset Chips */
-.preset-chips {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* Manual Demand Input Row */
+.demand-input-row {
+  display: flex;
+  align-items: center;
   gap: 6px;
-}
-
-.preset-chip {
   background: var(--bg-input);
   border: 1px solid var(--border-panel);
-  color: var(--text-secondary);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 6px 9px;
   border-radius: 5px;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 3px 8px;
+  transition: border-color 0.15s ease;
 }
 
-.preset-chip:hover {
-  background: rgba(255, 255, 255, 0.05);
+.demand-input-row:focus-within {
+  border-color: var(--accent-cyan);
+}
+
+.control-input {
+  flex: 1;
+  background: transparent;
+  border: none;
   color: var(--text-primary);
-  border-color: #334155;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+  min-width: 0;
+  padding: 4px 2px;
 }
 
-.preset-chip.active {
-  background: rgba(56, 189, 248, 0.12);
+.input-unit {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  user-select: none;
+}
+
+.btn-input-aux {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-panel);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-input-aux:hover {
+  background: rgba(56, 189, 248, 0.15);
   border-color: var(--accent-cyan);
   color: var(--accent-cyan);
-  font-weight: 600;
+}
+
+/* Control Select & Optgroups */
+.control-select optgroup {
+  background: #0f172a;
+  color: #38bdf8;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.control-select option {
+  background: #0b1120;
+  color: #f1f5f9;
+  font-weight: normal;
+  font-size: 11.5px;
+  padding: 4px 6px;
 }
 
 /* Road Select Dropdown */
@@ -609,6 +643,11 @@ body {
   border-radius: 50%;
 }
 
+.dot-freeflow {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
 .dot-heavy {
   background: var(--accent-red);
   box-shadow: 0 0 6px var(--accent-red);
@@ -626,6 +665,12 @@ body {
 
 .dot-moderate {
   background: var(--accent-amber);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+
+.dot-split {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
 }
 
 .dot-smooth {

@@ -189,11 +189,12 @@ async def evaluate_intervention_scenarios(request: InterventionEvaluationRequest
 
     evaluation = intervention_service.evaluate_interventions(
         incident=target_incident,
-        horizon_minutes=30,
+        horizon_minutes=request.horizon_minutes if request.horizon_minutes else 30,
         custom_scenarios=request.custom_scenarios,
         optimization_objective=request.optimization_objective,
         override_displaced_demand=request.override_displaced_demand,
         override_blockage_pct=request.override_blockage_pct,
+        override_baseline_demand=request.override_baseline_demand,
     )
     return evaluation
 

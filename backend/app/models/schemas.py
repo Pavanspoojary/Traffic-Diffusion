@@ -292,6 +292,8 @@ class InterventionEvaluationRequest(BaseModel):
     optimization_objective: str = "MINIMIZE_NETWORK_DELAY_AND_PREVENT_JUNCTION_GRIDLOCK"
     override_displaced_demand: Optional[float] = None
     override_blockage_pct: Optional[float] = None
+    override_baseline_demand: Optional[float] = None
+    horizon_minutes: Optional[int] = 60
 
 class InterventionEvaluationResponse(BaseModel):
     incident_id: str

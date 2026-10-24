@@ -85,87 +85,157 @@
           <div class="panel-header">
             <div class="header-with-icon">
               <span class="icon-header icon-red">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
               </span>
-              <h2 class="panel-title">Incident Setup</h2>
+              <h2 class="panel-title">Simulation Controls</h2>
             </div>
-            <span class="panel-meta">Stage 01 &bull; Detect</span>
+            <span class="panel-meta">Stage 01 &bull; Manual Setup</span>
           </div>
 
           <div class="panel-body">
-            <!-- Quick Presets -->
-            <div class="control-group">
-              <label class="control-label">Quick Incident Presets</label>
-              <div class="preset-chips">
-                <button type="button" class="preset-chip active" id="presetNanthoor" data-corridor="corridor_cctv_07" data-block="80">
-                  Nanthoor (80%)
-                </button>
-                <button type="button" class="preset-chip" id="presetBunts" data-corridor="corridor_cctv_05" data-block="50">
-                  Bunts (50%)
-                </button>
-                <button type="button" class="preset-chip" id="presetMgRoad" data-corridor="corridor_cctv_10" data-block="60">
-                  MG Road (60%)
-                </button>
-                <button type="button" class="preset-chip" id="presetHampankatta" data-corridor="corridor_cctv_01" data-block="100">
-                  K.S. Rao (100%)
-                </button>
-              </div>
-            </div>
-
             <!-- Road Segment Selector -->
             <div class="control-group">
               <div class="label-with-tip">
-                <label for="selectCorridor" class="control-label">Road Segment</label>
+                <label for="selectCorridor" class="control-label">Target Road Corridor</label>
                 <span class="control-tip">or click road on map</span>
               </div>
               <select id="selectCorridor" class="control-select">
-                <option value="corridor_cctv_07" selected>Circuit House - Nanthoor Road (corridor_cctv_07)</option>
-                <option value="corridor_cctv_05">Bunts Hostel - Kadri Road (corridor_cctv_05)</option>
-                <option value="corridor_cctv_10">M.G. Road (Lalbagh - Ladyhill) (corridor_cctv_10)</option>
-                <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
-                <option value="corridor_cctv_08_rev">NH-66 Kuntikan to Nanthoor (corridor_cctv_08_rev)</option>
-                <option value="corridor_cctv_15">NH-66 Pumpwell to Nanthoor Bypass (corridor_cctv_15)</option>
+                <optgroup label="Major Arterials">
+                  <option value="corridor_cctv_07" selected>Circuit House - Nanthoor Road (corridor_cctv_07)</option>
+                  <option value="corridor_cctv_07_rev">Nanthoor to Circuit House (corridor_cctv_07_rev)</option>
+                  <option value="corridor_cctv_05">Bunts Hostel Avenue (corridor_cctv_05)</option>
+                  <option value="corridor_cctv_05_rev">Bunts Hostel Avenue SB (corridor_cctv_05_rev)</option>
+                  <option value="corridor_cctv_06">Kadri Road Corridor (corridor_cctv_06)</option>
+                  <option value="corridor_cctv_06_rev">Kadri Road Corridor WB (corridor_cctv_06_rev)</option>
+                  <option value="corridor_cctv_10">Mahatma Gandhi (MG) Road (corridor_cctv_10)</option>
+                  <option value="corridor_cctv_10_rev">Mahatma Gandhi (MG) Road SB (corridor_cctv_10_rev)</option>
+                  <option value="corridor_cctv_01">K.S. Rao Arterial Road (corridor_cctv_01)</option>
+                  <option value="corridor_cctv_01_rev">K.S. Rao Road SB (corridor_cctv_01_rev)</option>
+                  <option value="corridor_cctv_13">Balmatta - Bendorewell Arterial (corridor_cctv_13)</option>
+                  <option value="corridor_cctv_13_rev">Balmatta - Bendorewell NB (corridor_cctv_13_rev)</option>
+                  <option value="corridor_cctv_20">Falnir - Kankanady Arterial Road (corridor_cctv_20)</option>
+                  <option value="corridor_cctv_20_rev">Falnir - Kankanady WB (corridor_cctv_20_rev)</option>
+                </optgroup>
+                <optgroup label="Highways &amp; Bypasses">
+                  <option value="corridor_cctv_08">NH-66 Kuntikan to Nanthoor (corridor_cctv_08)</option>
+                  <option value="corridor_cctv_08_rev">NH-66 Nanthoor to Kuntikan (corridor_cctv_08_rev)</option>
+                  <option value="corridor_cctv_16">NH-66 Pumpwell to Nanthoor Bypass (corridor_cctv_16)</option>
+                  <option value="corridor_cctv_16_rev">NH-66 Nanthoor to Pumpwell Bypass (corridor_cctv_16_rev)</option>
+                  <option value="corridor_cctv_11">Bejai Green Bypass Expressway (corridor_cctv_11)</option>
+                  <option value="corridor_cctv_11_rev">Bejai Green Bypass SB (corridor_cctv_11_rev)</option>
+                  <option value="corridor_cctv_15">Kankanady - Pumpwell Connector (corridor_cctv_15)</option>
+                  <option value="corridor_cctv_15_rev">Pumpwell - Kankanady Connector (corridor_cctv_15_rev)</option>
+                </optgroup>
+                <optgroup label="City Links &amp; Commercial">
+                  <option value="corridor_cctv_03">Light House Hill Road (corridor_cctv_03)</option>
+                  <option value="corridor_cctv_03_rev">Light House Hill Road WB (corridor_cctv_03_rev)</option>
+                  <option value="corridor_cctv_09">Navabharath Circle Link (corridor_cctv_09)</option>
+                  <option value="corridor_cctv_09_rev">Navabharath Circle Link EB (corridor_cctv_09_rev)</option>
+                  <option value="corridor_cctv_18">MG Road - Shri Devi College Road (corridor_cctv_18)</option>
+                  <option value="corridor_cctv_18_rev">Shri Devi College to MG Road (corridor_cctv_18_rev)</option>
+                  <option value="corridor_cctv_19">Ballalbagh Link Road (corridor_cctv_19)</option>
+                  <option value="corridor_cctv_19_rev">Ballalbagh Link SB (corridor_cctv_19_rev)</option>
+                  <option value="corridor_cctv_21">GHS Road - Car Street Link (corridor_cctv_21)</option>
+                  <option value="corridor_cctv_21_rev">Car Street - GHS Road SB (corridor_cctv_21_rev)</option>
+                  <option value="corridor_cctv_22">Port Road - Bunder Commercial Link (corridor_cctv_22)</option>
+                  <option value="corridor_cctv_22_rev">Bunder to Port Road SB (corridor_cctv_22_rev)</option>
+                </optgroup>
+                <optgroup label="Hospital &amp; Emergency Access">
+                  <option value="corridor_cctv_02">Wenlock Emergency Access Way (corridor_cctv_02)</option>
+                  <option value="corridor_cctv_02_rev">Wenlock Exit Way (corridor_cctv_02_rev)</option>
+                  <option value="corridor_cctv_04">Ambedkar Circle Hospital Intake (corridor_cctv_04)</option>
+                  <option value="corridor_cctv_04_rev">Ambedkar Circle Exit (corridor_cctv_04_rev)</option>
+                  <option value="corridor_cctv_12">A.J. Trauma Center Access Flyover (corridor_cctv_12)</option>
+                  <option value="corridor_cctv_12_rev">A.J. Trauma Center Exit (corridor_cctv_12_rev)</option>
+                  <option value="corridor_cctv_14">Father Muller Emergency Gate (corridor_cctv_14)</option>
+                  <option value="corridor_cctv_14_rev">Father Muller Exit Gate (corridor_cctv_14_rev)</option>
+                  <option value="corridor_cctv_17">Kadri Hills Dispatch Link (corridor_cctv_17)</option>
+                  <option value="corridor_cctv_17_rev">Kadri Hills Fire Base Access (corridor_cctv_17_rev)</option>
+                </optgroup>
               </select>
+            </div>
+
+            <!-- Incident Category Selector -->
+            <div class="control-group">
+              <div class="label-with-tip">
+                <label for="selectIncidentType" class="control-label">Incident Category</label>
+                <span class="control-tip" id="lblSeverityTag">CRITICAL IMPACT</span>
+              </div>
+              <select id="selectIncidentType" class="control-select">
+                <option value="COLLISION" selected>Vehicle Collision / Overturned Tanker</option>
+                <option value="BREAKDOWN">Heavy Vehicle Breakdown / Stalled Bus</option>
+                <option value="WATERLOGGING">Monsoon Flooding / Waterlogging</option>
+                <option value="ROADWORK">Emergency Road Excavation / Trenching</option>
+                <option value="VIP_MOVEMENT">VIP Escort / Procession Diversion</option>
+                <option value="SURGE">Sudden Inflow Surge / Chokepoint Gridlock</option>
+              </select>
+            </div>
+
+            <!-- Manual Baseline Demand Entry -->
+            <div class="control-group">
+              <div class="label-with-tip">
+                <label for="inputBaselineDemand" class="control-label">Baseline Traffic Demand</label>
+                <span class="control-tip" id="lblNominalBaselineHint">Nominal: 1,260 PCU/hr</span>
+              </div>
+              <div class="demand-input-row">
+                <input type="number" id="inputBaselineDemand" class="control-input" min="100" max="6000" step="50" value="1260" placeholder="e.g. 1500">
+                <span class="input-unit">PCU/hr</span>
+                <button type="button" id="btnResetDemand" class="btn-input-aux" title="Reset to corridor nominal baseline">Reset</button>
+              </div>
             </div>
 
             <!-- Incident Severity Chips & Blockage Slider -->
             <div class="control-group">
               <div class="label-with-tip">
-                <label class="control-label">Incident Severity</label>
+                <label class="control-label">Blockage &amp; Capacity Loss</label>
                 <span class="slider-readout" id="lblBlockagePct">80% Blocked</span>
               </div>
               <div class="severity-chips">
-                <button type="button" class="severity-chip" data-block="25">25%</button>
-                <button type="button" class="severity-chip" data-block="50">50%</button>
-                <button type="button" class="severity-chip active" data-block="80">80%</button>
-                <button type="button" class="severity-chip" data-block="100">100%</button>
+                <button type="button" class="severity-chip" data-block="25">25% Minor</button>
+                <button type="button" class="severity-chip" data-block="50">50% Half</button>
+                <button type="button" class="severity-chip active" data-block="80">80% Severe</button>
+                <button type="button" class="severity-chip" data-block="100">100% Closed</button>
               </div>
               <input type="range" id="sliderBlockage" min="0" max="100" step="5" value="80" class="control-range">
+            </div>
+
+            <!-- Simulation Horizon Selector -->
+            <div class="control-group">
+              <div class="label-with-tip">
+                <label for="selectHorizon" class="control-label">Simulation Horizon</label>
+                <span class="control-tip">Analysis Window</span>
+              </div>
+              <select id="selectHorizon" class="control-select">
+                <option value="30">30 Minutes (Rapid Incident)</option>
+                <option value="45">45 Minutes</option>
+                <option value="60" selected>60 Minutes (Standard Peak)</option>
+                <option value="90">90 Minutes (Major Clearing)</option>
+                <option value="120">120 Minutes (Extended Closure)</option>
+              </select>
             </div>
 
             <!-- Real-Time Demand & Capacity Telemetry -->
             <div class="demand-summary-strip">
               <div class="demand-stat">
-                <span class="d-label">Baseline Demand</span>
-                <span class="d-val" id="lblNominalFlow">1,255 PCU/hr</span>
+                <span class="d-label">Inflow Demand</span>
+                <span class="d-val" id="lblNominalFlow">1,260 PCU/hr</span>
               </div>
               <div class="demand-stat">
-                <span class="d-label">Effective Cap</span>
+                <span class="d-label">Remaining Cap</span>
                 <span class="d-val" id="lblEffectiveCap">360 PCU/hr</span>
               </div>
               <div class="demand-stat stat-displaced">
                 <span class="d-label">Displaced Flow</span>
-                <span class="d-val text-red" id="lblDisplacedFlow">895 PCU/hr</span>
+                <span class="d-val text-red" id="lblDisplacedFlow">900 PCU/hr</span>
               </div>
             </div>
 
             <!-- Primary Action Button -->
             <button type="button" class="btn-run-analysis" id="btnSimulateDiversion">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
-              <span>Run Analysis</span>
+              <span>Simulate Traffic Diversion</span>
             </button>
           </div>
         </div>
@@ -178,10 +248,11 @@
               <span class="panel-meta">Geo-Physical Corridor Simulation</span>
             </div>
             <div class="map-legend">
-              <span class="legend-item"><span class="legend-dot dot-heavy"></span>Incident Segment</span>
-              <span class="legend-item"><span class="legend-dot dot-detour-a"></span>Alternative A</span>
-              <span class="legend-item"><span class="legend-dot dot-detour-b"></span>Alternative B</span>
-              <span class="legend-item"><span class="legend-dot dot-moderate"></span>Bottleneck Warning</span>
+              <span class="legend-item"><span class="legend-dot dot-freeflow"></span>Free Flow</span>
+              <span class="legend-item"><span class="legend-dot dot-moderate"></span>Moderate</span>
+              <span class="legend-item"><span class="legend-dot dot-heavy"></span>Incident</span>
+              <span class="legend-item"><span class="legend-dot dot-detour-a"></span>Detour A</span>
+              <span class="legend-item"><span class="legend-dot dot-detour-b"></span>Detour B / Split</span>
             </div>
           </div>
 

@@ -95,18 +95,12 @@ class WhatIfInterventionPlanner:
         elif subgraph.has_edge(source_node_id, target_node_id):
             subgraph.remove_edge(source_node_id, target_node_id)
 
-        # Remove any other confirmed impassable edges or total road blocks
+        # Remove any other confirmed impassable edges or total road blocks from active incidents
         for inc in self.prediction_service.list_incidents():
             if inc.affected_edge_id != blocked_edge_id and inc.capacity_reduction_pct >= 0.90:
                 other_edge = edges_map.get(inc.affected_edge_id)
                 if other_edge and subgraph.has_edge(other_edge.source, other_edge.target):
                     subgraph.remove_edge(other_edge.source, other_edge.target)
-
-        # Also remove edges explicitly marked BLOCKED in the road network state
-        for eid, e in edges_map.items():
-            if eid != blocked_edge_id and e.congestion_level == CongestionLevel.BLOCKED:
-                if subgraph.has_edge(e.source, e.target):
-                    subgraph.remove_edge(e.source, e.target)
 
         viable_routes: List[Dict[str, Any]] = []
 
@@ -200,6 +194,7 @@ class WhatIfInterventionPlanner:
         optimization_objective: str = "MINIMIZE_NETWORK_DELAY_AND_PREVENT_JUNCTION_GRIDLOCK",
         override_displaced_demand: Optional[float] = None,
         override_blockage_pct: Optional[float] = None,
+        override_baseline_demand: Optional[float] = None,
     ) -> InterventionEvaluationResponse:
         """
         Executes capacity-aware traffic assignment across candidate diversion routes.
@@ -219,7 +214,11 @@ class WhatIfInterventionPlanner:
 
         # 1. Calculate Traffic Displaced by Blockage
         nominal_capacity = self._compute_edge_capacity(target_edge)
-        nominal_flow = self._compute_edge_nominal_flow(target_edge)
+        if override_baseline_demand is not None and override_baseline_demand > 0:
+            nominal_flow = float(override_baseline_demand)
+        else:
+            nominal_flow = self._compute_edge_nominal_flow(target_edge)
+
         blockage_pct = override_blockage_pct if override_blockage_pct is not None else incident.capacity_reduction_pct
         blockage_pct = min(1.0, max(0.0, float(blockage_pct)))
 
@@ -536,40 +535,61 @@ class WhatIfInterventionPlanner:
             )
 
         # ---------------------------------------------------------------------
-        # 6. CANDIDATE SCENARIO 3: Capacity-Aware Multi-Route Split
+        # 6. CANDIDATE SCENARIO 3: Anti-Jam Capacity-Aware Multi-Route Split
         # ---------------------------------------------------------------------
         if len(viable_detours) >= 2:
-            # Genuine capacity-aware allocation:
-            # Evaluate spare capacity at the bottleneck edge of each route without artificial floors
+            # Genuine anti-jam capacity-aware allocation:
+            # Evaluates spare reserve buffer at the critical bottleneck link of each candidate detour.
+            num_routes = min(3, len(viable_detours))
+            detours_to_split = viable_detours[:num_routes]
+
             reserves = []
-            for d in viable_detours[:2]:
+            for d in detours_to_split:
                 spare_cap = max(0.0, d["bottleneck_capacity_pcu"] * (1.0 - d["max_baseline_vc"]))
                 reserves.append(spare_cap)
 
             total_reserve = sum(reserves)
             if total_reserve > 0.0:
                 # Assign proportionally to available reserve capacity
-                w1 = reserves[0] / total_reserve
-                w2 = reserves[1] / total_reserve
+                weights = [r / total_reserve for r in reserves]
             else:
-                # When both alternative routes are already at or above capacity (V/C >= 1.0),
-                # allocate inversely to their (V/C)^2 so the least overloaded route receives more demand
-                inv1 = 1.0 / (max(1.0, viable_detours[0]["max_baseline_vc"]) ** 2)
-                inv2 = 1.0 / (max(1.0, viable_detours[1]["max_baseline_vc"]) ** 2)
-                sum_inv = inv1 + inv2
-                w1 = inv1 / sum_inv
-                w2 = inv2 / sum_inv
+                # When all alternative routes are at or above capacity (V/C >= 1.0),
+                # allocate inversely to their (V/C)^2 so least overloaded routes absorb more
+                inv_vcs = [1.0 / (max(1.0, d["max_baseline_vc"]) ** 2) for d in detours_to_split]
+                sum_inv = sum(inv_vcs)
+                weights = [iv / sum_inv for iv in inv_vcs]
 
-            # Exact conservation: ensure sum of splits equals displaced_demand exactly
-            vol_split_1 = round(displaced_demand * w1, 1)
-            vol_split_2 = round(displaced_demand - vol_split_1, 1)
+            # Exact flow conservation: sum of splits equals displaced_demand exactly
+            rounded_weights = [round(w, 2) for w in weights]
+            weight_residue = round(1.0 - sum(rounded_weights), 2)
+            rounded_weights[0] = round(rounded_weights[0] + weight_residue, 2)
+
+            vol_splits = [round(displaced_demand * w, 1) for w in weights]
+            residue = round(displaced_demand - sum(vol_splits), 1)
+            vol_splits[0] = round(vol_splits[0] + residue, 1)
 
             scen_c_volumes = dict(baseline_volumes)
             scen_c_volumes[target_edge_id] = remaining_flow_on_blocked
-            for eid in viable_detours[0]["edge_ids"]:
-                scen_c_volumes[eid] = scen_c_volumes.get(eid, 0.0) + vol_split_1
-            for eid in viable_detours[1]["edge_ids"]:
-                scen_c_volumes[eid] = scen_c_volumes.get(eid, 0.0) + vol_split_2
+            split_desc_parts = []
+            split_actions = []
+
+            for idx, d in enumerate(detours_to_split):
+                v_split = vol_splits[idx]
+                pct_split = round(rounded_weights[idx] * 100.0)
+                split_desc_parts.append(f"{pct_split}% ({v_split:.0f} PCU/hr) via {d['title']}")
+                for eid in d["edge_ids"]:
+                    scen_c_volumes[eid] = scen_c_volumes.get(eid, 0.0) + v_split
+
+                split_actions.append(
+                    InterventionAction(
+                        type=InterventionType.TRAFFIC_DIVERSION,
+                        target_edge_or_junction_id=target_edge_id,
+                        diversion_route_ids=d["edge_ids"],
+                        diversion_percentage=rounded_weights[idx],
+                        dispatch_delay_minutes=3.0,
+                        resource_units_required=2,
+                    )
+                )
 
             c_time_min, c_delay_veh_hrs, c_saturated, c_max_vc, c_chokepoints = _evaluate_network_delay(scen_c_volumes)
             c_saved_veh_hrs = max(0.0, round(base_delay_veh_hrs - c_delay_veh_hrs, 2))
@@ -577,35 +597,28 @@ class WhatIfInterventionPlanner:
             c_saved_pct = round((c_saved_veh_hrs / max(0.1, base_delay_veh_hrs)) * 100.0, 1)
             c_bottlenecks = [name for name in c_chokepoints if name not in base_chokepoints]
 
+            # Compare against single-detour overload risk
+            single_risk_note = ""
+            if candidate_scenarios and candidate_scenarios[0].downstream_bottlenecks:
+                single_risk_note = f" Avoids secondary jam on {', '.join(candidate_scenarios[0].downstream_bottlenecks)}."
+
+            all_route_edges = []
+            for d in detours_to_split:
+                for eid in d["edge_ids"]:
+                    if eid not in all_route_edges:
+                        all_route_edges.append(eid)
+
             candidate_scenarios.append(
                 InterventionScenario(
                     scenario_id="scenario_capacity_split",
                     scenario_name="Capacity-Aware Multi-Corridor Split (Balanced Detour)",
                     description=(
-                        f"Distributes displaced demand proportionally across viable detours according to available capacity: "
-                        f"{w1*100.0:.0f}% ({vol_split_1:.0f} PCU/hr) via {viable_detours[0]['title']} and "
-                        f"{w2*100.0:.0f}% ({vol_split_2:.0f} PCU/hr) via {viable_detours[1]['title']}."
+                        f"Distributes displaced demand proportionally across {num_routes} viable detours according to available capacity: "
+                        f"{', '.join(split_desc_parts)}. Prevents secondary bottleneck formation."
                     ),
-                    actions=[
-                        InterventionAction(
-                            type=InterventionType.TRAFFIC_DIVERSION,
-                            target_edge_or_junction_id=target_edge_id,
-                            diversion_route_ids=viable_detours[0]["edge_ids"],
-                            diversion_percentage=round(w1, 2),
-                            dispatch_delay_minutes=3.0,
-                            resource_units_required=2,
-                        ),
-                        InterventionAction(
-                            type=InterventionType.TRAFFIC_DIVERSION,
-                            target_edge_or_junction_id=target_edge_id,
-                            diversion_route_ids=viable_detours[1]["edge_ids"],
-                            diversion_percentage=round(w2, 2),
-                            dispatch_delay_minutes=3.0,
-                            resource_units_required=2,
-                        ),
-                    ],
+                    actions=split_actions,
                     dispatch_delay_min=3.0,
-                    resource_summary="2 units (Multi-Junction VMS Signage & Dynamic Guidance)",
+                    resource_summary=f"{min(3, num_routes)} units (Multi-Junction VMS Signage & Dynamic Guidance)",
                     estimated_network_travel_time_min=c_time_min,
                     delay_reduction_relative_to_baseline_min=c_saved_min,
                     delay_reduction_pct=c_saved_pct,
@@ -615,15 +628,14 @@ class WhatIfInterventionPlanner:
                     feasibility_rating="HIGH",
                     key_tradeoffs=(
                         f"Saves {c_saved_veh_hrs:.1f} veh-hrs delay ({c_saved_pct:.1f}% reduction). "
-                        f"Balances network load: peak arterial V/C remains at {c_max_vc:.2f}, "
-                        f"creating {len(c_bottlenecks)} new bottleneck(s). Prevents overloading any single alternative road."
+                        f"Anti-Jam Protection: peak arterial V/C remains at {c_max_vc:.2f} with {len(c_bottlenecks)} new bottleneck(s).{single_risk_note}"
                     ),
                     rank=1,
                     assigned_demand_pcu=round(displaced_demand, 1),
-                    route_edges=viable_detours[0]["edge_ids"] + viable_detours[1]["edge_ids"],
-                    route_names=[viable_detours[0]["title"], viable_detours[1]["title"]],
-                    route_length_km=round((viable_detours[0]["total_length_km"] + viable_detours[1]["total_length_km"]) / 2.0, 1),
-                    route_travel_time_min=round((viable_detours[0]["free_flow_time_min"] + viable_detours[1]["free_flow_time_min"]) / 2.0, 2),
+                    route_edges=all_route_edges,
+                    route_names=[d["title"] for d in detours_to_split],
+                    route_length_km=round(sum(d["total_length_km"] for d in detours_to_split) / float(num_routes), 1),
+                    route_travel_time_min=round(sum(d["free_flow_time_min"] for d in detours_to_split) / float(num_routes), 2),
                     max_vc_ratio=c_max_vc,
                     saturated_segments=c_chokepoints,
                     downstream_bottlenecks=c_bottlenecks,

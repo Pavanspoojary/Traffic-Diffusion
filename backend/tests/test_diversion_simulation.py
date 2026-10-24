@@ -352,3 +352,71 @@ def test_objective_ranking_and_downstream_bottleneck_detection():
     assert rec.rank == 1
     assert len(res.recommendation_rationale) > 10
     assert len(res.tradeoff_summary) > 10
+
+
+def test_manual_baseline_demand_entry_override():
+    """Verify that the control room operator can manually specify custom baseline demand."""
+    inc = TrafficIncident(
+        incident_id="INC-MANUAL-DEMAND",
+        category=IncidentCategory.ROAD_BLOCKAGE,
+        affected_edge_id="corridor_cctv_07",
+        capacity_reduction_pct=0.50,
+        provenance=EventProvenance.SIMULATED,
+    )
+    # Calibrated nominal flow on corridor_cctv_07 is 1254.5 PCU/hr
+    # Operator manually enters peak-surge demand of 2200 PCU/hr
+    custom_demand = 2200.0
+    res = intervention_service.evaluate_interventions(
+        incident=inc,
+        override_baseline_demand=custom_demand,
+        override_blockage_pct=0.50,
+    )
+    # Effective capacity = 1800 * (1 - 0.50) = 900 PCU/hr
+    # Displaced demand = 2200 - 900 = 1300 PCU/hr
+    assert res.baseline_flow_veh_hr == 2200.0
+    assert res.effective_capacity_veh_hr == 900.0
+    assert res.displaced_demand_veh_hr == 1300.0
+    assert res.viable_detours_count >= 2
+
+
+def test_anti_jam_multi_corridor_split_prevents_secondary_congestion():
+    """Verify that capacity-aware multi-corridor split assigns flow to keep peak V/C within safe limits."""
+    inc = TrafficIncident(
+        incident_id="INC-ANTI-JAM-TEST",
+        category=IncidentCategory.COLLISION,
+        affected_edge_id="corridor_cctv_07",
+        capacity_reduction_pct=0.85,
+        provenance=EventProvenance.SIMULATED,
+    )
+    res = intervention_service.evaluate_interventions(incident=inc)
+    split_scen = next((s for s in res.candidate_scenarios if s.scenario_id == "scenario_capacity_split"), None)
+    assert split_scen is not None
+    assert len(split_scen.actions) >= 2
+    # Capacity-aware split must achieve 0 new downstream bottlenecks
+    assert len(split_scen.downstream_bottlenecks) == 0
+    assert split_scen.max_vc_ratio <= 1.05
+
+
+def test_all_mangaluru_arterials_have_viable_detours():
+    """Verify that all key mapped arterial corridors in Mangaluru discover viable detour alternatives."""
+    corridors_to_check = [
+        "corridor_cctv_01",  # K.S. Rao Road
+        "corridor_cctv_03",  # Light House Hill Road
+        "corridor_cctv_05",  # Bunts Hostel Avenue
+        "corridor_cctv_06",  # Kadri Road Corridor
+        "corridor_cctv_07",  # Circuit House - Nanthoor Road
+        "corridor_cctv_08",  # NH-66 Highway Corridor
+        "corridor_cctv_10",  # MG Road
+        "corridor_cctv_15",  # Kankanady - Pumpwell Connector
+    ]
+    for cid in corridors_to_check:
+        inc = TrafficIncident(
+            incident_id=f"INC-{cid}-DETOUR-TEST",
+            category=IncidentCategory.ROAD_BLOCKAGE,
+            affected_edge_id=cid,
+            capacity_reduction_pct=0.80,
+            provenance=EventProvenance.SIMULATED,
+        )
+        res = intervention_service.evaluate_interventions(incident=inc)
+        assert res.viable_detours_count > 0, f"Corridor {cid} should have at least 1 viable detour"
+

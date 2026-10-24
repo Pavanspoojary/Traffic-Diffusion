@@ -58,14 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.__renderNetworkOnMap = () => renderNetworkOnMap();
   window.__getEdgeCoords = (id) => getEdgeCoords(id);
 
-  // Presets mapping
-  const PRESETS = {
-    nanthoor: { corridor: 'corridor_cctv_07', blockage: 80, desc: 'Nanthoor Rollover (80%)', id: 'presetNanthoor' },
-    bunts: { corridor: 'corridor_cctv_05', blockage: 50, desc: 'Bunts Waterlogging (50%)', id: 'presetBunts' },
-    mgRoad: { corridor: 'corridor_cctv_10', blockage: 60, desc: 'MG Road Bus Stall (60%)', id: 'presetMgRoad' },
-    hampankatta: { corridor: 'corridor_cctv_01', blockage: 100, desc: 'K.S. Rao Closure (100%)', id: 'presetHampankatta' }
-  };
-
   // =========================================================================
   // 3. Coordinate Geometry Normalization (GeoJSON RFC 7946: [lng, lat])
   // =========================================================================
@@ -221,17 +213,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       data.nodes.forEach(n => currentNodesMap.set(n.id, n));
       currentCorridorsData = data.edges;
 
-      // Populate Corridor Select dropdown
-      const selectCorridor = document.getElementById('selectCorridor');
-      if (selectCorridor && selectCorridor.options.length <= 1) {
-        selectCorridor.innerHTML = '';
-        data.edges.forEach(e => {
-          const opt = document.createElement('option');
-          opt.value = e.id;
-          opt.textContent = `${e.name} (${e.id})`;
-          if (e.id === activeCorridorId) opt.selected = true;
-          selectCorridor.appendChild(opt);
-        });
+      // Sync manual demand input if empty or default
+      const inputDemandEl = document.getElementById('inputBaselineDemand');
+      const activeEdge = currentCorridorsData.find(e => e.id === activeCorridorId);
+      if (inputDemandEl && activeEdge) {
+        const lanes = activeEdge.lanes || 2;
+        const nominalFlow = activeEdge.baseline_flow_veh_hr || (lanes * 900.0 * 0.7);
+        if (!inputDemandEl.value) {
+          inputDemandEl.value = Math.round(nominalFlow);
+        }
       }
 
       // Update initial demand/capacity calculation strip
@@ -262,13 +252,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!coords || coords.length < 2) return;
 
       const isTarget = (edge.id === activeCorridorId);
-      let color = '#94a3b8'; // Base network road color
+      let color = '#10b981'; // Green: Free Flow
       if (isTarget) {
-        color = '#ef4444'; // Blocked incident road
+        color = '#ef4444'; // Red: Target Incident Road
       } else if (edge.congestion_level === 'HEAVY') {
-        color = '#f59e0b';
+        color = '#f97316'; // Orange: Heavy Congestion
       } else if (edge.congestion_level === 'MODERATE') {
-        color = '#38bdf8';
+        color = '#f59e0b'; // Amber: Moderate
+      } else if (edge.congestion_level === 'BLOCKED') {
+        color = '#ef4444'; // Red: Blocked
       }
 
       features.push({
@@ -304,9 +296,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         source: 'mng-corridors',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['case', ['get', 'isTarget'], '#fca5a5', '#ffffff'],
-          'line-width': ['case', ['get', 'isTarget'], 8, 4],
-          'line-opacity': 0.8
+          'line-color': ['case', ['get', 'isTarget'], '#fee2e2', '#0f172a'],
+          'line-width': ['case', ['get', 'isTarget'], 10, 4.5],
+          'line-opacity': 0.85
         }
       });
 
@@ -318,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'isTarget'], 5, 2.5],
+          'line-width': ['case', ['get', 'isTarget'], 6, 2.8],
           'line-opacity': 0.95
         }
       });
@@ -326,7 +318,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       mapInstance.on('click', 'corridors-core', (e) => {
         if (!e.features || !e.features.length) return;
         const prop = e.features[0].properties;
-        setIncidentState(prop.id, activeBlockagePct, true);
+        setIncidentState(prop.id, activeBlockagePct, null, true);
       });
 
       mapInstance.on('mouseenter', 'corridors-core', () => {
@@ -417,6 +409,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     updateWorkflowStepper(2);
 
+    const inputDemandEl = document.getElementById('inputBaselineDemand');
+    const selectIncType = document.getElementById('selectIncidentType');
+    const selectHoriz = document.getElementById('selectHorizon');
+
+    const manualDemand = inputDemandEl ? parseFloat(inputDemandEl.value) : null;
+    const incCategory = selectIncType ? selectIncType.value : 'COLLISION';
+    const horizonMin = selectHoriz ? parseInt(selectHoriz.value, 10) : 60;
+
     try {
       const payload = {
         incident: {
@@ -424,11 +424,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           affected_edge_id: activeCorridorId,
           capacity_reduction_pct: activeBlockagePct / 100.0,
           severity: activeBlockagePct >= 80 ? 'CRITICAL' : (activeBlockagePct >= 50 ? 'HIGH' : 'MODERATE'),
-          estimated_duration_min: 45.0,
+          estimated_duration_min: horizonMin,
           provenance: 'ESTIMATED',
-          description: `Disruption on ${activeCorridorId} with ${activeBlockagePct}% blockage`
+          description: `${incCategory} on ${activeCorridorId} with ${activeBlockagePct}% capacity loss`
         },
-        override_blockage_pct: activeBlockagePct / 100.0
+        override_blockage_pct: activeBlockagePct / 100.0,
+        override_baseline_demand: (!isNaN(manualDemand) && manualDemand > 0) ? manualDemand : null,
+        horizon_minutes: horizonMin
       };
 
       const res = await fetch('/api/v1/intelligence/interventions/evaluate', {
@@ -457,7 +459,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       updateWorkflowStepper(4);
-      showToast('Incident analysis evaluated');
+      showToast('Incident simulation evaluated');
 
     } catch (err) {
       console.error('Diversion evaluation error:', err);
@@ -467,10 +469,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnSim.disabled = false;
         btnSim.innerHTML = `
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
           </svg>
-          <span>Run Analysis</span>
+          <span>Simulate Traffic Diversion</span>
         `;
       }
     }
@@ -813,6 +814,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
+    // Route C (Detour 3)
+    const isDetour3 = (scenId === 'scenario_detour_3');
+    if ((isCapacitySplit || isDetour3) && latestEvaluation.candidate_detours && latestEvaluation.candidate_detours.length >= 3) {
+      const d3 = latestEvaluation.candidate_detours[2];
+      if (d3.edge_ids) {
+        d3.edge_ids.forEach(eid => {
+          const coords = getEdgeCoords(eid);
+          if (coords && coords.length > 1) {
+            overlayFeatures.push({
+              type: 'Feature',
+              properties: {
+                routeType: 'ROUTE_C',
+                color: '#10b981',
+                width: isCapacitySplit ? 4.8 : 6.5,
+                name: d3.title,
+                desc: `Alternative Route C: ${d3.title}`
+              },
+              geometry: { type: 'LineString', coordinates: coords }
+            });
+            coords.forEach(pt => allRoutePoints.push(pt));
+          }
+        });
+      }
+    }
+
     // 3. DOWNSTREAM BOTTLENECKS (Amber/Orange #ea580c)
     if (scenario && scenario.downstream_bottlenecks && scenario.downstream_bottlenecks.length) {
       scenario.downstream_bottlenecks.forEach(botName => {
@@ -917,9 +943,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const edge = currentCorridorsData.find(e => e.id === activeCorridorId);
     const lanes = (edge && edge.lanes) ? edge.lanes : 2;
     const nominalCap = lanes * 900.0;
-    const nominalFlow = (edge && edge.baseline_flow_veh_hr) ? edge.baseline_flow_veh_hr : (nominalCap * 0.7);
+    const nominalBaseFlow = (edge && edge.baseline_flow_veh_hr) ? edge.baseline_flow_veh_hr : (nominalCap * 0.7);
+
+    const inputDemandEl = document.getElementById('inputBaselineDemand');
+    const lblNominalHint = document.getElementById('lblNominalBaselineHint');
+    if (lblNominalHint) {
+      lblNominalHint.textContent = `Nominal: ${Math.round(nominalBaseFlow)} PCU/hr`;
+    }
+
+    let actualInflow = nominalBaseFlow;
+    if (inputDemandEl) {
+      const val = parseFloat(inputDemandEl.value);
+      if (!isNaN(val) && val > 0) {
+        actualInflow = val;
+      } else if (!inputDemandEl.value) {
+        inputDemandEl.value = Math.round(nominalBaseFlow);
+      }
+    }
+
     const effCap = Math.max(0, nominalCap * (1.0 - (activeBlockagePct / 100.0)));
-    const dispDemand = Math.max(0, nominalFlow - effCap);
+    const dispDemand = Math.max(0, actualInflow - effCap);
 
     activeDisplacedDemand = dispDemand;
 
@@ -927,12 +970,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lblEff = document.getElementById('lblEffectiveCap');
     const lblDisp = document.getElementById('lblDisplacedFlow');
 
-    if (lblNom) lblNom.textContent = `${Math.round(nominalFlow)} PCU/hr`;
+    if (lblNom) lblNom.textContent = `${Math.round(actualInflow)} PCU/hr`;
     if (lblEff) lblEff.textContent = `${Math.round(effCap)} PCU/hr`;
     if (lblDisp) lblDisp.textContent = `${Math.round(dispDemand)} PCU/hr`;
   }
 
-  function setIncidentState(newCorridorId, newBlockagePct, shouldTriggerEval = true) {
+  function setIncidentState(newCorridorId, newBlockagePct, newDemand = null, shouldTriggerEval = true) {
+    const corridorChanged = (newCorridorId && newCorridorId !== activeCorridorId);
     if (newCorridorId) activeCorridorId = newCorridorId;
     if (newBlockagePct !== undefined && newBlockagePct !== null) {
       activeBlockagePct = parseInt(newBlockagePct, 10);
@@ -944,29 +988,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       select.value = activeCorridorId;
     }
 
-    // 2. Sync slider & readout
+    // 2. Sync demand input: if corridor changed and no manual override passed, reset to nominal baseline
+    const inputDemandEl = document.getElementById('inputBaselineDemand');
+    if (inputDemandEl) {
+      if (newDemand !== null && !isNaN(newDemand)) {
+        inputDemandEl.value = Math.round(newDemand);
+      } else if (corridorChanged) {
+        const edge = currentCorridorsData.find(e => e.id === activeCorridorId);
+        const lanes = (edge && edge.lanes) ? edge.lanes : 2;
+        const nominalFlow = (edge && edge.baseline_flow_veh_hr) ? edge.baseline_flow_veh_hr : (lanes * 900.0 * 0.7);
+        inputDemandEl.value = Math.round(nominalFlow);
+      }
+    }
+
+    // 3. Sync slider & readout
     const slider = document.getElementById('sliderBlockage');
     const lbl = document.getElementById('lblBlockagePct');
     if (slider) slider.value = activeBlockagePct;
     if (lbl) lbl.textContent = `${activeBlockagePct}% Blocked`;
 
-    // 3. Sync severity quick-chips
+    // 4. Sync severity quick-chips
     const severityBtns = document.querySelectorAll('.severity-chip');
     severityBtns.forEach(btn => {
       const bPct = parseInt(btn.dataset.block, 10);
       if (bPct === activeBlockagePct) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    });
-
-    // 4. Sync preset chips: active ONLY if BOTH corridor and blockage match!
-    const presetBtns = document.querySelectorAll('.preset-chip');
-    presetBtns.forEach(btn => {
-      const pCorridor = btn.dataset.corridor;
-      const pBlock = parseInt(btn.dataset.block, 10);
-      if (pCorridor === activeCorridorId && pBlock === activeBlockagePct) {
         btn.classList.add('active');
       } else {
         btn.classList.remove('active');
@@ -994,7 +1039,60 @@ document.addEventListener('DOMContentLoaded', async () => {
   const selectCorridor = document.getElementById('selectCorridor');
   if (selectCorridor) {
     selectCorridor.addEventListener('change', (e) => {
-      setIncidentState(e.target.value, activeBlockagePct, true);
+      setIncidentState(e.target.value, activeBlockagePct, null, true);
+    });
+  }
+
+  // Incident Category change
+  const selectIncidentType = document.getElementById('selectIncidentType');
+  const lblSeverityTag = document.getElementById('lblSeverityTag');
+  if (selectIncidentType) {
+    selectIncidentType.addEventListener('change', (e) => {
+      if (lblSeverityTag) {
+        const cat = e.target.value;
+        if (cat === 'COLLISION') lblSeverityTag.textContent = 'CRITICAL IMPACT';
+        else if (cat === 'BREAKDOWN') lblSeverityTag.textContent = 'HIGH IMPACT';
+        else if (cat === 'WATERLOGGING') lblSeverityTag.textContent = 'HIGH IMPACT';
+        else if (cat === 'ROADWORK') lblSeverityTag.textContent = 'MODERATE IMPACT';
+        else if (cat === 'VIP_MOVEMENT') lblSeverityTag.textContent = 'HIGH PRIORITY';
+        else if (cat === 'SURGE') lblSeverityTag.textContent = 'DEMAND SURGE';
+      }
+      triggerDiversionEvaluation();
+    });
+  }
+
+  // Inflow Demand Input
+  const inputBaselineDemand = document.getElementById('inputBaselineDemand');
+  if (inputBaselineDemand) {
+    inputBaselineDemand.addEventListener('input', () => {
+      updateDemandPreviewStrip();
+    });
+    inputBaselineDemand.addEventListener('change', () => {
+      updateDemandPreviewStrip();
+      triggerDiversionEvaluation();
+    });
+  }
+
+  // Reset Demand Button
+  const btnResetDemand = document.getElementById('btnResetDemand');
+  if (btnResetDemand) {
+    btnResetDemand.addEventListener('click', () => {
+      const edge = currentCorridorsData.find(e => e.id === activeCorridorId);
+      const lanes = (edge && edge.lanes) ? edge.lanes : 2;
+      const nominalFlow = (edge && edge.baseline_flow_veh_hr) ? edge.baseline_flow_veh_hr : (lanes * 900.0 * 0.7);
+      if (inputBaselineDemand) {
+        inputBaselineDemand.value = Math.round(nominalFlow);
+      }
+      updateDemandPreviewStrip();
+      triggerDiversionEvaluation();
+    });
+  }
+
+  // Simulation Horizon Select
+  const selectHorizon = document.getElementById('selectHorizon');
+  if (selectHorizon) {
+    selectHorizon.addEventListener('change', () => {
+      triggerDiversionEvaluation();
     });
   }
 
@@ -1003,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   severityButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const bPct = parseInt(btn.dataset.block, 10);
-      setIncidentState(activeCorridorId, bPct, true);
+      setIncidentState(activeCorridorId, bPct, null, true);
     });
   });
 
@@ -1011,26 +1109,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sliderBlockage = document.getElementById('sliderBlockage');
   if (sliderBlockage) {
     sliderBlockage.addEventListener('input', (e) => {
-      // Live UI sync during dragging without triggering API storm
-      setIncidentState(activeCorridorId, e.target.value, false);
+      setIncidentState(activeCorridorId, e.target.value, null, false);
     });
     sliderBlockage.addEventListener('change', (e) => {
-      // API calculation on release
-      setIncidentState(activeCorridorId, e.target.value, true);
+      setIncidentState(activeCorridorId, e.target.value, null, true);
     });
   }
 
-  // Presets
-  const presetButtons = document.querySelectorAll('.preset-chip');
-  presetButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const pCorridor = btn.dataset.corridor;
-      const pBlock = parseInt(btn.dataset.block, 10);
-      setIncidentState(pCorridor, pBlock, true);
-    });
-  });
-
-  // Calculate Button
+  // Simulate Button
   const btnSimulate = document.getElementById('btnSimulateDiversion');
   if (btnSimulate) {
     btnSimulate.addEventListener('click', () => {

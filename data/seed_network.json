@@ -1476,9 +1476,9 @@
       "base_speed_kmh": 45,
       "lanes": 2,
       "density_score": 0.95,
-      "congestion_level": "BLOCKED",
-      "has_incident": true,
-      "incident_description": "Freight truck bottleneck and collision blocking Nanthoor junction",
+      "congestion_level": "MODERATE",
+      "has_incident": false,
+      "incident_description": null,
       "traffic_signals": 3,
       "path_coordinates": [
         [
@@ -6985,9 +6985,9 @@
       "base_speed_kmh": 45,
       "lanes": 2,
       "density_score": 0.95,
-      "congestion_level": "BLOCKED",
-      "has_incident": true,
-      "incident_description": "Freight truck bottleneck and collision blocking Nanthoor junction",
+      "congestion_level": "MODERATE",
+      "has_incident": false,
+      "incident_description": null,
       "traffic_signals": 3,
       "path_coordinates": [
         [
@@ -10957,6 +10957,206 @@
         [
           12.877854,
           74.84606
+        ]
+      ]
+    },
+    {
+      "id": "corridor_cctv_20",
+      "source": "INT_HAMPANKATTA",
+      "target": "INT_KANKANADY",
+      "name": "Falnir - Kankanady Arterial Road",
+      "corridor_id": "corridor_cctv_20",
+      "length_km": 1.6,
+      "base_speed_kmh": 40,
+      "lanes": 2,
+      "density_score": 0.35,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 2,
+      "path_coordinates": [
+        [
+          12.867513,
+          74.841988
+        ],
+        [
+          12.8665,
+          74.8455
+        ],
+        [
+          12.8652,
+          74.8495
+        ],
+        [
+          12.8645,
+          74.854
+        ],
+        [
+          12.864146,
+          74.861866
+        ]
+      ]
+    },
+    {
+      "id": "corridor_cctv_20_rev",
+      "source": "INT_KANKANADY",
+      "target": "INT_HAMPANKATTA",
+      "name": "Falnir - Kankanady Arterial Road (Westbound)",
+      "corridor_id": "corridor_cctv_20_rev",
+      "length_km": 1.6,
+      "base_speed_kmh": 40,
+      "lanes": 2,
+      "density_score": 0.35,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 2,
+      "path_coordinates": [
+        [
+          12.864146,
+          74.861866
+        ],
+        [
+          12.8645,
+          74.854
+        ],
+        [
+          12.8652,
+          74.8495
+        ],
+        [
+          12.8665,
+          74.8455
+        ],
+        [
+          12.867513,
+          74.841988
+        ]
+      ]
+    },
+    {
+      "id": "corridor_cctv_21",
+      "source": "INT_HAMPANKATTA",
+      "target": "INT_PVS_CIRCLE",
+      "name": "GHS Road - Car Street Link",
+      "corridor_id": "corridor_cctv_21",
+      "length_km": 1.4,
+      "base_speed_kmh": 35,
+      "lanes": 2,
+      "density_score": 0.3,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 1,
+      "path_coordinates": [
+        [
+          12.867513,
+          74.841988
+        ],
+        [
+          12.8705,
+          74.8432
+        ],
+        [
+          12.874,
+          74.8445
+        ],
+        [
+          12.877854,
+          74.84606
+        ]
+      ]
+    },
+    {
+      "id": "corridor_cctv_21_rev",
+      "source": "INT_PVS_CIRCLE",
+      "target": "INT_HAMPANKATTA",
+      "name": "GHS Road - Car Street Link (Southbound)",
+      "corridor_id": "corridor_cctv_21_rev",
+      "length_km": 1.4,
+      "base_speed_kmh": 35,
+      "lanes": 2,
+      "density_score": 0.3,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 1,
+      "path_coordinates": [
+        [
+          12.877854,
+          74.84606
+        ],
+        [
+          12.874,
+          74.8445
+        ],
+        [
+          12.8705,
+          74.8432
+        ],
+        [
+          12.867513,
+          74.841988
+        ]
+      ]
+    },
+    {
+      "id": "corridor_cctv_22",
+      "source": "EMS_STATE_BANK",
+      "target": "INT_PVS_CIRCLE",
+      "name": "Port Road - Bunder Commercial Link",
+      "corridor_id": "corridor_cctv_22",
+      "length_km": 2.1,
+      "base_speed_kmh": 40,
+      "lanes": 2,
+      "density_score": 0.25,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 2,
+      "path_coordinates": [
+        [
+          12.861811,
+          74.839231
+        ],
+        [
+          12.868,
+          74.8385
+        ],
+        [
+          12.8735,
+          74.841
+        ],
+        [
+          12.877854,
+          74.84606
+        ]
+      ]
+    },
+    {
+      "id": "corridor_cctv_22_rev",
+      "source": "INT_PVS_CIRCLE",
+      "target": "EMS_STATE_BANK",
+      "name": "Port Road - Bunder Commercial Link (Southbound)",
+      "corridor_id": "corridor_cctv_22_rev",
+      "length_km": 2.1,
+      "base_speed_kmh": 40,
+      "lanes": 2,
+      "density_score": 0.25,
+      "congestion_level": "FREE_FLOW",
+      "has_incident": false,
+      "traffic_signals": 2,
+      "path_coordinates": [
+        [
+          12.877854,
+          74.84606
+        ],
+        [
+          12.8735,
+          74.841
+        ],
+        [
+          12.868,
+          74.8385
+        ],
+        [
+          12.861811,
+          74.839231
         ]
       ]
     }
